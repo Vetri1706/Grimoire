@@ -1,0 +1,10 @@
+.env
+.local/
+.tools/
+**/target/
+**/node_modules/
+**/dist/
+*.log
+*.exe
+web/.vite/
+*.tsbuildinfo

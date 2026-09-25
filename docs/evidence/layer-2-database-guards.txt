@@ -1,0 +1,97 @@
+SET
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ c34954a2-076a-4217-b4b1-26713e1569e7
+(1 row)
+
+      set_config      
+----------------------
+ procurement_preparer
+(1 row)
+
+      set_config       
+-----------------------
+ local:database-checks
+(1 row)
+
+          set_config           
+-------------------------------
+ Rollback-only security checks
+(1 row)
+
+DO
+SET
+psql:C:/proj/Grimoire/grim/api/tests/database_guards.sql:67: NOTICE:  PASS: immutable UPDATE/DELETE; sequential revisions; atomic pointer/audit; least privilege; no TEMP/schema creation; disabled principal denial
+DO
+psql:C:/proj/Grimoire/grim/api/tests/database_guards.sql:75: NOTICE:  PASS: actual runtime CREATE TEMP TABLE rejected
+ROLLBACK
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ e61e6c49-7103-4060-9399-ca1b3ea99323
+(1 row)
+
+      set_config      
+----------------------
+ procurement_preparer
+(1 row)
+
+      set_config       
+-----------------------
+ local:database-checks
+(1 row)
+
+                set_config                 
+-------------------------------------------
+ Rollback-only history author scope checks
+(1 row)
+
+DO
+SET
+psql:C:/proj/Grimoire/grim/api/tests/database_guards.sql:141: NOTICE:  PASS: readable history Handler; foreign, mismatched and missing context author denial; no direct principal access
+DO
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ ed8f9dad-715b-4294-8683-9b133fdc3535
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim/api/tests/source_guards.sql:95: NOTICE:  PASS: source/claim/revocation immutability; hash and locator guards; missing rights; revoked content RLS; pointer privileges; foreign hiding
+ROLLBACK

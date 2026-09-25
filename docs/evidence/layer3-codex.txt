@@ -1,0 +1,39 @@
+Actual Codex CLI execution through the local BYOA bridge
+Recorded: 2026-09-26T00:22:18.7551698+05:30
+CLI: codex-cli 0.149.0; existing local ChatGPT login (no manual authentication/configuration edits).
+Command: pwsh -NoProfile -File scripts/byoa.ps1 -Mode Once
+Backend: running Rust API http://127.0.0.1:8080; canonical PostgreSQL17; private real MinIO sources.
+Task input: explicitly supplied synthetic physical scope and pinned claim references only; source bytes and quotes absent.
+Boundary: isolated temporary workspace; no Grimoire credentials in Codex child environment; read-only/ephemeral, tools disabled.
+Earlier adapter attempts were retained as failed tasks. Fixed a guard that incorrectly treated the CLI error event as tool execution, plus Windows temporary-file cleanup retry.
+Final execution: PASS; CLI exit0, real structured proposal saved through Rust API, task completed.
+No human confirmation action performed. No sourcing approval or supplier interaction.
+{
+  "task_id": "b6fe5dc5-fb21-45e2-b399-c055e1e501a1",
+  "scion_id": "f2f3b2ab-d9e7-45af-8897-a11698cf3cb7",
+  "scion_revision": 1,
+  "adapter": "codex_cli",
+  "started_at": "2026-09-25T18:51:05.780Z",
+  "status": "completed",
+  "proposal_id": "7bdf2955-16f5-40e5-84a6-ea50c434b59a",
+  "provider_run_id": "01a0d9e8-293d-7601-a49a-6c882d73ba84",
+  "output_sha256": "b254869d4d8d03baddef22c8566fd9791d00fdc47154949bcee24421216a4aba",
+  "completed_at": "2026-09-25T18:51:24.729Z",
+  "human_confirmation": false,
+  "external_tools_used": false
+}
+Database/API readback:
+task_status=completed
+proposal_author=10000000-0000-4000-8000-000000000018
+confirmation_is_null=True
+identity_match=exact
+unresolved_gaps=
+Cleanup limitation: an attempted recursive cleanup of first-attempt temporary folder C:\Users\Nemean Cestus\AppData\Local\Temp\grimoire-byoa-OcOsV2 was rejected by automatic approval policy. No detailed reason beyond blocked by policy was returned; this known synthetic staging folder remains. The successful run completed its normal temporary cleanup.
+Bridge regression verification after event-guard fix: node --test byoa/bridge.test.mjs passed 8/8 checks, including benign CLI error events and denial of command/file/browser/MCP tool events.
+
+Managed worker lifecycle verification (2026-09-25 UTC):
+- Stop verified previous worker PID 9864 and exempted only its child with exact executable path C:\WINDOWS\system32\conhost.exe.
+- Codex children, unknown children, and missing executable paths continue to block Stop.
+- Stop -> Start -> Status completed successfully without requesting another model run.
+- Hidden worker PID 30096 is running and polling the local API; process presence is not a provider login or task success assertion.
+- Worker identity remains checked against recorded PID, start ticks, executable path, and exact project bridge command line.

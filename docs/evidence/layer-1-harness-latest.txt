@@ -1,0 +1,34 @@
+Recorded: 2026-09-25T23:08:40.4876726+05:30
+Command: pwsh -NoProfile -File scripts/dev.ps1 -Task Harness
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.71s
+Grimoire Layer 1 HTTP acceptance harness
+Rust binary: C:\proj\Grimoire\grim\api\target\debug\grimoire-api.exe
+API: http://127.0.0.1:62778
+Database: grimoire_test; PostgreSQL 17.11; runtime role: grimoire_intake_app
+PASS 01  real PostgreSQL 17 health and disposable-database guard
+PASS 02  independent authenticated organizations
+PASS 03  missing and invalid authentication are rejected
+PASS 04  create an incomplete Scion; unknown fields remain null
+PASS 05  reopen the saved Scion and history with authenticated Handler names
+PASS 06  idempotent create retry returns original status, body, and ETag
+PASS 07  reusing a create idempotency key with changed content returns 409
+PASS 08  revision creation without If-Match returns 428
+PASS 09  edit creates revision 2 without changing revision 1
+PASS 10  stale If-Match returns 412 and leaves history unchanged
+PASS 11  concurrent edits from revision 2 produce one revision 3 and one 412
+PASS 12  older idempotent writes replay exactly after later revisions
+PASS 13  changed revision payload cannot reuse an idempotency key
+PASS 14  cross-organization lists do not expose the Scion
+PASS 15  cross-organization latest, history, revision, and writes conceal existence
+PASS 16  history and individual revisions require authentication
+PASS 17  a forged organization header cannot grant access
+PASS 18  idempotency keys are isolated between organizations
+Rust restart: PID 25752 terminated; PID 15076 started
+Database: grimoire_test; PostgreSQL 17.11; runtime role: grimoire_intake_app
+PASS 19  reopen after actual Rust process termination and restart
+PASS 20  idempotency records survive the Rust process restart
+PASS 21  digital drafts explicitly disclose unavailable vendor comparison
+
+PASS: 21 checks against the running Rust API and PostgreSQL 17 (433ms).
+The child API was terminated and restarted; the database stayed running. Synthetic fixture loading and database reset are external setup steps.
+Exit code: 0

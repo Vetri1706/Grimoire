@@ -1,0 +1,55 @@
+Read-only local PostgreSQL migration evidence
+Recorded: 2026-09-25T22:51:46.5613562+05:30
+Endpoint: 127.0.0.1:55432
+Query: SELECT version(), current_setting('server_version_num');
+                                 version                                  | version_num 
+--------------------------------------------------------------------------+-------------
+ PostgreSQL 17.11 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit | 170011
+(1 row)
+
+Database: grimoire_dev
+Query: SELECT name, sha256, applied_at FROM public.grimoire_schema_migrations ORDER BY name;
+                 name                 |                              sha256                              |            applied_at            
+--------------------------------------+------------------------------------------------------------------+----------------------------------
+ 0022_grimoire_contract.sql           | 5af2c09b31f1be6b537fba05b7af7c561e4b7e959849532bbed43a8d8de4205b | 2026-09-25 21:46:47.728919+05:30
+ 0023_grimoire_review_corrections.sql | 9f7012c8ea6f9e0a32395fa9e569b6f83bff8bbbb7b36862e2a80523b4e82df9 | 2026-09-25 21:46:49.750527+05:30
+ 0024_intake.sql                      | e472417bbcf1009b611c4e38ebd0efbd1c6084f7bb28bad9ee2778a06f10b2b9 | 2026-09-25 21:46:51.19476+05:30
+ 0025_intake_history_authors.sql      | 8b5639092f7d5d2e0e6d734fc5936a1ea94a94acf18f9ecae7ab85be60ed4a22 | 2026-09-25 22:50:37.128876+05:30
+(4 rows)
+
+PASS applied hash equals disk: 0022_grimoire_contract.sql 5af2c09b31f1be6b537fba05b7af7c561e4b7e959849532bbed43a8d8de4205b
+PASS applied hash equals disk: 0023_grimoire_review_corrections.sql 9f7012c8ea6f9e0a32395fa9e569b6f83bff8bbbb7b36862e2a80523b4e82df9
+PASS applied hash equals disk: 0024_intake.sql e472417bbcf1009b611c4e38ebd0efbd1c6084f7bb28bad9ee2778a06f10b2b9
+PASS applied hash equals disk: 0025_intake_history_authors.sql 8b5639092f7d5d2e0e6d734fc5936a1ea94a94acf18f9ecae7ab85be60ed4a22
+Query: governed sourcing and supplied synthetic fixture counts
+ governed_cases | governed_offers | supplied_fixture_cases 
+----------------+-----------------+------------------------
+              0 |               0 |                      0
+(1 row)
+
+Database: grimoire_test
+Query: SELECT name, sha256, applied_at FROM public.grimoire_schema_migrations ORDER BY name;
+                 name                 |                              sha256                              |            applied_at            
+--------------------------------------+------------------------------------------------------------------+----------------------------------
+ 0022_grimoire_contract.sql           | 5af2c09b31f1be6b537fba05b7af7c561e4b7e959849532bbed43a8d8de4205b | 2026-09-25 22:50:40.158358+05:30
+ 0023_grimoire_review_corrections.sql | 9f7012c8ea6f9e0a32395fa9e569b6f83bff8bbbb7b36862e2a80523b4e82df9 | 2026-09-25 22:50:40.428989+05:30
+ 0024_intake.sql                      | e472417bbcf1009b611c4e38ebd0efbd1c6084f7bb28bad9ee2778a06f10b2b9 | 2026-09-25 22:50:40.730214+05:30
+ 0025_intake_history_authors.sql      | 8b5639092f7d5d2e0e6d734fc5936a1ea94a94acf18f9ecae7ab85be60ed4a22 | 2026-09-25 22:50:40.889873+05:30
+(4 rows)
+
+PASS applied hash equals disk: 0022_grimoire_contract.sql 5af2c09b31f1be6b537fba05b7af7c561e4b7e959849532bbed43a8d8de4205b
+PASS applied hash equals disk: 0023_grimoire_review_corrections.sql 9f7012c8ea6f9e0a32395fa9e569b6f83bff8bbbb7b36862e2a80523b4e82df9
+PASS applied hash equals disk: 0024_intake.sql e472417bbcf1009b611c4e38ebd0efbd1c6084f7bb28bad9ee2778a06f10b2b9
+PASS applied hash equals disk: 0025_intake_history_authors.sql 8b5639092f7d5d2e0e6d734fc5936a1ea94a94acf18f9ecae7ab85be60ed4a22
+Query: governed sourcing and supplied synthetic fixture counts
+ governed_cases | governed_offers | supplied_fixture_cases 
+----------------+-----------------+------------------------
+              1 |               2 |                      1
+(1 row)
+
+Supplied SQL verification command: pwsh -NoProfile -File scripts/dev.ps1 -Task VerifySql
+SHA256 PASS 0022_grimoire_contract.sql
+SHA256 PASS 0023_grimoire_review_corrections.sql
+SHA256 PASS fixture_one_case_two_event.sql
+Synthetic fixture disk SHA256: 1372d06269030dd33e95adce9e19d0f6d9591523fc4bc641f4d29cabbff6f698
+No migrations, resets, writes, or service restarts performed by these evidence queries.

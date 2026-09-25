@@ -1,0 +1,50 @@
+Layer 2B live browser observation — 2026-09-25 (Asia/Calcutta)
+
+Runtime: React/Vite http://127.0.0.1:5173, real Rust API :8080,
+PostgreSQL 17.11 grimoire_dev, private native MinIO :19000.
+Observed with Codex browser controls and read-only DOM inspection. No mocked
+responses, scripted DOM mutations, or hidden React-state inspection were used.
+
+Original accepted demo reopened after externalization:
+Scion d83bbaf8-412a-42f6-979b-4fbac68673bd, intake revision 4.
+Source 3339f37d-f807-4d47-8be3-76bf3db88f70, source revision 1.
+UI displayed the original 144-byte text, unverified claim and [51,82) locator.
+Displayed: Private versioned storage · content hash checked by the API.
+Displayed: This checks the stored bytes, not the truth of the source or its claims.
+
+Separate synthetic browser probe was created through the real API:
+Scion 2751414b-b8fe-4711-9374-bc6df2236a3b, source 574c5baa-4010-461a-af0b-b5e05b38053c,
+claim 681e777a-0e8d-4f11-89df-0fe1e6124ae1. Source 105 bytes, quote [82,104).
+The original accepted demo was not revoked or edited.
+
+Before revocation, observed 2026-09-25T18:24:19.844Z:
+URL http://127.0.0.1:5173/#/scions/2751414b-b8fe-4711-9374-bc6df2236a3b
+document.visibilityState=visible
+source marker L2B_SOURCE_ONLY_20260925 present=true
+claim marker L2B_CLAIM_ONLY_20260925 present=true
+quote "Quoted target: 321 mm." present=true
+.source-text node count=1
+A desktop screenshot also showed source text, the unverified claim and quotation.
+
+Permission was revoked through a separate authenticated Rust HTTP request while
+that Sources and claims tab remained open. No browser click, refresh or navigation
+was used to trigger clearing. API committed a revoked receipt at
+2026-09-25T23:54:46.2663378+05:30.
+
+After revocation, observed 2026-09-25T18:24:51.562Z:
+same URL; document.visibilityState=visible
+source marker present=false
+claim marker present=false
+quote present=false
+.source-text node count=0
+UI: Permission revoked · content hidden; AUDIT METADATA ONLY.
+Screenshot confirmed text and quotation panels were replaced by provenance and
+revocation reason. No content returned on the next display checks.
+
+The first post-revocation observation was about 5.3 seconds after the API receipt;
+this is an observation interval, not a measured detection-latency guarantee.
+Implementation polls every 2 seconds, bounds reads at 2 seconds, and expires the
+display lease at 5 seconds from request start. Hidden/offline clearing, suspended
+JavaScript timers, browser-back-cache behavior and in-flight race handling were
+reviewed in code but not separately simulated in this bounded browser check.
+Clearing the app display does not erase downloaded/copied bytes or browser memory.

@@ -1,0 +1,45 @@
+Live in-app browser checks, 2026-09-26, local UI 127.0.0.1:5173.
+Desktop check used a temporary 1728 x 1080 viewport; no mobile acceptance claim.
+The API was Rust against canonical grimoire_dev/PostgreSQL 17.11 and real MinIO.
+
+Codex demo Scion: f2f3b2ab-d9e7-45af-8897-a11698cf3cb7
+Observed the blank physical-scope form: missing identities/locators explicitly
+shown and Save/Queue disabled. Inspected the configuration source claim in the
+form: Handler-entered, unverified, source revision 1, UTF-8 [53,192).
+Observed the actual task move from running to proposal prepared/human review
+required. Proposal 7bdf2955-16f5-40e5-84a6-ea50c434b59a showed all four supplied
+identity sections, SHA-256, source revision and exact locator per link. The
+Handler who queued it could not confirm it; the UI requested another reviewer.
+No confirmation was made for this Codex-generated proposal.
+
+Separate browser probe Scion: 41cf489a-f0c8-43a6-acbb-2209b77aadf8
+Proposal: 4e16ecfe-9da1-4fb4-ad89-81d1056f21e4
+Confirmation was executed through the actual HTTP API using the separately
+provisioned synthetic Engineering Reviewer, then inspected in the browser.
+Reviewer credential sign-in/form submission itself was not browser-tested.
+Observed four exact governed revision IDs and the synthetic confirmation audit
+record. Intake revision remained 1. Source claims still said unverified.
+
+While Physical scope remained open, configuration source
+d386489b-0a4e-417d-a73d-e011ce7969fb was revoked by an external Rust API request
+at 2026-09-26T00:22:50.7820408+05:30. Without navigation or reload, the open view
+withheld all derived scope fields and the review note; SOURCE_RIGHTS_DENIED
+appeared. Confirmation principal/time/case IDs remained audit metadata.
+After the presentation correction, a fresh browser observation showed both list
+and top badge: Binding blocked · confirmation retained. The audit section said
+Confirmation retained · binding blocked. A desktop screenshot was visually
+inspected in the tool output; no exported screenshot file is claimed here.
+
+While Sources and claims remained open on the same probe, component source
+0c80e73e-7b8d-484f-ac41-55a6d418e5de showed its source body, unverified Handler
+statement and quote at UTF-8 [53,173). An external Rust API request revoked it
+at 2026-09-26T00:23:41.0167433+05:30. Without navigation or reload, the body,
+statement, quote, revision selector and source edit controls disappeared.
+The panel showed AUDIT METADATA ONLY and Permission revoked. The hash stayed
+visible, and verified facts remained zero.
+
+These are observed transitions, not an independently measured latency bound.
+The implementation polls every 2 seconds with a 2-second request timeout and
+5-second display lease; browser scheduling/suspension can exceed that interval.
+Already copied content is not recalled. Background/offline and OS suspension
+edge cases were not exhaustively exercised in this browser run.

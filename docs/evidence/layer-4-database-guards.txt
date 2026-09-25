@@ -1,0 +1,240 @@
+SET
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ 662d4d4c-d8c9-4c12-9caf-b084c180a273
+(1 row)
+
+      set_config      
+----------------------
+ procurement_preparer
+(1 row)
+
+      set_config       
+-----------------------
+ local:database-checks
+(1 row)
+
+          set_config           
+-------------------------------
+ Rollback-only security checks
+(1 row)
+
+DO
+SET
+psql:C:/proj/Grimoire/grim/api/tests/database_guards.sql:67: NOTICE:  PASS: immutable UPDATE/DELETE; sequential revisions; atomic pointer/audit; least privilege; no TEMP/schema creation; disabled principal denial
+DO
+psql:C:/proj/Grimoire/grim/api/tests/database_guards.sql:75: NOTICE:  PASS: actual runtime CREATE TEMP TABLE rejected
+ROLLBACK
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ 70cc5e4e-e823-4287-93eb-d12c800da4a4
+(1 row)
+
+      set_config      
+----------------------
+ procurement_preparer
+(1 row)
+
+      set_config       
+-----------------------
+ local:database-checks
+(1 row)
+
+                set_config                 
+-------------------------------------------
+ Rollback-only history author scope checks
+(1 row)
+
+DO
+SET
+psql:C:/proj/Grimoire/grim/api/tests/database_guards.sql:141: NOTICE:  PASS: readable history Handler; foreign, mismatched and missing context author denial; no direct principal access
+DO
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ c6a40d80-c358-4145-864f-5b86b5359722
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim/api/tests/source_guards.sql:114: NOTICE:  PASS: source/claim/revocation/object-reference immutability; reference identity and locator bounds; no runtime externalization; missing rights; revoked content RLS; pointer privileges; foreign hiding. Exact object bytes/quote are verified by the live API harness.
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000012
+(1 row)
+
+              set_config              
+--------------------------------------
+ 408dbd42-60d0-4e44-a3d1-06009cbf8355
+(1 row)
+
+           set_config           
+--------------------------------
+ synthetic_engineering_reviewer
+(1 row)
+
+     set_config     
+--------------------
+ local:scope-guards
+(1 row)
+
+                   set_config                   
+------------------------------------------------
+ Rollback-only synthetic scope invariant checks
+(1 row)
+
+psql:C:/proj/Grimoire/grim/api/tests/scope_guards.sql:95: NOTICE:  PASS: existing GG-40 exact chain, criteria hash, immutable proposal/confirmation/component, mismatched governed chain denial, bounded runtime privileges, dual-role queued-origin self-review denial, agent confirmation denial, cross-org chain denial
+DO
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ f7ef13bb-08f0-430d-84c5-3ee790923bc7
+(1 row)
+
+      set_config      
+----------------------
+ procurement_preparer
+(1 row)
+
+     set_config      
+---------------------
+ local:worker-guards
+(1 row)
+
+                   set_config                    
+-------------------------------------------------
+ Rollback-only synthetic worker invariant checks
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim/api/tests/worker_guards.sql:84: NOTICE:  PASS: explicit Handler dispatch, no agent self-dispatch, no future deadline spoof, one active org task, immutable execution bounds/events/completed results, exact task-result origin, cancellation prevents proposals/restarts, bounded runtime grants
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000012
+(1 row)
+
+              set_config              
+--------------------------------------
+ 90f35893-8d6e-489f-9214-d61f4499cbe1
+(1 row)
+
+           set_config           
+--------------------------------
+ synthetic_engineering_reviewer
+(1 row)
+
+     set_config     
+--------------------
+ local:offer-guards
+(1 row)
+
+                 set_config                  
+---------------------------------------------
+ Rollback-only exact offer comparison checks
+(1 row)
+
+psql:C:/proj/Grimoire/grim/api/tests/offer_guards.sql:56: NOTICE:  PASS: exact governed source-object mapping; no agent source-grant escalation; exact same-basis decimal preservation; supplier/scope revocation artifact invalidation and price-read denial; immutable submission/offer/comparison; invented FX rejection; least privilege; agent review denial; cross-org hiding
+DO
+ROLLBACK
+BEGIN
+SET
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config              
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config              
+--------------------------------------
+ 8b94fd69-f59a-418d-926a-6ce17126d3bf
+(1 row)
+
+       set_config        
+-------------------------
+ synthetic_test_preparer
+(1 row)
+
+       set_config        
+-------------------------
+ local:offer-0033-guards
+(1 row)
+
+                              set_config                              
+----------------------------------------------------------------------
+ Rollback-only legal identity and historical author regression checks
+(1 row)
+
+psql:C:/proj/Grimoire/grim/api/tests/offer_guards.sql:130: NOTICE:  PASS: equal registration references across distinct jurisdictions accepted; duplicate full legal identity denied; earlier offer author denied normalization review despite different current offer, series and proposal authors
+DO
+ROLLBACK

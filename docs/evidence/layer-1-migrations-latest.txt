@@ -1,0 +1,46 @@
+Read-only live local PostgreSQL migration evidence
+Recorded: 2026-09-25T23:09:26.9392085+05:30
+Endpoint: 127.0.0.1:55432
+All psql sessions use default_transaction_read_only=on.
+
+Database: grimoire_dev
+Query: SELECT current_database(), version(), current_setting('server_version_num'), current_setting('transaction_read_only'), clock_timestamp();
+grimoire_dev|PostgreSQL 17.11 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit|170011|on|2026-09-25 23:09:27.108924+05:30
+Query: SELECT name, sha256, applied_at FROM public.grimoire_schema_migrations ORDER BY name;
+0022_grimoire_contract.sql|5af2c09b31f1be6b537fba05b7af7c561e4b7e959849532bbed43a8d8de4205b|2026-09-25 21:46:47.728919+05:30
+0023_grimoire_review_corrections.sql|9f7012c8ea6f9e0a32395fa9e569b6f83bff8bbbb7b36862e2a80523b4e82df9|2026-09-25 21:46:49.750527+05:30
+0024_intake.sql|e472417bbcf1009b611c4e38ebd0efbd1c6084f7bb28bad9ee2778a06f10b2b9|2026-09-25 21:46:51.19476+05:30
+0025_intake_history_authors.sql|8b5639092f7d5d2e0e6d734fc5936a1ea94a94acf18f9ecae7ab85be60ed4a22|2026-09-25 22:50:37.128876+05:30
+PASS applied ledger SHA256 matches disk: 0022_grimoire_contract.sql
+PASS applied ledger SHA256 matches disk: 0023_grimoire_review_corrections.sql
+PASS applied ledger SHA256 matches disk: 0024_intake.sql
+PASS applied ledger SHA256 matches disk: 0025_intake_history_authors.sql
+Query: SELECT (SELECT count(*) FROM grimoire.sourcing_cases) AS governed_cases, (SELECT count(*) FROM grimoire.supplier_offers) AS governed_offers, (SELECT count(*) FROM grimoire.sourcing_cases WHERE id='00000000-0000-4000-8000-000000000110') AS supplied_fixture_cases;
+governed_cases|governed_offers|supplied_fixture_cases
+0|0|0
+PASS governed and supplied fixture counts match expected isolation.
+
+Database: grimoire_test
+Query: SELECT current_database(), version(), current_setting('server_version_num'), current_setting('transaction_read_only'), clock_timestamp();
+grimoire_test|PostgreSQL 17.11 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit|170011|on|2026-09-25 23:09:27.373673+05:30
+Query: SELECT name, sha256, applied_at FROM public.grimoire_schema_migrations ORDER BY name;
+0022_grimoire_contract.sql|5af2c09b31f1be6b537fba05b7af7c561e4b7e959849532bbed43a8d8de4205b|2026-09-25 22:50:40.158358+05:30
+0023_grimoire_review_corrections.sql|9f7012c8ea6f9e0a32395fa9e569b6f83bff8bbbb7b36862e2a80523b4e82df9|2026-09-25 22:50:40.428989+05:30
+0024_intake.sql|e472417bbcf1009b611c4e38ebd0efbd1c6084f7bb28bad9ee2778a06f10b2b9|2026-09-25 22:50:40.730214+05:30
+0025_intake_history_authors.sql|8b5639092f7d5d2e0e6d734fc5936a1ea94a94acf18f9ecae7ab85be60ed4a22|2026-09-25 22:50:40.889873+05:30
+PASS applied ledger SHA256 matches disk: 0022_grimoire_contract.sql
+PASS applied ledger SHA256 matches disk: 0023_grimoire_review_corrections.sql
+PASS applied ledger SHA256 matches disk: 0024_intake.sql
+PASS applied ledger SHA256 matches disk: 0025_intake_history_authors.sql
+Query: SELECT (SELECT count(*) FROM grimoire.sourcing_cases) AS governed_cases, (SELECT count(*) FROM grimoire.supplier_offers) AS governed_offers, (SELECT count(*) FROM grimoire.sourcing_cases WHERE id='00000000-0000-4000-8000-000000000110') AS supplied_fixture_cases;
+governed_cases|governed_offers|supplied_fixture_cases
+1|2|1
+PASS governed and supplied fixture counts match expected isolation.
+
+Original package: Grimoire_GG40_v2.2.1_verified_SQL_and_reference_2026-09-25.zip
+PASS original ZIP member = disk = supplied manifest SHA256: 0022_grimoire_contract.sql 5af2c09b31f1be6b537fba05b7af7c561e4b7e959849532bbed43a8d8de4205b
+PASS original ZIP member = disk = supplied manifest SHA256: 0023_grimoire_review_corrections.sql 9f7012c8ea6f9e0a32395fa9e569b6f83bff8bbbb7b36862e2a80523b4e82df9
+PASS original ZIP member = disk = supplied manifest SHA256: fixture_one_case_two_event.sql 1372d06269030dd33e95adce9e19d0f6d9591523fc4bc641f4d29cabbff6f698
+
+0022 and 0023 are supplied GG-40 contract migrations; 0024 and 0025 are new additive intake migrations, not part of verified GG-40.
+No migrations, resets, database writes, or service restarts were performed by this verification. No intake tables were queried.

@@ -1,0 +1,11 @@
+{
+  "title": "SYNTHETIC — enclosure evaluation note",
+  "origin": "synthetic://grimoire/local/enclosure-note",
+  "owner": "Grimoire local prototype fixture",
+  "synthetic": true,
+  "source_text": "SYNTHETIC TEST NOTE — not manufacturer evidence.\nTarget enclosure width: 120 mm.\nThis target has not been measured or independently verified.\n",
+  "rights_status": "granted",
+  "permission_basis": "Synthetic text created for this local prototype; permitted for local Scion review only.",
+  "permitted_use": "scion_review",
+  "change_summary": "Initial synthetic note for the draft evidence workflow"
+}

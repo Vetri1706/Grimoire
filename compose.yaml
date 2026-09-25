@@ -1,0 +1,23 @@
+name: grimoire-local
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/dev.ps1 -Task Init first}
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:${PGPORT:-55432}:5432"
+    volumes:
+      - grimoire_pg17:/var/lib/postgresql/data
+      - ./db:/workspace/db:ro
+      - ./api/tests:/workspace/api/tests:ro
+      - ./.local:/workspace/local:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+volumes:
+  grimoire_pg17:

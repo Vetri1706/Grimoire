@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171717" />
+    <script>
+      // Apply the saved appearance before rendering, independently of the browser's theme.
+      try {
+        if (localStorage.getItem('grimoire.theme') === 'light') {
+          document.documentElement.dataset.theme = 'light';
+          document.querySelector('meta[name="theme-color"]').content = '#ffffff';
+        }
+      } catch { /* Dark remains the default when browser storage is unavailable. */ }
+    </script>
+    <link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="description" content="Grimoire Scion intake. Record what is known, make missing information visible, and preserve every revision." />
+    <title>Grimoire · Scion intake</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

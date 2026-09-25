@@ -1,0 +1,23 @@
+[package]
+name = "grimoire-api"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+futures-util = "0.3"
+object_store = { version = "0.14", default-features = false, features = ["aws-base", "reqwest", "ring"] }
+# Use the existing ring provider instead of introducing a second TLS provider.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"

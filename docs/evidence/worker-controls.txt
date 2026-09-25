@@ -1,0 +1,34 @@
+Codex adapter control checks — 2026-09-26 local
+
+node --test byoa/bridge.test.mjs
+13 tests, 13 passed, 0 failed.
+
+Coverage:
+- Child environment removes Handler/agent/DB/storage/provider-key environment variables.
+- Physical identities, exact citations, missing fields, gaps and ambiguity cannot be silently changed.
+- Codex tool events are rejected; diagnostic error items are not mistaken for tool execution.
+- Offer normalization preserves exact scope/offer revisions and every comparison-basis value.
+- Execution timeout is bounded by the declared task deadline and remaining lease.
+- A real harmless local Node child exits on cancellation while an unrelated child remains alive.
+- A real harmless local Node child exits on timeout.
+- An unavailable permission-control check terminates that exact managed child.
+
+These process tests use local Node children, not a Codex provider run. They are
+separate from real API/PostgreSQL tests and the actual Codex normalization smoke.
+No remote inference was invoked for these tests.
+
+cargo check --manifest-path api/Cargo.toml: PASS
+cargo clippy --manifest-path api/Cargo.toml -- -D warnings: PASS
+
+Frozen migration 0031_worker_controls.sql:
+SHA256 9009d9f61729dc3b36dd901699c233a8c6c6340dced792e752b704204eaf1ac9
+
+Runtime was stopped through verified scripts/byoa.ps1 before edits.
+Blocked historical temporary directory grimoire-byoa-OcOsV2 was left untouched.
+
+Actual Codex normalization smoke:
+pwsh -NoProfile -File scripts/byoa.ps1 -Mode Once: exit 0.
+The existing local Codex login completed one explicitly dispatched task in 11.3s.
+Rust API readback confirmed Scion revision 1, exact offer revision IDs, agent author,
+immutable task events and confirmation:null. No human confirmation was performed.
+Full nonsecret IDs and hashes: layer4-codex-normalization.json.
