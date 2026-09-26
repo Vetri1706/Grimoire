@@ -107,6 +107,25 @@ fixture belongs only in this disposable database; this harness does not load it.
 Layer 3/4 checks use the real API to create synthetic governed identity, offer
 and reviewed-normalization records. They create no sourcing approval.
 
+## GG-46 focused decision-authority guard
+
+`harness/gg46` is a small PostgreSQL-focused Go harness for the additive `0034`
+gate. Against a disposable database containing the unchanged GG-40 fixture and
+`0034`, it checks exact revision identifiers, explicit comparability/exclusions,
+stale scope and offer/source revisions, revocation, cross-organization
+non-disclosure, idempotent retries, agent/quality-role denial, the rejection of a
+decision write without human authority, and one clearly labelled synthetic
+positive path. The positive result remains a draft and creates no sourcing
+approval.
+
+```sh
+cd harness
+go run ./gg46 \
+  -dsn 'postgresql://postgres@127.0.0.1:55446/grimoire_gg46?sslmode=disable' \
+  -fixture ../fixtures/gg46-two-offer.json \
+  -code-revision '<commit>'
+```
+
 Layer 2B additionally uses the real private versioned object store. Runtime
 credentials are tested for read/write access without version deletion. A separate
 test-bucket-only credential injects overwrites and missing objects. A local,
