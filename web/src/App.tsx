@@ -6,7 +6,7 @@ import PhysicalScope from './PhysicalScope';
 import Offers from './Offers';
 import type { Category, Intake, Principal, Revision, RevisionHistory, Scion } from './api';
 
-type IconName = 'book' | 'plus' | 'arrow' | 'history' | 'file' | 'check' | 'search' | 'lock' | 'edit' | 'alert' | 'logout' | 'sun' | 'moon' | 'layers' | 'columns';
+type IconName = 'book' | 'plus' | 'arrow' | 'history' | 'file' | 'check' | 'search' | 'lock' | 'edit' | 'alert' | 'logout' | 'sun' | 'moon' | 'monitor' | 'layers' | 'columns';
 function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
     book: <><path d="M3 4h6a4 4 0 0 1 3 1.4A4 4 0 0 1 15 4h6v16h-6a4 4 0 0 0-3 1.4A4 4 0 0 0 9 20H3Z" /><path d="M12 5v16M6 8h3M15 8h3M6 12h3M15 12h3" /></>,
@@ -22,6 +22,7 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
     logout: <><path d="M9 3H3v18h6M8 12h13m-5-5 5 5-5 5" /></>,
     sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5" /></>,
     moon: <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />,
+    monitor: <><rect x="3" y="3" width="18" height="13" rx="2" /><path d="M12 16v5M8 21h8" /></>,
     layers: <><path d="m12 3 9 5-9 5-9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></>,
     columns: <><rect x="3" y="4" width="7" height="16" rx="1" /><rect x="14" y="4" width="7" height="16" rx="1" /></>,
   };
@@ -34,14 +35,15 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
 const routeFromHash = () => window.location.hash.replace(/^#/, '') || '/';
 const enteredFieldCount = (revision: Intake) => [Boolean(revision.product_description?.trim()), revision.product_category !== 'unspecified', Boolean(revision.decision?.trim()), revision.requirements !== null, revision.questions !== null].filter(Boolean).length;
 
-type Theme = 'dark' | 'light';
-type ThemeControl = { theme: Theme; onToggleTheme: () => void };
-function ThemeToggle({ theme, onToggleTheme }: ThemeControl) {
-  const label = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
-  return <button type="button" className="icon-button theme-toggle" onClick={onToggleTheme} aria-label={label} title={label}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} /></button>;
+type ThemePreference = 'system' | 'dark' | 'light';
+type ThemeControl = { theme: ThemePreference; onChangeTheme: (theme: ThemePreference) => void };
+const themeKey = 'grimoire.theme-preference';
+const parseTheme = (value: string | null | undefined): ThemePreference => value === 'light' || value === 'dark' ? value : 'system';
+function ThemePicker({ theme, onChangeTheme }: ThemeControl) {
+  return <label className="theme-picker"><Icon name={theme === 'system' ? 'monitor' : theme === 'dark' ? 'moon' : 'sun'} size={18} /><select aria-label="Appearance" value={theme} onChange={event => onChangeTheme(parseTheme(event.target.value))}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>;
 }
 
-function Connection({ onConnect, theme, onToggleTheme }: ThemeControl & { onConnect: (token: string, principal: Principal) => void }) {
+function Connection({ onConnect, theme, onChangeTheme }: ThemeControl & { onConnect: (token: string, principal: Principal) => void }) {
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -53,7 +55,7 @@ function Connection({ onConnect, theme, onToggleTheme }: ThemeControl & { onConn
     } catch (failure) { setError(errorText(failure)); } finally { setBusy(false); }
   }
   return <main className="connection-page">
-    <div className="connection-brand"><span className="brand-icon"><Icon name="book" size={27} /></span><span>GRIMOIRE</span><span className="local-tag">LOCAL WORKSPACE</span><ThemeToggle theme={theme} onToggleTheme={onToggleTheme} /></div>
+    <div className="connection-brand"><span className="brand-icon"><Icon name="book" size={27} /></span><span>GRIMOIRE</span><span className="local-tag">LOCAL WORKSPACE</span><ThemePicker theme={theme} onChangeTheme={onChangeTheme} /></div>
     <div className="connection-layout">
       <section className="connection-intro"><p className="eyebrow">A considered beginning</p><h1>Every decision starts<br />with what you know.</h1><p>Create a Scion. Capture the product, make the gaps visible, and keep a record of how the understanding changes.</p><div className="intro-note"><Icon name="history" /><span>One case record.<br /><strong>Every revision preserved.</strong></span></div></section>
       <form className="connection-card" onSubmit={connect}><span className="subtle-icon"><Icon name="lock" size={24} /></span><h2>Open your workspace</h2><p>Use your local Handler token to access your organization’s Scions.</p><label htmlFor="token">Handler access token</label><input id="token" type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" required autoFocus placeholder="Paste your local token" />{error && <ErrorMessage>{error}</ErrorMessage>}<button className="button primary full" disabled={!token.trim() || busy}>{busy ? 'Connecting…' : 'Open workspace'}<Icon name="arrow" size={18} /></button><p className="connection-footnote">Your token stays in this browser tab’s session. The API checks your organization access.</p></form>
@@ -62,7 +64,7 @@ function Connection({ onConnect, theme, onToggleTheme }: ThemeControl & { onConn
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<Theme>(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  const [theme, setTheme] = useState<ThemePreference>(() => parseTheme(document.documentElement.dataset.themePreference));
   const [token, setToken] = useState(() => sessionStorage.getItem(storageKey) ?? '');
   const [principal, setPrincipal] = useState<Principal | null>(null);
   const [route, setRoute] = useState(routeFromHash);
@@ -80,11 +82,27 @@ export default function App() {
   const canWrite = principal?.can_write !== false;
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#171717' : '#ffffff');
-    try { localStorage.setItem('grimoire.theme', theme); } catch { /* The switch still works for this visit. */ }
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const dark = theme === 'dark' || (theme === 'system' && media.matches);
+      document.documentElement.dataset.themePreference = theme;
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#171717' : '#ffffff');
+    };
+    apply();
+    if (theme !== 'system') return;
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
   }, [theme]);
-  function toggleTheme() { setTheme(value => value === 'dark' ? 'light' : 'dark'); }
+  useEffect(() => {
+    const sync = (event: StorageEvent) => { if (event.key === themeKey || event.key === null) setTheme(parseTheme(event.newValue)); };
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
+  function changeTheme(value: ThemePreference) {
+    setTheme(value);
+    try { localStorage.setItem(themeKey, value); } catch { /* Still applies for this visit. */ }
+  }
 
   useEffect(() => {
     const change = () => {
@@ -135,7 +153,7 @@ export default function App() {
     navigate(`/scions/${scion.id}`);
     setNotice(`Revision ${scion.current_revision} saved. The case record is up to date.`);
   }
-  if (!token) return <Connection theme={theme} onToggleTheme={toggleTheme} onConnect={(value, identity) => { sessionStorage.setItem(storageKey, value); setToken(value); setPrincipal(identity); setError(''); }} />;
+  if (!token) return <Connection theme={theme} onChangeTheme={changeTheme} onConnect={(value, identity) => { sessionStorage.setItem(storageKey, value); setToken(value); setPrincipal(identity); setError(''); }} />;
   if (!principal) return <div className="boot-state" role="status"><Icon name="book" size={34} /><p>Opening your workspace…</p></div>;
   return <div className="app-shell">
     <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to content</a>
@@ -146,7 +164,7 @@ export default function App() {
       <div className="sidebar-note"><span className="sidebar-note-rule" /><p>A record of what is known.<br />A clear view of what is missing.</p><small>Intake drafts are the starting point for a sourcing decision.</small></div>
       <div className="identity"><span className="avatar">{principal.display_name?.charAt(0) || 'H'}</span><span><strong>{principal.display_name}</strong><small>Handler</small></span><button className="icon-button" onClick={disconnect} aria-label="Disconnect workspace" title="Disconnect"><Icon name="logout" size={18} /></button></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="breadcrumb"><button onClick={() => navigate('/')}>Workspace</button><span>/</span><span>{route === '/new' ? 'New Scion' : id ? 'Case record' : 'Scions'}</span></div><div className="topbar-actions"><span className="environment"><span />Local development</span><ThemeToggle theme={theme} onToggleTheme={toggleTheme} /></div></header><main id="main-content" tabIndex={-1}>
+    <div className="workspace"><header className="topbar"><div className="breadcrumb"><button onClick={() => navigate('/')}>Workspace</button><span>/</span><span>{route === '/new' ? 'New Scion' : id ? 'Case record' : 'Scions'}</span></div><div className="topbar-actions"><span className="environment"><span />Local development</span><ThemePicker theme={theme} onChangeTheme={changeTheme} /></div></header><main id="main-content" tabIndex={-1}>
       {!canWrite && <div className="info-notice"><Icon name="lock" size={18} /><p>This identity has read-only access. A Handler must create and revise Scion intakes.</p></div>}{notice && <div className="success-notice" role="status"><Icon name="check" size={18} />{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}
       {error && <ErrorMessage>{error}<button className="text-button" onClick={() => setRefresh(value => value + 1)}>Retry</button></ErrorMessage>}
       {loading ? <div className="loading-panel" role="status">Loading the case record…</div> : route === '/new' ? !canWrite ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <IntakeForm token={token} onSaved={saved} onCancel={() => navigate('/')} onDirty={setDirty} /> : selected && id ? edit ? <IntakeForm key={`${selected.id}-edit`} token={token} scion={selected} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /> : <CaseRecord key={selected.id} token={token} scion={selected} principalId={principal.principal_id} canWrite={canWrite} onDirty={setDirty} onEdit={() => setEdit(true)} /> : !id ? <ScionList scions={scions} canWrite={canWrite} loading={listLoading} onOpen={value => navigate(`/scions/${value}`)} onNew={() => navigate('/new')} /> : !error && <div className="loading-panel">Choose a Scion to open its case record.</div>}
