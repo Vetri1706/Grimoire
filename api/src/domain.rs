@@ -167,7 +167,7 @@ impl Scion {
         let missing_information = revision.intake.missing();
         let category_notice = match revision.intake.product_category {
             Category::Digital => {
-                Some("Intake only — digital vendor comparison unavailable.".into())
+                Some("Capability and evidence drafts only — digital vendor comparison and sourcing approval unavailable.".into())
             }
             _ => None,
         };
@@ -251,7 +251,9 @@ mod tests {
         );
         assert_eq!(
             scion.category_notice.as_deref(),
-            Some("Intake only — digital vendor comparison unavailable.")
+            Some(
+                "Capability and evidence drafts only — digital vendor comparison and sourcing approval unavailable."
+            )
         );
     }
 

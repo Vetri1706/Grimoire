@@ -1,5 +1,13 @@
 # Grimoire integration audit — 2026-09-26
 
+> Historical audit. The Handler subsequently clarified that GG-53/GG-54 and
+> their reviews belong to an unavailable Mac-local instance. The Windows work
+> continues independently on `feature/windows-adaptive-scion` from
+> `572697cdadb20906294fbe6d552b1ad935a7b6de`. The earlier database and Stage B status
+> below describes this audit's original point in time, not the current build.
+> See [Windows implementation and verification](windows-adaptive-verification.md).
+> No later work depends on localhost:3100 or claims integration of the Mac commits.
+
 ## Result and limits
 
 The available GG-46 implementation branch was merged into the new local branch

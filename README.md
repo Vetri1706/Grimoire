@@ -1,12 +1,16 @@
 # Grimoire Scion intake
 
-Working local Scion intake, synthetic evidence, physical-scope review and two-offer exact comparison. React/TypeScript calls a Rust HTTP API backed by PostgreSQL 17 and private versioned MinIO source storage. Exact configuration, BOM occurrence, component, requirement, supplier, source and commercial terms remain pinned. Separate synthetic engineering review creates the identity chain and confirms normalization in existing GG-40 tables. The Go harness exercises the real API, database and object store, including process restarts, conflicts, revocation and organization isolation.
+Working local Scion intake, synthetic evidence, adaptive capability proposals, physical-scope review and two-offer exact comparison. React/TypeScript calls a Rust HTTP API backed by PostgreSQL 17 and private versioned MinIO source storage. Exact configuration, BOM occurrence, component, requirement, supplier, source and commercial terms remain pinned. Separate synthetic engineering review creates the identity chain and confirms normalization in existing GG-40 tables. The Go harness exercises the real API, database and object store, including process restarts, conflicts, revocation and organization isolation.
 
-Draft and source history stay immutable. No physical values are generated from missing fields. Synthetic scope confirmation records exact identity only; claims remain unverified and no sourcing decision is approved. Digital vendor comparison, supplier discovery, real supplier offers, RFQs, production qualification and the Paperclip connector remain deferred. A local BYOA bridge executes bounded preparation tasks using the user's installed **Codex CLI and existing login**, returning proposals without human confirmation authority. See [BYOA setup](docs/byoa-local.md), [Layer 4 results](docs/layer-4-verification-2026-09-26.md), and [remaining storage work](docs/storage-recovery-backlog.md).
+Draft and source history stay immutable. No physical values are generated from missing fields. Synthetic scope confirmation records exact identity only; claims remain unverified and sourcing approval is disabled. Digital Scions support revision-bound capability proposals and Handler-authored evidence comparison drafts; digital vendor comparison remains unavailable. Supplier discovery, real supplier offers, RFQs, production qualification and the Paperclip connector remain deferred. A local BYOA bridge executes bounded preparation tasks using the user's installed **Codex CLI and existing login**, returning proposals without human confirmation authority. See [Windows adaptive Scions, authority boundaries and commands](docs/windows-adaptive-scion.md), [BYOA setup](docs/byoa-local.md), [Layer 4 results](docs/layer-4-verification-2026-09-26.md), and [remaining storage work](docs/storage-recovery-backlog.md).
 
 ## Current local run
 
-- UI: <http://127.0.0.1:5173>
+The [Windows adaptive verification report](docs/windows-adaptive-verification.md)
+records the 131-check live regression, real Codex digital demonstration, applied
+migration hashes, startup protections and unavailable Mac work.
+
+- Windows adaptive UI: <http://127.0.0.1:5180> (explicit command below; Vite default remains 5173).
 - Rust API: <http://127.0.0.1:8080/api/health>
 - PostgreSQL: `127.0.0.1:55432`, canonical development database `grimoire_dev`.
 - Database runtime: native PostgreSQL **17.11**, stored persistently in `.local/pgdata`, retained from the earlier Docker Desktop startup failure. Docker Engine is now reachable; Layer 2B uses a native source-built MinIO because the attempted official images/binaries were unavailable. No Docker settings, existing volumes, WSL distributions or Paperclip databases were reset.
@@ -53,7 +57,7 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 
 ## Migration and fixture handling
 
-`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034**. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
+`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034 → 0038 → 0039**. Mac-origin migrations 0035–0037 are unavailable and have not been reconstructed. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
 
 - `db/gg40/0022_grimoire_contract.sql`, `0023_grimoire_review_corrections.sql`, and `fixture_one_case_two_event.sql` are unchanged supplied bytes.
 - `db/gg40/checksums.json` contains the supplied expected SHA-256 values. `.gitattributes` prevents newline conversion of these SQL files.
@@ -64,6 +68,7 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 - `0028_intake_scope.sql` adds immutable scope proposals and confirmation links to the existing governed tables. `0029_intake_agent_tasks.sql` adds the scoped BYOA preparation queue. `0030_scope_chain_guard.sql` strengthens exact-chain readback and prevents a task requester from confirming work returned by their agent. All three are new application migrations, not part of verified GG-40.
 - `0031_worker_controls.sql` adds explicit dispatch, cancellation, execution bounds and immutable task provenance. `0032_synthetic_offer_comparison.sql` adds synthetic offer staging and reviewed exact comparison through existing GG-40 tables. `0033_offer_review_identity_guards.sql` enforces jurisdiction-scoped supplier identity and review separation across full offer history. `0034_sourcing_authority_gate.sql` rejects every future canonical decision revision unless an immutable, exact-scope review exists from a distinct enabled commercial authority; its positive fixture is synthetic software-behavior evidence only. These are additive application migrations, not verified GG-40 files.
 - `public.grimoire_schema_migrations` records applied file hashes and refuses changed migrations.
+- `0038_windows_adaptive_plans.sql` adds revision-bound capability proposals and reviewable evidence drafts. `0039_windows_approval_lockdown.sql` keeps unverified canonical approval/decision paths disabled. Neither is GG-53/GG-54 or the unavailable Mac 0037 work. Startup verifies compiled migration hashes and a clean PostgreSQL catalog; see the [Windows authority boundary](docs/windows-adaptive-scion.md#windows-authority-protections-and-unavailable-mac-work).
 - `db/local-handlers.sql` creates no governed product, offer, price or approval records.
 - `db/local-scope-actors.sql` enrolls only separate synthetic reviewer and proposal-agent principals. `GRIMOIRE_TOKEN_REVIEWER_A` is a test identity, not a qualified real reviewer. `GRIMOIRE_TOKEN_AGENT_A` cannot confirm scope or edit intake/source history.
 - The fixture is never applied by `Migrate` or API startup. Only `ResetTest` applies it, in `grimoire_test`.
@@ -88,12 +93,29 @@ Terminal 2:
 
 ```powershell
 npm.cmd --prefix web ci
-pwsh -File scripts/dev.ps1 -Task Web
+npm.cmd --prefix web run dev -- --host 127.0.0.1 --port 5180
 ```
 
-Open <http://127.0.0.1:5173> and enter the local Handler A token from `.env`. Create a Scion with just a name; the missing fields stay visible. Field-entry counts and unresolved questions are displayed separately from evidence readiness, which remains unassessed. Revision history selects the current snapshot immediately and shows the Handler's readable directory name, with the principal ID in details. A stale form must load the latest record and explicitly reapply intended changes; it never silently overwrites another save.
+Open <http://127.0.0.1:5180> and enter the local Handler A token from `.env`. Create a Scion with just a name; the missing fields stay visible. Field-entry counts and unresolved questions are displayed separately from evidence readiness, which remains unassessed. Revision history selects the current snapshot immediately and shows the Handler's readable directory name, with the principal ID in details. A stale form must load the latest record and explicitly reapply intended changes; it never silently overwrites another save.
 
 Vite proxies `/api` to Rust at `127.0.0.1:8080`. Rust rejects non-loopback binds, non-PostgreSQL-17 databases and privileged/owning runtime roles. No database credential is sent to the browser. No deployment or paid service is required.
+
+## Adaptive Scions and local MCP
+
+Enter a free-text description, then use **Capability plan** to queue and explicitly dispatch a revision-bound Codex proposal. The API reports the actual `handler_intake` and `scion_sources` data connectors. External provider discovery is unavailable. A Handler can name alternatives and link exact authorized claims in an evidence comparison draft; unsupported criteria stay visible and all claims remain unverified. Existing physical workflows remain separate. See the [complete flow and API contract](docs/windows-adaptive-scion.md).
+
+```powershell
+pwsh -NoProfile -File scripts/dev.ps1 -Task Migrate -TestDatabase
+pwsh -NoProfile -File scripts/dev.ps1 -Task Harness -HarnessSlice adaptive
+node --test byoa/bridge.test.mjs connectors/local-mcp.test.mjs
+pwsh -NoProfile -File scripts/windows-startup-checks.ps1 -Task Check
+```
+
+The adaptive Go slice uses the running Rust API, PostgreSQL and MinIO, and launches the real MCP stdio facade. The full harness remains necessary for physical regression checks. The startup script checks both the retained clean startup database and upgraded disposable database; [catalog reproduction instructions](docs/windows-adaptive-scion.md#startup-and-verification-commands) explain its one-time `PrepareCatalog` mode.
+
+The read-only MCP server is launched with `node connectors/local-mcp.mjs`, using `GRIMOIRE_API_URL=http://127.0.0.1:8080` and an existing local credential in `GRIMOIRE_MCP_TOKEN`. See [MCP setup and access boundaries](docs/windows-adaptive-scion.md#actual-data-connectors-and-mcp) for a command that reads the ignored local credential without printing it. This does not install an agent configuration or connect Paperclip; it exposes no writes or approval tool.
+
+For the synthetic digital website demonstration, run `scripts/adaptive-demo.ps1 -Task Intake`, `scripts/byoa.ps1 -Mode Once`, then `scripts/adaptive-demo.ps1 -Task Evidence`. The evidence step requires the real Codex task result and never supplies fake agent output. Optional `scripts/adaptive-demo.ps1 -Task Revoke` withdraws permission for a synthetic source so an already open comparison can be checked. See [the full commands and their effects](docs/windows-adaptive-scion.md#startup-and-verification-commands).
 
 ## First Layer 2 slice: synthetic source and claim
 

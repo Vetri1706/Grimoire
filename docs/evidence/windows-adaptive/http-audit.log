@@ -1,0 +1,37 @@
+SET
+BEGIN
+SET
+              set_config
+--------------------------------------
+ a8ae929d-a09b-4518-aa43-13f60b0b090a
+(1 row)
+
+              set_config
+--------------------------------------
+ 4af197b0-e3f6-4dbf-9c15-16f89ee6c300
+(1 row)
+
+                          set_config
+--------------------------------------------------------------
+ POST /api/scions/23d923ae-27de-4bdf-97bd-04c20de8b60a/offers
+(1 row)
+
+                            set_config
+------------------------------------------------------------------
+ e576978548057ecde94416316209190c730d85e82901b4882caa43bd6bb60432
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+      set_config
+----------------------
+ procurement_preparer
+(1 row)
+
+DO
+ROLLBACK
+psql:C:/proj/Grimoire/grim/api/tests/http_audit_guards.sql:33: NOTICE:  PASS: actual Rust HTTP request created canonical audit rows with exact body SHA256, method/path, authenticated actor/role/request ID; caller-spoofed internal headers were overwritten
+Verified real HTTP audit provenance in disposable grimoire_test; no rows changed.

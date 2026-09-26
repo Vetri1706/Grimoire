@@ -1,4 +1,6 @@
+mod attestation;
 mod byoa;
+mod capabilities;
 mod domain;
 mod error;
 mod offers;
@@ -134,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .map_err(|error| format!("{}: {}", error.1, error.2).into());
     }
-    let unsafe_role: bool = sqlx::query_scalar("SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname=current_user").fetch_one(&pool).await?;
+    let unsafe_role: bool = sqlx::query_scalar("SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication FROM pg_roles WHERE rolname=current_user").fetch_one(&pool).await?;
     if identity.runtime_role != "grimoire_intake_app" || unsafe_role {
         return Err("API requires the unprivileged grimoire_intake_app runtime login.".into());
     }
@@ -149,9 +151,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !migrated {
         return Err("Apply unchanged migrations 0022 through 0030, then additive migrations 0031 through 0034 before starting the API.".into());
     }
+    attestation::verify(&pool).await?;
+    if std::env::args().nth(1).as_deref() == Some("check-startup") {
+        println!("WINDOWS_STARTUP_ATTESTATION_PASS approvals_disabled=true");
+        return Ok(());
+    }
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/me", get(me))
+        .route("/api/authority-status", get(authority_status))
+        .route("/api/approvals", axum::routing::post(approval_unavailable))
+        .route(
+            "/api/scions/{id}/sourcing-approval",
+            axum::routing::post(scion_approval_unavailable),
+        )
         .route("/api/scions", get(list_scions).post(create_scion))
         .route("/api/scions/{id}", get(get_scion))
         .route(
@@ -163,6 +176,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(scope::routes())
         .merge(offers::routes())
         .merge(byoa::routes())
+        .merge(capabilities::routes())
         .fallback(|| async {
             ApiError(
                 StatusCode::NOT_FOUND,
@@ -178,6 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         })
         .layer(DefaultBodyLimit::max(256 * 1024))
+        .layer(axum::middleware::from_fn(audit_request))
         .layer(axum::middleware::map_response(security_headers))
         .with_state(pool);
     let listener = tokio::net::TcpListener::bind(bind).await?;
@@ -201,6 +216,37 @@ async fn security_headers(mut response: Response) -> Response {
         HeaderValue::from_static("nosniff"),
     );
     response
+}
+
+// Overwrite incoming values so a caller cannot choose its audit scope/hash.
+// The body remains bounded and is reconstructed before typed route validation.
+async fn audit_request(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let (mut parts, body) = request.into_parts();
+    let bytes = match axum::body::to_bytes(body, 256 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return ApiError(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "REQUEST_TOO_LARGE",
+                "Request body exceeds its allowed size.".into(),
+            )
+            .into_response();
+        }
+    };
+    let scope = format!("{} {}", parts.method, parts.uri.path());
+    let Ok(scope) = HeaderValue::from_str(&scope) else {
+        return ApiError::invalid("Invalid request path.").into_response();
+    };
+    parts.headers.insert("x-grimoire-internal-endpoint", scope);
+    parts.headers.insert(
+        "x-grimoire-internal-input-sha256",
+        HeaderValue::from_str(&format!("{:x}", Sha256::digest(&bytes))).expect("hex digest"),
+    );
+    next.run(axum::extract::Request::from_parts(
+        parts,
+        axum::body::Body::from(bytes),
+    ))
+    .await
 }
 
 async fn authenticate(pool: &PgPool, headers: &HeaderMap) -> Result<(Tx, Actor), ApiError> {
@@ -230,6 +276,11 @@ async fn authenticate(pool: &PgPool, headers: &HeaderMap) -> Result<(Tx, Actor),
     if actor.is_agent {
         actor.can_write = false;
     }
+    sqlx::query("SELECT set_config('app.endpoint_scope',$1,true),set_config('app.input_hash',$2,true),set_config('app.effective_role',$3,true),set_config('app.action_reason','Authenticated local HTTP request',true),set_config('app.action_outcome','committed',true)")
+        .bind(headers.get("x-grimoire-internal-endpoint").and_then(|v|v.to_str().ok()).unwrap_or("internal:unspecified"))
+        .bind(headers.get("x-grimoire-internal-input-sha256").and_then(|v|v.to_str().ok()).unwrap_or(""))
+        .bind(if actor.is_agent { "agent" } else if actor.can_confirm_scope { "engineering_reviewer" } else { "procurement_preparer" })
+        .execute(&mut *tx).await?;
     Ok((tx, actor))
 }
 
@@ -244,6 +295,30 @@ async fn me(State(pool): State<PgPool>, headers: HeaderMap) -> ApiResult {
     let (tx, actor) = authenticate(&pool, &headers).await?;
     tx.commit().await?;
     Ok(Json(actor).into_response())
+}
+
+async fn authority_status(State(pool): State<PgPool>, headers: HeaderMap) -> ApiResult {
+    let (tx, _) = authenticate(&pool, &headers).await?;
+    tx.commit().await?;
+    Ok(Json(json!({"sourcing_approval_enabled":false,"mode":"windows_proposals_only","reason":"Authenticated sourcing-approval work from the Mac instance is unavailable and unverified. Synthetic physical scope and normalization review do not approve sourcing."})).into_response())
+}
+fn approval_disabled() -> ApiError {
+    ApiError(StatusCode::FORBIDDEN,"APPROVAL_UNAVAILABLE","Sourcing approval is disabled on this Windows implementation. Agent proposals cannot grant approval.".into())
+}
+async fn approval_unavailable(State(pool): State<PgPool>, headers: HeaderMap) -> ApiResult {
+    let (tx, _) = authenticate(&pool, &headers).await?;
+    tx.commit().await?;
+    Err(approval_disabled())
+}
+async fn scion_approval_unavailable(
+    State(pool): State<PgPool>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let (mut tx, _) = authenticate(&pool, &headers).await?;
+    visible_revision(&mut tx, parse_id(&id)?, false).await?;
+    tx.commit().await?;
+    Err(approval_disabled())
 }
 
 async fn list_scions(State(pool): State<PgPool>, headers: HeaderMap) -> ApiResult {

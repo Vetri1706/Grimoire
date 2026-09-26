@@ -415,15 +415,11 @@ fn request_hash<T: Serialize>(path: &str, base: i32, input: &T) -> Result<String
         )
     ))
 }
-async fn audit_context(
-    tx: &mut Tx,
-    role: &str,
-    endpoint: &str,
-    hash: &str,
-    reason: &str,
-) -> Result<(), ApiError> {
-    sqlx::query("SELECT set_config('app.effective_role',$1,true),set_config('app.endpoint_scope',$2,true),set_config('app.input_hash',$3,true),set_config('app.action_reason',$4,true),set_config('app.action_outcome','committed',true)")
-        .bind(role).bind(endpoint).bind(hash).bind(reason).execute(&mut **tx).await?;
+async fn audit_context(tx: &mut Tx, reason: &str) -> Result<(), ApiError> {
+    // Keep the authenticated role and exact HTTP method/path/body hash supplied
+    // by middleware. Semantic idempotency hashes are a separate concern.
+    sqlx::query("SELECT set_config('app.action_reason',$1,true),set_config('app.action_outcome','committed',true)")
+        .bind(reason).execute(&mut **tx).await?;
     Ok(())
 }
 async fn write_offer(
@@ -463,14 +459,7 @@ async fn write_offer(
     }
     let number = previous.map_or(1, |n| n + 1);
     let id = offer.unwrap_or_else(Uuid::new_v4);
-    audit_context(
-        &mut tx,
-        "synthetic_offer_handler",
-        "intake:synthetic-offer-submit",
-        &hash,
-        &input.change_summary,
-    )
-    .await?;
+    audit_context(&mut tx, &input.change_summary).await?;
     let _: Uuid = sqlx::query_scalar("SELECT app.intake_offer_submit($1,$2,$3,$4)")
         .bind(scion)
         .bind(id)
@@ -699,14 +688,7 @@ async fn confirm(
         tx.commit().await?;
         return Ok(response);
     }
-    audit_context(
-        &mut tx,
-        "synthetic_engineering_reviewer",
-        "intake:synthetic-normalization-confirm",
-        &hash,
-        &input.review_note,
-    )
-    .await?;
+    audit_context(&mut tx, &input.review_note).await?;
     sqlx::query("SELECT app.intake_offer_confirm($1,$2,$3,$4)")
         .bind(id)
         .bind(proposal)

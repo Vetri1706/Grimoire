@@ -1,0 +1,37 @@
+   Compiling grimoire-api v0.1.0 (C:\proj\Grimoire\grim\api)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.11s
+Grimoire Layers 1-4, adaptive Scions, BYOA and local MCP acceptance harness
+Rust binary: C:\proj\Grimoire\grim\api\target\debug\grimoire-api.exe
+API: http://127.0.0.1:58640
+Database: grimoire_test; PostgreSQL 17.11; runtime role: grimoire_intake_app
+PASS 01  adaptive digital free-text intake preserves Handler description and explicit unknown fields
+PASS 02  unverified Windows sourcing approval remains disabled for Handlers, reviewers, and agents
+PASS 03  connector discovery lists actual enabled local adapters and explicitly reports absent external providers
+PASS 04  name-only drafts may discover connectors but cannot queue an invented capability plan
+PASS 05  adaptive tasks require Handler dispatch, reject invented candidates, and retry one revision-bound task
+PASS 06  claimed capability task exposes only pinned Handler intake and actual connector discovery
+PASS 07  adaptive reads and writes reject missing authentication and missing revision preconditions
+PASS 08  capability proposals require an active agent lease and reject unknown connectors or erased gaps
+PASS 09  leased capability plan is immutable, idempotent and bound to the originating Scion revision and task
+PASS 10  capability task completion retries retain proposal status without reviewer confirmation
+PASS 11  adaptive routes hide cross-organization cases with identical unknown-case errors and no identity headers
+PASS 12  comparison without evidence preserves explicit gaps and never invents claims or provider listings
+PASS 13  unpermitted synthetic website source cannot enter an evidence comparison
+PASS 14  authorized synthetic website claims retain exact versioned source hashes and UTF-8 locators
+PASS 15  real MCP stdio discovers only read-only tools and reads authorized source bytes through Rust
+PASS 16  real MCP rejects another organization's intake, discovery and source reads without content
+PASS 17  comparison requests require current revision and reject forged approval or verified status
+PASS 18  reviewable comparison uses only authorized exact claims and remains explicitly unverified on retry
+PASS 19  unknown capabilities, missing claims and cross-case plan or claim bindings are rejected
+Layer 2 Rust restart: PID 31968 terminated; PID 31032 started
+Database: grimoire_test; PostgreSQL 17.11; runtime role: grimoire_intake_app
+PASS 20  plan, comparison, intake and task provenance survive a real Rust API restart unchanged
+PASS 21  revocation blocks comparison retries and removes source statements and quotations from already available results
+PASS 22  already open real MCP session stops returning revoked source bytes and derived quotations
+Layer 2 Rust restart: PID 31032 terminated; PID 32004 started
+Database: grimoire_test; PostgreSQL 17.11; runtime role: grimoire_intake_app
+PASS 23  revoked comparison content remains withheld after another real API restart
+PASS 24  new source revisions invalidate earlier exact-claim comparison bindings without overwriting their history
+PASS 25  intake revision changes reject queued dispatch, running proposals and earlier capability-plan comparisons
+PASS 26  stale running task rejects completion and releases its lease through explicit failure
+PASS: 26 adaptive Scion checks (adaptive-only; physical workflow regressions not run).

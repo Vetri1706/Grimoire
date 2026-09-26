@@ -73,14 +73,24 @@ func main() {
 	bind := flag.String("bind", "", "loopback IP:port for the child Rust API; default selects a free port")
 	scopeOnly := flag.Bool("scope-only", false, "run Layer 3 and BYOA protocol checks only; full regression remains the default")
 	offersOnly := flag.Bool("offers-only", false, "run Layer 4 exact offer checks only; full regression remains the default")
+	adaptiveOnly := flag.Bool("adaptive-only", false, "run adaptive Scion and disabled approval HTTP checks only; full regression remains the default")
 	flag.Parse()
-	if err := execute(*binary, *bind, *scopeOnly, *offersOnly); err != nil {
+	if err := execute(*binary, *bind, *scopeOnly, *offersOnly, *adaptiveOnly); err != nil {
 		fmt.Fprintf(os.Stderr, "\nFAIL: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func execute(binary, bind string, scopeOnly, offersOnly bool) error {
+func execute(binary, bind string, scopeOnly, offersOnly, adaptiveOnly bool) error {
+	selected := 0
+	for _, enabled := range []bool{scopeOnly, offersOnly, adaptiveOnly} {
+		if enabled {
+			selected++
+		}
+	}
+	if selected > 1 {
+		return fmt.Errorf("select at most one focused harness slice")
+	}
 	if binary == "" {
 		return fmt.Errorf("provide -api-binary or GRIMOIRE_API_BINARY; a real process restart is required")
 	}
@@ -104,13 +114,23 @@ func execute(binary, bind string, scopeOnly, offersOnly bool) error {
 		tokenA: os.Getenv("GRIMOIRE_TOKEN_A"), tokenB: os.Getenv("GRIMOIRE_TOKEN_B"), runID: hex.EncodeToString(id),
 		reviewer: os.Getenv("GRIMOIRE_TOKEN_REVIEWER_A"), agent: os.Getenv("GRIMOIRE_TOKEN_AGENT_A"),
 		knownRevisions: make(map[string]map[int]json.RawMessage)}
-	fmt.Printf("Grimoire Layers 1-4 and BYOA protocol HTTP acceptance harness\nRust binary: %s\nAPI: %s\n", process.binary, h.client.baseURL)
+	fmt.Printf("Grimoire Layers 1-4, adaptive Scions, BYOA and local MCP acceptance harness\nRust binary: %s\nAPI: %s\n", process.binary, h.client.baseURL)
 	if err := process.start(h.client); err != nil {
 		_ = process.stop()
 		return err
 	}
 	defer process.stop()
 	started := time.Now()
+	if adaptiveOnly {
+		if err := h.verifyDatabase(); err != nil {
+			return err
+		}
+		if err := h.runAdaptive(); err != nil {
+			return fmt.Errorf("%d adaptive checks passed before failure: %w", h.passed, err)
+		}
+		fmt.Printf("PASS: %d adaptive Scion checks (adaptive-only; physical workflow regressions not run).\n", h.passed)
+		return nil
+	}
 	if offersOnly {
 		if err := h.verifyDatabase(); err != nil {
 			return err
@@ -144,6 +164,9 @@ func execute(binary, bind string, scopeOnly, offersOnly bool) error {
 		return fmt.Errorf("%d checks passed before failure: %w", h.passed, err)
 	}
 	if err := h.runOffers(); err != nil {
+		return fmt.Errorf("%d checks passed before failure: %w", h.passed, err)
+	}
+	if err := h.runAdaptive(); err != nil {
 		return fmt.Errorf("%d checks passed before failure: %w", h.passed, err)
 	}
 	fmt.Printf("\nPASS: %d checks against the running Rust API, PostgreSQL 17, and real versioned object store (%s).\n", h.passed, time.Since(started).Round(time.Millisecond))

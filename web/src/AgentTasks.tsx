@@ -8,7 +8,7 @@ const statusLabel: Record<AgentTask['status'], string> = {
   cancel_requested: 'Cancellation requested · waiting for worker acknowledgement', cancelled: 'Cancelled',
   completed: 'Proposal prepared · human review required', failed: 'Failed · no human confirmation performed',
 };
-function taskLabel(task: AgentTask) { return task.task_kind === 'prepare_offer_normalization' ? 'Offer normalization proposal' : 'Physical scope proposal'; }
+function taskLabel(task: AgentTask) { return task.task_kind === 'prepare_capability_plan' ? 'Capability plan proposal' : task.task_kind === 'prepare_offer_normalization' ? 'Offer normalization proposal' : 'Physical scope proposal'; }
 
 export default function AgentTasks({ token, scionId, currentRevision, canWrite, tasks, error, onOpen, onChanged }: {
   token: string; scionId: string; currentRevision: number; canWrite: boolean; tasks: AgentTask[] | null; error: string;

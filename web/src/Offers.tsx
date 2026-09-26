@@ -20,8 +20,8 @@ function Missing() { return <span className="offer-missing">Not provided</span>;
 function Value({ value }: { value: string | number | null | undefined }) { return value === null || value === undefined || value === '' ? <Missing /> : <>{value}</>; }
 function Reasons({ reasons }: { reasons: string[] }) { return reasons.length > 0 ? <ul className="scope-blockers">{reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul> : null; }
 
-export default function Offers({ token, scion, canWrite, preferredProposalId, onDirty, onSources, onScopeProposal }: {
-  token: string; scion: Scion; canWrite: boolean; preferredProposalId: string | null; onDirty: (value: boolean) => void; onSources: () => void; onScopeProposal: (id: string) => void;
+export default function Offers({ token, scion, canWrite, preferredProposalId, onDirty, onSources, onScopeProposal, onCapabilityProposal }: {
+  token: string; scion: Scion; canWrite: boolean; preferredProposalId: string | null; onDirty: (value: boolean) => void; onSources: () => void; onScopeProposal: (id: string) => void; onCapabilityProposal: (id: string) => void;
 }) {
   const [offers, setOffers] = useState<OfferView[]>([]); const [comparisons, setComparisons] = useState<ComparisonList | null>(null); const [scope, setScope] = useState<ScopeList | null>(null); const [sources, setSources] = useState<SourceSummary[]>([]); const [tasks, setTasks] = useState<AgentTask[] | null>(null);
   const [taskError, setTaskError] = useState(''); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [loading, setLoading] = useState(true); const [ready, setReady] = useState(false);
@@ -91,7 +91,7 @@ export default function Offers({ token, scion, canWrite, preferredProposalId, on
         {selectedProposal && <ComparisonRecord key={selectedProposal.id} token={token} scion={scion} proposal={selectedProposal} offers={offers} scopes={scope.proposals} canConfirm={comparisons.can_confirm && selectedProposal.can_confirm_this_proposal} onDirty={markDirty} onAccessLost={accessLost} onSaved={id => saved('confirmation', id)} />}
       </>}
     </> : null}
-    <AgentTasks token={token} scionId={scion.id} currentRevision={scion.current_revision} canWrite={canWrite && !form} tasks={tasks} error={taskError} onOpen={(id, kind) => kind === 'prepare_physical_scope' ? onScopeProposal(id) : openProposal(id)} onChanged={() => refresh(true)} />
+    <AgentTasks token={token} scionId={scion.id} currentRevision={scion.current_revision} canWrite={canWrite && !form} tasks={tasks} error={taskError} onOpen={(id, kind) => kind === 'prepare_capability_plan' ? onCapabilityProposal(id) : kind === 'prepare_physical_scope' ? onScopeProposal(id) : openProposal(id)} onChanged={() => refresh(true)} />
   </section>;
 }
 

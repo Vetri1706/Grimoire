@@ -124,7 +124,25 @@ func (h *harness) addOffer(f *offerFixture, label string, overrides map[string]a
 	if err != nil {
 		return offerView{}, err
 	}
-	r, err := h.sourceReq("POST", f.path+"/offers", h.tokenA, p, "offer-"+label, `"1"`, 201)
+	var r response
+	if label == "main-0" {
+		// Exercise the real HTTP middleware against caller-chosen internal audit
+		// headers. The independent SQL guard checks persisted canonical audit rows
+		// against the exact body hash emitted below; this Go client never reads SQL.
+		r, err = h.client.request("POST", f.path+"/offers", h.tokenA, p, map[string]string{
+			"Idempotency-Key": h.runID + "-offer-" + label, "If-Match": `"1"`,
+			"x-grimoire-internal-endpoint":     "forged:caller-audit-scope",
+			"x-grimoire-internal-input-sha256": strings.Repeat("f", 64),
+		})
+		if err == nil {
+			err = expectStatus(r, 201)
+		}
+		if err == nil && !strings.Contains(r.header.Get("Cache-Control"), "no-store") {
+			err = fmt.Errorf("audit fixture response lacks no-store")
+		}
+	} else {
+		r, err = h.sourceReq("POST", f.path+"/offers", h.tokenA, p, "offer-"+label, `"1"`, 201)
+	}
 	if err != nil {
 		return offerView{}, err
 	}
@@ -132,6 +150,14 @@ func (h *harness) addOffer(f *offerFixture, label string, overrides map[string]a
 	if err == nil {
 		f.offers = append(f.offers, v)
 		f.inputs = append(f.inputs, p)
+		if label == "main-0" {
+			raw, encodeErr := json.Marshal(p)
+			if encodeErr != nil {
+				return offerView{}, encodeErr
+			}
+			expected, _ := json.Marshal(map[string]any{"offer_revision_id": v.Revision.GovernedRevision, "offer_line_id": v.Revision.GovernedLine, "endpoint_scope": "POST " + f.path + "/offers", "input_sha256": fmt.Sprintf("%x", sha256.Sum256(raw)), "actor_id": "10000000-0000-4000-8000-000000000011", "effective_role": "procurement_preparer"})
+			fmt.Printf("HTTP_AUDIT_EXPECTATION %s\n", expected)
+		}
 	}
 	return v, err
 }

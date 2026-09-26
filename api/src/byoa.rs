@@ -346,11 +346,15 @@ async fn create(
     if !actor.can_write || actor.is_agent {
         return Err(ApiError::forbidden());
     }
-    let input = json_input(input)?;
+    let mut input = json_input(input)?;
     let base = precondition(&headers)?;
     let key = key(&headers)?;
-    if !["prepare_physical_scope", "prepare_offer_normalization"]
-        .contains(&input.task_kind.as_str())
+    if ![
+        "prepare_physical_scope",
+        "prepare_offer_normalization",
+        "prepare_capability_plan",
+    ]
+    .contains(&input.task_kind.as_str())
         || input.candidate_proposal["synthetic"] != true
         || !input.candidate_proposal.is_object()
         || serde_json::to_vec(&input)?.len() > 48000
@@ -362,6 +366,13 @@ async fn create(
     }
     match input.task_kind.as_str() {
         "prepare_physical_scope" => crate::scope::validate_candidate(&input.candidate_proposal)?,
+        "prepare_capability_plan" => {
+            if input.candidate_proposal != json!({"synthetic":true}) {
+                return Err(ApiError::invalid(
+                    "Capability preparation accepts only {synthetic:true}; intake, connector registry and mandatory gaps are pinned by the server.",
+                ));
+            }
+        }
         _ => crate::offers::validate_candidate(&input.candidate_proposal)?,
     }
     let hash = format!(
@@ -395,6 +406,22 @@ async fn create(
     }
     if visible(&mut tx, id).await? != base {
         return Err(ApiError::stale());
+    }
+    if input.task_kind == "prepare_capability_plan" {
+        input.candidate_proposal = crate::capabilities::task_candidate(&mut tx, id, base).await?;
+        if input.candidate_proposal["intake"]["product_description"]
+            .as_str()
+            .is_none_or(|text| text.trim().is_empty())
+        {
+            return Err(ApiError::invalid(
+                "Enter a product description in a new Scion revision before asking an agent to prepare capabilities.",
+            ));
+        }
+        if serde_json::to_vec(&input)?.len() > 48000 {
+            return Err(ApiError::invalid(
+                "The pinned intake is too large for this bounded agent task. Save a more focused intake revision before preparation.",
+            ));
+        }
     }
     let task_id = Uuid::new_v4();
     sqlx::query("INSERT INTO grimoire.intake_agent_tasks(id,org_id,scion_id,scion_revision,task_kind,input,created_by,request_key,request_sha256,timeout_seconds) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)").bind(task_id).bind(actor.org_id).bind(id).bind(base).bind(&input.task_kind).bind(sqlx::types::Json(json!({"candidate_proposal":input.candidate_proposal}))).bind(actor.principal_id).bind(key).bind(hash).bind(input.timeout_seconds).execute(&mut *tx).await?;

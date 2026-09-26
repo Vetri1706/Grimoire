@@ -3,6 +3,30 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { childEnvironment, executionTimeout, outputSchema, prohibitedAgentEvent, superviseChild, validateCandidate, validateOutput } from './bridge.mjs'
 
+function adaptiveCandidate() {
+  return { synthetic: true, intake: { product_description: 'A synthetic website for appointment requests.' }, connectors: [{ id: 'handler_intake', enabled: true }, { id: 'scion_sources', enabled: true }], unresolved_gaps: ['No external connector enabled.'] }
+}
+function adaptiveOutput() {
+  return { proposal: { synthetic: true, summary: 'Proposed website capabilities for review.', capabilities: [{ key: 'appointments', title: 'Appointment requests', reason: 'Handler described appointment requests.', evidence_needed: ['What data can visitors submit?'], connector_ids: ['handler_intake', 'scion_sources'] }], unresolved_gaps: ['No external connector enabled.'], change_summary: 'Unverified capability proposal.' }, preparation_note: 'Based on Handler description only.' }
+}
+test('capability proposals preserve required gaps and accept only enabled connectors', () => {
+  const input = adaptiveCandidate(); const output = adaptiveOutput()
+  validateOutput(input, output, 'prepare_capability_plan')
+  output.proposal.capabilities[0].connector_ids.push('invented_provider')
+  assert.throws(() => validateOutput(input, output, 'prepare_capability_plan'), /INVALID_CAPABILITY_PLAN/)
+  const missing = adaptiveOutput(); missing.proposal.unresolved_gaps = []
+  assert.throws(() => validateOutput(input, missing, 'prepare_capability_plan'), /AGENT_REMOVED_GAP/)
+})
+test('capability output rejects sourcing fields and duplicate keys', () => {
+  const input = adaptiveCandidate(); const output = adaptiveOutput()
+  output.proposal.price = 10
+  assert.throws(() => validateOutput(input, output, 'prepare_capability_plan'), /INVALID_CAPABILITY_PLAN/)
+  delete output.proposal.price
+  output.proposal.capabilities.push(structuredClone(output.proposal.capabilities[0]))
+  assert.throws(() => validateOutput(input, output, 'prepare_capability_plan'), /INVALID_CAPABILITY_PLAN/)
+  assert.deepEqual(outputSchema(input, 'prepare_capability_plan').properties.proposal.properties.capabilities.items.properties.connector_ids.items.enum, ['handler_intake', 'scion_sources'])
+})
+
 function candidate() {
   return {
     synthetic: true, identity_match: 'exact',

@@ -37,8 +37,8 @@ export function useScopeWrite(token: string) {
   };
 }
 
-export default function PhysicalScope({ token, scion, principalId, canWrite, onDirty, onSources, onOfferProposal, preferredProposalId }: {
-  token: string; scion: Scion; principalId: string; canWrite: boolean; onDirty: (value: boolean) => void; onSources: () => void; onOfferProposal: (id: string) => void; preferredProposalId: string | null;
+export default function PhysicalScope({ token, scion, principalId, canWrite, onDirty, onSources, onOfferProposal, onCapabilityProposal, preferredProposalId }: {
+  token: string; scion: Scion; principalId: string; canWrite: boolean; onDirty: (value: boolean) => void; onSources: () => void; onOfferProposal: (id: string) => void; onCapabilityProposal: (id: string) => void; preferredProposalId: string | null;
 }) {
   const [scope, setScope] = useState<ScopeList | null>(null);
   const [sources, setSources] = useState<SourceSummary[]>([]);
@@ -141,7 +141,7 @@ export default function PhysicalScope({ token, scion, principalId, canWrite, onD
       <aside className="scope-proposals"><div className="section-heading"><h3>Saved proposals</h3><span className="badge">{scope.proposals.length}</span></div><p className="section-description">Immutable candidates and their exact review outcome.</p>{scope.proposals.length === 0 ? <p className="scope-empty">No scope proposed. Enter synthetic identities and pin the supporting claims; missing values are never generated.</p> : <ol>{scope.proposals.map(item => <li key={item.id}><button className={`scope-proposal-choice ${item.id === selectedId ? 'active' : ''}`} aria-pressed={item.id === selectedId} onClick={() => openProposal(item.id)}><strong>{item.input?.case_title || 'Scope content unavailable'}</strong><span className={bindingBlocked(item) ? 'scope-status-blocked' : ''}>{proposalStatus(item)}</span><span>Scion revision {item.scion_revision} · {when(item.created_at)}</span></button></li>)}</ol>}</aside>
       <div className="scope-detail">{proposal ? <ProposalView key={proposal.id} token={token} scion={scion} proposal={proposal} canConfirm={scope.can_confirm && proposal.can_confirm_this_proposal === true} isProposer={proposal.reviewer_conflict || proposal.created_by === principalId} onDirty={markDirty} onAccessLost={accessLost} onSaved={result => saved(result, false)} /> : <section className="scope-card"><h2>Exact identities come first</h2><p className="section-description">A proposal records explicitly entered synthetic scope. Confirmation requires current source rights, exact locators, no unresolved gaps, and a separate enrolled Engineering Reviewer.</p></section>}</div>
     </div> : null}
-    <AgentTasks token={token} scionId={scion.id} currentRevision={scion.current_revision} canWrite={canWrite} tasks={tasks} error={taskError} onOpen={(id, kind) => kind === 'prepare_offer_normalization' ? onOfferProposal(id) : openProposal(id)} onChanged={() => refresh(true)} />
+    <AgentTasks token={token} scionId={scion.id} currentRevision={scion.current_revision} canWrite={canWrite} tasks={tasks} error={taskError} onOpen={(id, kind) => kind === 'prepare_capability_plan' ? onCapabilityProposal(id) : kind === 'prepare_offer_normalization' ? onOfferProposal(id) : openProposal(id)} onChanged={() => refresh(true)} />
     <p className="scope-footnote">No supplier offer, price, quality release, or sourcing decision is produced here. Source text, Handler claims, and verified facts remain separate; verified facts remain zero.</p>
   </section>;
 }
