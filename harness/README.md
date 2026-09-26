@@ -119,9 +119,10 @@ positive path. The positive result remains a draft and creates no sourcing
 approval.
 
 ```sh
-go run ./harness/gg46 \
+cd harness
+go run ./gg46 \
   -dsn 'postgresql://postgres@127.0.0.1:55446/grimoire_gg46?sslmode=disable' \
-  -fixture fixtures/gg46-two-offer.json \
+  -fixture ../fixtures/gg46-two-offer.json \
   -code-revision '<commit>'
 ```
 
