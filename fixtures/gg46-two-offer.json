@@ -1,0 +1,184 @@
+{
+  "fixture_kind": "synthetic_software_behavior_only",
+  "fixture_version": 1,
+  "claims_disallowed": [
+    "customer value",
+    "production readiness",
+    "security certification",
+    "reviewer qualification",
+    "sourcing approval"
+  ],
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "scion": {
+    "id": "46000000-0000-4000-8000-000000000001",
+    "revision": 1,
+    "name": "SYNTHETIC GG-46 exact valve comparison",
+    "sourcing_case_id": "00000000-0000-4000-8000-000000000110",
+    "sourcing_case_revision_id": "00000000-0000-4000-8000-000000000111",
+    "product_id": "00000000-0000-4000-8000-000000000101",
+    "product_configuration_id": "00000000-0000-4000-8000-000000000102",
+    "product_configuration_revision_id": "00000000-0000-4000-8000-000000000103",
+    "bom_occurrence_id": "00000000-0000-4000-8000-000000000106",
+    "bom_occurrence_revision_id": "00000000-0000-4000-8000-000000000107",
+    "component_id": "00000000-0000-4000-8000-000000000104",
+    "component_revision_id": "00000000-0000-4000-8000-000000000105",
+    "requirement_revision_id": "00000000-0000-4000-8000-000000000109"
+  },
+  "normalization_proposal": {
+    "id": "46000000-0000-4000-8000-000000000611",
+    "canonical_comparison_revision_id": "00000000-0000-4000-8000-000000000611",
+    "decision_packet_revision_id": "00000000-0000-4000-8000-000000000702",
+    "authority": "proposal_only",
+    "provider": "codex_cli",
+    "agent_principal_id": "00000000-0000-4000-8000-000000000016",
+    "source_text_provided_to_agent": false,
+    "selected_offer_revision_id": null,
+    "recommended_supplier": null
+  },
+  "comparison_basis": {
+    "quantity": "100",
+    "uom": "EA",
+    "currency": "USD",
+    "destination": "Plant A",
+    "incoterm": "DAP",
+    "payment_terms": "NET30",
+    "as_of": "2026-02-15T00:00:00Z",
+    "valid_from": "2026-02-15T00:00:00Z",
+    "valid_until": "2026-03-01T00:00:00Z",
+    "fx_assumption": "identity_only; USD to USD at 1",
+    "unit_conversion_assumption": "none; EA must equal EA",
+    "rounding_assumption": "none; exact PostgreSQL numeric values"
+  },
+  "offers": [
+    {
+      "offer_id": "00000000-0000-4000-8000-000000000501",
+      "offer_revision_id": "00000000-0000-4000-8000-000000000511",
+      "offer_line_id": "00000000-0000-4000-8000-000000000521",
+      "supplier_entity_id": "00000000-0000-4000-8000-000000000201",
+      "source_document_id": "00000000-0000-4000-8000-000000000301",
+      "source_revision_id": "00000000-0000-4000-8000-000000000311",
+      "source_content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "manufacturer": "Acme Components",
+      "part_number": "ACV-17-A",
+      "quantity": "100",
+      "uom": "EA",
+      "unit_price": "12.50",
+      "currency": "USD",
+      "destination": "Plant A",
+      "incoterm": "DAP",
+      "payment_terms": "NET30",
+      "valid_from": "2026-02-01T00:00:00Z",
+      "valid_until": "2026-04-01T00:00:00Z",
+      "lead_time_days": 30,
+      "comparison_state": "comparable_at_recorded_revision",
+      "currentness": "stale_due_to_offer_revision_2"
+    },
+    {
+      "offer_id": "00000000-0000-4000-8000-000000000502",
+      "offer_revision_id": "00000000-0000-4000-8000-000000000512",
+      "offer_line_id": "00000000-0000-4000-8000-000000000522",
+      "supplier_entity_id": "00000000-0000-4000-8000-000000000202",
+      "source_document_id": "00000000-0000-4000-8000-000000000302",
+      "source_revision_id": "00000000-0000-4000-8000-000000000312",
+      "source_content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "manufacturer": "Acme Components",
+      "part_number": "ACV-17-A",
+      "quantity": "100",
+      "uom": "EA",
+      "unit_price": "13.00",
+      "currency": "USD",
+      "destination": "Plant A",
+      "incoterm": "DAP",
+      "payment_terms": "NET30",
+      "valid_from": "2026-02-01T00:00:00Z",
+      "valid_until": "2026-04-01T00:00:00Z",
+      "lead_time_days": 20,
+      "comparison_state": "comparable",
+      "currentness": "current"
+    }
+  ],
+  "comparability_matrix": [
+    {
+      "term": "manufacturer and orderable part",
+      "offer_1": "Acme Components / ACV-17-A",
+      "offer_2": "Acme Components / ACV-17-A",
+      "basis": "confirmed component revision 00000000-0000-4000-8000-000000000105",
+      "result": "comparable_at_recorded_revision",
+      "evidence": [
+        "offers[0].offer_line_id",
+        "offers[1].offer_line_id",
+        "scion.component_revision_id"
+      ]
+    },
+    {
+      "term": "quantity and unit",
+      "offer_1": "100 EA",
+      "offer_2": "100 EA",
+      "basis": "100 EA; no unit conversion",
+      "result": "comparable",
+      "evidence": ["comparison_basis.quantity", "comparison_basis.uom"]
+    },
+    {
+      "term": "unit price and currency",
+      "offer_1": "USD 12.50",
+      "offer_2": "USD 13.00",
+      "basis": "USD; identity FX rate 1 only",
+      "result": "comparable",
+      "evidence": [
+        "offers[0].source_revision_id",
+        "offers[1].source_revision_id"
+      ]
+    },
+    {
+      "term": "destination, incoterm, payment",
+      "offer_1": "Plant A / DAP / NET30",
+      "offer_2": "Plant A / DAP / NET30",
+      "basis": "exact string equality; no freight or payment adjustment",
+      "result": "comparable",
+      "evidence": ["comparison_basis.destination", "comparison_basis.incoterm", "comparison_basis.payment_terms"]
+    },
+    {
+      "term": "validity",
+      "offer_1": "2026-02-01 through 2026-04-01",
+      "offer_2": "2026-02-01 through 2026-04-01",
+      "basis": "both cover the exact comparison window",
+      "result": "comparable",
+      "evidence": ["comparison_basis.valid_from", "comparison_basis.valid_until"]
+    },
+    {
+      "term": "lead time",
+      "offer_1": "30 days",
+      "offer_2": "20 days",
+      "basis": "displayed source term only",
+      "result": "excluded_from_normalized_price_and_selection",
+      "exclusion_reason": "No delivery-risk or carrying-cost model is authorized.",
+      "evidence": ["offers[0].lead_time_days", "offers[1].lead_time_days"]
+    },
+    {
+      "term": "freight, tax, duty, quality risk, supplier performance",
+      "offer_1": null,
+      "offer_2": null,
+      "basis": null,
+      "result": "unknown_and_excluded",
+      "exclusion_reason": "No evidence or approved normalization is supplied; unknown remains unknown.",
+      "evidence": []
+    }
+  ],
+  "synthetic_positive_authority": {
+    "review_id": "46000000-0000-4000-8000-000000000714",
+    "reviewer_principal_id": "00000000-0000-4000-8000-000000000014",
+    "role": "commercial_approver",
+    "selected_offer_revision_id": "00000000-0000-4000-8000-000000000512",
+    "selected_offer_line_id": "00000000-0000-4000-8000-000000000522",
+    "label": "SYNTHETIC SOFTWARE-BEHAVIOR REVIEW; NOT SOURCING APPROVAL"
+  },
+  "synthetic_draft_decision": {
+    "receipt_id": "46000000-0000-4000-8000-000000000720",
+    "decision_id": "46000000-0000-4000-8000-000000000721",
+    "decision_revision_id": "46000000-0000-4000-8000-000000000722",
+    "state_event_id": "46000000-0000-4000-8000-000000000723",
+    "state": "draft",
+    "submitted": false,
+    "approved": false
+  }
+}
