@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { newestReaction, parseFlowRoute, reactionForChange, reactionForTask } from './flow-model.ts';
+import { newestReaction, parseFlowRoute, principalRoleLabel, reactionForChange, reactionForTask, recommendedFlowAction, settleNamedReads } from './flow-model.ts';
+import type { FlowActionInput, PrincipalCapabilities, WorkflowReadKey } from './flow-model.ts';
 import type { RevisionReaction } from './flow-model.ts';
 
 const reactions: RevisionReaction[] = [
@@ -35,4 +36,51 @@ test('selects the newest authoritative revision reaction without relying on API 
 test('unknown routes fail closed instead of falling into a mutation screen', () => {
   assert.equal(parseFlowRoute('/scions/case-1/decisions').kind, 'unknown');
   assert.equal(parseFlowRoute('/not-scions/case-1/context').scionId, null);
+});
+
+const baseAction: FlowActionInput = {
+  page: 'context', scionId: 'case-1', scopeId: 'scope-1', scopeState: 'usable', comparisonId: null, comparisonState: 'missing', reactionId: null,
+  canPrepareScope: false, canPrepareComparison: false, canConfirmComparison: false, freshnessKnown: true,
+};
+
+test('state and capability table exposes at most one legal forward action', () => {
+  const missingScope = recommendedFlowAction({ ...baseAction, scopeId: null, scopeState: 'missing', canPrepareScope: true });
+  assert.deepEqual(missingScope, { label: 'Complete exact scope', route: '/scions/case-1/workbench/scope' });
+  assert.equal(recommendedFlowAction({ ...baseAction, scopeId: null, scopeState: 'missing', canPrepareScope: false }), null);
+
+  const prepareComparison = recommendedFlowAction({ ...baseAction, canPrepareComparison: true });
+  assert.deepEqual(prepareComparison, { label: 'Prepare exact comparison', route: '/scions/case-1/workbench/offers' });
+  for (const scopeState of ['restricted', 'blocked', 'stale', 'proposed'] as const) {
+    assert.equal(recommendedFlowAction({ ...baseAction, page: 'scope', scopeState, canPrepareComparison: true }), null);
+  }
+
+  const confirmedComparison = { ...baseAction, page: 'comparison' as const, comparisonId: 'comparison-1', comparisonState: 'usable' as const };
+  assert.equal(recommendedFlowAction({ ...confirmedComparison, canConfirmComparison: true }), null, 'confirmation never implies decision authority');
+  assert.deepEqual(recommendedFlowAction({ ...confirmedComparison, comparisonState: 'proposed', canConfirmComparison: true }), { label: 'Complete normalization review', route: '/scions/case-1/workbench/offers' });
+  assert.equal(recommendedFlowAction({ ...baseAction, canPrepareComparison: true, freshnessKnown: false }), null);
+  assert.deepEqual(recommendedFlowAction({ ...baseAction, reactionId: 'change-1' }), { label: 'Review latest change', route: '/scions/case-1/changes/change-1' });
+});
+
+test('displayed identity role comes only from explicit server capability fields', () => {
+  const role = (overrides: Partial<PrincipalCapabilities>) => principalRoleLabel({ can_write: false, can_confirm_scope: false, can_propose_scope: false, is_agent: false, ...overrides });
+  assert.equal(role({}), 'Viewer');
+  assert.equal(role({ can_write: true }), 'Intake editor');
+  assert.equal(role({ can_propose_scope: true }), 'Scope proposer');
+  assert.equal(role({ can_confirm_scope: true }), 'Engineering Reviewer');
+  assert.equal(role({ is_agent: true, can_write: true, can_confirm_scope: true, can_propose_scope: true }), 'Proposal agent');
+  assert.notEqual(role({ can_write: true }), 'Commercial Approver');
+});
+
+test('each independent read failure preserves all other permitted results', async () => {
+  const keys: WorkflowReadKey[] = ['scope', 'comparisons', 'offers', 'reactions'];
+  for (const failedKey of keys) {
+    const results = await settleNamedReads(keys.map(key => [key, () => key === failedKey ? Promise.reject(new Error(`${key} failed`)) : Promise.resolve(`${key} value`)] as const));
+    assert.equal(results.length, 4);
+    assert.equal(results.find(result => result.key === failedKey)?.status, 'rejected');
+    for (const key of keys.filter(key => key !== failedKey)) {
+      const result = results.find(item => item.key === key);
+      assert.equal(result?.status, 'fulfilled');
+      if (result?.status === 'fulfilled') assert.equal(result.value, `${key} value`);
+    }
+  }
 });

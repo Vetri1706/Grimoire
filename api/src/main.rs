@@ -3,14 +3,17 @@ mod domain;
 mod error;
 mod monitoring;
 mod offers;
+mod onboarding;
 mod scope;
 mod sources;
 mod storage;
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{DefaultBodyLimit, Path, State, rejection::JsonRejection},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header},
+    middleware::Next,
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -28,7 +31,7 @@ type Tx = Transaction<'static, Postgres>;
 type ApiResult = Result<Response, ApiError>;
 
 #[derive(FromRow, Serialize)]
-struct Actor {
+pub(crate) struct Actor {
     principal_id: Uuid,
     org_id: Uuid,
     display_name: String,
@@ -144,11 +147,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("The API runtime must not own Grimoire tables.".into());
     }
     let migrated: bool =
-        sqlx::query_scalar("SELECT to_regclass('grimoire.intake_revisions') IS NOT NULL AND to_regprocedure('app.intake_history_authors(uuid)') IS NOT NULL AND to_regclass('grimoire.intake_source_objects') IS NOT NULL AND to_regprocedure('app.intake_source_read_lock(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_agent_tasks') IS NOT NULL AND to_regprocedure('app.intake_scope_has_preparer_conflict(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_offer_submissions') IS NOT NULL AND to_regclass('grimoire.intake_proposal_stale_transitions') IS NOT NULL AND to_regclass('grimoire.intake_proposal_review_tasks') IS NOT NULL")
+        sqlx::query_scalar("SELECT to_regclass('grimoire.intake_revisions') IS NOT NULL AND to_regprocedure('app.intake_history_authors(uuid)') IS NOT NULL AND to_regclass('grimoire.intake_source_objects') IS NOT NULL AND to_regprocedure('app.intake_source_read_lock(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_agent_tasks') IS NOT NULL AND to_regprocedure('app.intake_scope_has_preparer_conflict(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_offer_submissions') IS NOT NULL AND to_regclass('grimoire.intake_proposal_stale_transitions') IS NOT NULL AND to_regclass('grimoire.intake_proposal_review_tasks') IS NOT NULL AND to_regclass('grimoire.handler_sessions') IS NOT NULL AND to_regprocedure('app.intake_create_organization(text,text,text,text)') IS NOT NULL")
             .fetch_one(&pool)
             .await?;
     if !migrated {
-        return Err("Apply unchanged migrations 0022 through 0030, then additive worker/offer migrations 0031 through 0034 before starting the API.".into());
+        return Err("Apply unchanged migrations 0022 through 0030, then additive migrations 0031 through 0035 before starting the API.".into());
     }
     let app = Router::new()
         .route("/api/health", get(health))
@@ -160,6 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             get(history).post(create_revision),
         )
         .route("/api/scions/{id}/revisions/{number}", get(get_revision))
+        .merge(onboarding::routes())
         .merge(sources::routes())
         .merge(scope::routes())
         .merge(offers::routes())
@@ -180,6 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         })
         .layer(DefaultBodyLimit::max(256 * 1024))
+        .layer(axum::middleware::from_fn(session_csrf))
         .layer(axum::middleware::map_response(security_headers))
         .with_state(pool);
     let listener = tokio::net::TcpListener::bind(bind).await?;
@@ -205,7 +210,27 @@ async fn security_headers(mut response: Response) -> Response {
     response
 }
 
+async fn session_csrf(request: Request<Body>, next: Next) -> Response {
+    let session_write = !matches!(
+        request.method(),
+        &Method::GET | &Method::HEAD | &Method::OPTIONS
+    ) && onboarding::has_session_cookie(request.headers());
+    if session_write
+        && request
+            .headers()
+            .get("X-Grimoire-CSRF")
+            .and_then(|value| value.to_str().ok())
+            != Some("1")
+    {
+        return ApiError::csrf().into_response();
+    }
+    next.run(request).await
+}
+
 async fn authenticate(pool: &PgPool, headers: &HeaderMap) -> Result<(Tx, Actor), ApiError> {
+    if onboarding::has_session_cookie(headers) {
+        return onboarding::authenticate_session(pool, headers).await;
+    }
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())

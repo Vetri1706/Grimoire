@@ -26,6 +26,15 @@ BEGIN
    SELECT 1 FROM grimoire.intake_proposal_review_tasks
    GROUP BY org_id,transition_id HAVING count(*)<>1
  ) THEN RAISE EXCEPTION 'revision reaction uniqueness broken'; END IF;
+ IF EXISTS(
+   SELECT 1 FROM grimoire.intake_proposal_review_tasks WHERE status<>'required'
+ ) OR NOT EXISTS(
+   SELECT 1 FROM pg_constraint c
+   JOIN pg_class r ON r.oid=c.conrelid
+   JOIN pg_namespace n ON n.oid=r.relnamespace
+   WHERE n.nspname='grimoire' AND r.relname='intake_proposal_review_tasks'
+     AND c.contype='c' AND pg_get_constraintdef(c.oid) LIKE '%status%required%'
+ ) THEN RAISE EXCEPTION 'review task status is not required-only'; END IF;
  SELECT * INTO STRICT sample FROM grimoire.intake_proposal_stale_transitions
  ORDER BY recorded_at DESC,id LIMIT 1;
  SELECT count(*) INTO transitions_before FROM grimoire.intake_proposal_stale_transitions;
@@ -50,7 +59,7 @@ BEGIN
     OR has_function_privilege('grimoire_intake_app','grimoire.intake_record_revision_reactions(uuid,uuid,integer)','EXECUTE') THEN
    RAISE EXCEPTION 'runtime can forge or mutate revision monitoring state';
  END IF;
- RAISE NOTICE 'PASS: atomic transition/task pairing, replay idempotency, immutable history, and least-privilege writes';
+ RAISE NOTICE 'PASS: atomic transition/task pairing, required-only status, replay idempotency, immutable history, and least-privilege writes';
 END $$;
 
 SET LOCAL ROLE grimoire_intake_app;

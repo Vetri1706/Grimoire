@@ -10,7 +10,7 @@ Draft and source history stay immutable. No physical values are generated from m
 - Rust API: <http://127.0.0.1:8080/api/health>
 - PostgreSQL: `127.0.0.1:55432`, canonical development database `grimoire_dev`.
 - Database runtime: native PostgreSQL **17.11**, stored persistently in `.local/pgdata`, retained from the earlier Docker Desktop startup failure. Docker Engine is now reachable; Layer 2B uses a native source-built MinIO because the attempted official images/binaries were unavailable. No Docker settings, existing volumes, WSL distributions or Paperclip databases were reset.
-- Open the ignored `.env` and use `GRIMOIRE_TOKEN_A` in the UI. Token B belongs to a different local organization. The browser keeps the token only in its tab session. These are generated local development credentials, not production sign-in.
+- Open the UI and follow the one-direction setup: create the installation-owner Handler identity, name an organization, enter its empty workspace, then create the first Scion. Ordinary browser onboarding never opens `.env`. Seeded tokens remain development-harness credentials only.
 
 A clearly labelled `UI smoke test — enclosure intake` draft with four revisions remains in development for inspection. It contains no real product/supplier evidence and is independent of the supplied GG-40 fixture. The supplied fixture is present only in disposable `grimoire_test`.
 
@@ -47,13 +47,13 @@ pwsh -File scripts/dev.ps1 -Task DbUp
 pwsh -File scripts/dev.ps1 -Task Migrate
 ```
 
-`Init` never replaces an existing `.env` or its credentials. This checkout is already initialized with `GRIMOIRE_DB_MODE=native`; use `DbUp` to restart it. The native cluster persists inside this project and listens only on `127.0.0.1:55432`. `pwsh -File scripts/dev.ps1 -Task DbDown` stops the selected runtime without removing data.
+`Init` never replaces an existing `.env` or its database/harness credentials. These values support local infrastructure and automated tests; they are not ordinary UI onboarding. This checkout is already initialized with `GRIMOIRE_DB_MODE=native`; use `DbUp` to restart it. The native cluster persists inside this project and listens only on `127.0.0.1:55432`. `pwsh -File scripts/dev.ps1 -Task DbDown` stops the selected runtime without removing data.
 
 Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a native cluster and a Docker volume. Do not start both on the same port or create a second development authority as a shortcut. No Mac migration is required.
 
 ## Migration and fixture handling
 
-`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034**. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
+`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034 → 0035**. It seeds development-only harness identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing test credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
 
 - `db/gg40/0022_grimoire_contract.sql`, `0023_grimoire_review_corrections.sql`, and `fixture_one_case_two_event.sql` are unchanged supplied bytes.
 - `db/gg40/checksums.json` contains the supplied expected SHA-256 values. `.gitattributes` prevents newline conversion of these SQL files.
@@ -63,6 +63,7 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 - `db/intake/0027_intake_source_objects.sql` adds immutable object-version references and the constrained administrator transition from inline source text. This is additive Layer 2B work, not verified GG-40 SQL. Apply it, then run `ExternalizeSources` for existing inline sources before reopening their content.
 - `0028_intake_scope.sql` adds immutable scope proposals and confirmation links to the existing governed tables. `0029_intake_agent_tasks.sql` adds the scoped BYOA preparation queue. `0030_scope_chain_guard.sql` strengthens exact-chain readback and prevents a task requester from confirming work returned by their agent. All three are new application migrations, not part of verified GG-40.
 - `0031_worker_controls.sql` adds explicit dispatch, cancellation, execution bounds and immutable task provenance. `0032_synthetic_offer_comparison.sql` adds synthetic offer staging and reviewed exact comparison through existing GG-40 tables. `0033_offer_review_identity_guards.sql` enforces jurisdiction-scoped supplier identity and review separation across full offer history. `0034_persisted_revision_monitoring.sql` atomically records one stale transition and required-review task for each proposal made stale by a new Scion revision, including qualifying revisions that predate installation of the trigger; the existing computed blocker remains active. These are additive application migrations, not verified GG-40 files.
+- `0035_organization_onboarding.sql` adds one-time installation ownership, human Handler identities, hashed opaque sessions, checked organization memberships, and immutable organization-creation receipts. Organization, epoch, organization-scoped principal, and `org_admin` membership commit atomically. `org_admin` may manage Scion intake but receives no source/scope/offer, engineering, commercial, or approval authority.
 - `public.grimoire_schema_migrations` records applied file hashes and refuses changed migrations.
 - `db/local-handlers.sql` creates no governed product, offer, price or approval records.
 - `db/local-scope-actors.sql` enrolls only separate synthetic reviewer and proposal-agent principals. `GRIMOIRE_TOKEN_REVIEWER_A` is a test identity, not a qualified real reviewer. `GRIMOIRE_TOKEN_AGENT_A` cannot confirm scope or edit intake/source history.
@@ -91,7 +92,9 @@ npm.cmd --prefix web ci
 pwsh -File scripts/dev.ps1 -Task Web
 ```
 
-Open <http://127.0.0.1:5173> and enter the local Handler A token from `.env`. Create a Scion with just a name; the missing fields stay visible. Field-entry counts and unresolved questions are displayed separately from evidence readiness, which remains unassessed. Revision history selects the current snapshot immediately and shows the Handler's readable directory name, with the principal ID in details. A stale form must load the latest record and explicitly reapply intended changes; it never silently overwrites another save.
+Open <http://127.0.0.1:5173>. On first use, create the local installation-owner Handler identity and passphrase, then name the first organization. The browser receives an HttpOnly server-managed session; it never reads or stores a bearer token. Enter the empty workspace and create a Scion with just a name. Use the organization control in the sidebar to create or switch organizations. Missing fields stay visible, and each organization sees only its checked membership's Scions.
+
+The first-use setup flag is independent of organization count, so the two development workspaces seeded for the Go harness do not suppress onboarding. Setup is accepted once, only without a bearer or existing Handler session. See [the organization onboarding contract and evidence](docs/gg67-organization-onboarding.md).
 
 Vite proxies `/api` to Rust at `127.0.0.1:8080`. Rust rejects non-loopback binds, non-PostgreSQL-17 databases and privileged/owning runtime roles. No database credential is sent to the browser. No deployment or paid service is required.
 

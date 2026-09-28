@@ -28,7 +28,7 @@ if ($Task -eq 'Init') {
         "GRIMOIRE_TOKEN_REVIEWER_A=$(New-Secret)"
         "GRIMOIRE_TOKEN_AGENT_A=$(New-Secret)"
     ) | Set-Content -LiteralPath '.env' -Encoding utf8
-    Write-Host 'Created .env with fresh local database and Handler credentials.'
+    Write-Host 'Created .env with fresh local database and development-harness credentials. Browser onboarding does not read this file.'
     exit 0
 }
 function Verify-Sql {
@@ -109,7 +109,7 @@ function Initialize-Database([string]$Database) {
     Invoke-Psql -Database $Database -Sql "REVOKE ALL ON DATABASE $Database FROM PUBLIC; GRANT CONNECT ON DATABASE $Database TO grimoire_intake_app;" | Out-Null
     Verify-Sql
     Invoke-Psql -Database $Database -AsMigrator -Sql 'CREATE TABLE IF NOT EXISTS public.grimoire_schema_migrations (name text PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT clock_timestamp());' | Out-Null
-    foreach ($file in @('db/gg40/0022_grimoire_contract.sql','db/gg40/0023_grimoire_review_corrections.sql','db/intake/0024_intake.sql','db/intake/0025_intake_history_authors.sql','db/intake/0026_intake_sources.sql','db/intake/0027_intake_source_objects.sql','db/intake/0028_intake_scope.sql','db/intake/0029_intake_agent_tasks.sql','db/intake/0030_scope_chain_guard.sql','db/intake/0031_worker_controls.sql','db/intake/0032_synthetic_offer_comparison.sql','db/intake/0033_offer_review_identity_guards.sql','db/intake/0034_persisted_revision_monitoring.sql')) {
+    foreach ($file in @('db/gg40/0022_grimoire_contract.sql','db/gg40/0023_grimoire_review_corrections.sql','db/intake/0024_intake.sql','db/intake/0025_intake_history_authors.sql','db/intake/0026_intake_sources.sql','db/intake/0027_intake_source_objects.sql','db/intake/0028_intake_scope.sql','db/intake/0029_intake_agent_tasks.sql','db/intake/0030_scope_chain_guard.sql','db/intake/0031_worker_controls.sql','db/intake/0032_synthetic_offer_comparison.sql','db/intake/0033_offer_review_identity_guards.sql','db/intake/0034_persisted_revision_monitoring.sql','db/intake/0035_organization_onboarding.sql')) {
         $name = Split-Path $file -Leaf
         $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
         $previous = (Invoke-Psql -Database $Database -Scalar -Sql "SELECT sha256 FROM public.grimoire_schema_migrations WHERE name='$name';" | Out-String).Trim()
@@ -132,7 +132,7 @@ function Initialize-Database([string]$Database) {
     $scopeSeed = (Get-Content -LiteralPath 'db/local-scope-actors.sql' -Raw).Replace('__TOKEN_REVIEWER_A__',$config.GRIMOIRE_TOKEN_REVIEWER_A).Replace('__TOKEN_AGENT_A__',$config.GRIMOIRE_TOKEN_AGENT_A)
     $scopeSeed | Set-Content -LiteralPath '.local/scope-actors.sql' -Encoding utf8
     Invoke-Psql -Database $Database -AsMigrator -File '.local/scope-actors.sql' | Out-Null
-    Write-Host "Local Handler identities ready in $Database. Credentials remain in .env."
+    Write-Host "Development-harness identities ready in $Database. Browser onboarding uses a server-managed session."
 }
 
 switch ($Task) {
