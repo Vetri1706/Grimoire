@@ -19,17 +19,23 @@ All paths below are relative to the read-only `../paperclip` clone:
   compact navigation, icon sizing, and selected/hover treatment.
 - `ui/src/components/BreadcrumbBar.tsx`: header sizing and typography.
 - `ui/index.html` and `ui/src/context/ThemeContext.tsx`: reference theme
-  initialization and preference handling. Grimoire uses its own default and
-  stored preference.
+  initialization and preference handling. Grimoire resolves its own System,
+  Light or Dark preference and retains its own palette and stored setting.
 - `DESIGN.md`: semantic tokens, compact operational hierarchy, and restrained
   decoration.
 
-Grimoire defaults to dark, regardless of the browser or operating system's color
-preference. The theme switch in the workspace topbar and connection header lets
-the Handler choose light or dark. The choice is saved per browser in
-`localStorage` under `grimoire.theme` and restored on reload. If no valid saved
-choice is available, the appearance starts dark. Grimoire does not read
-Paperclip's separately stored theme preference.
+Grimoire defaults to **System**, following the browser/operating system's
+`prefers-color-scheme` preference, including changes while the page is open.
+The Appearance selector in the workspace topbar and connection header offers
+System, Light and Dark. Explicit choices are saved per browser under
+`grimoire.theme-preference`, restored before the first paint, and synchronized
+between tabs. System does not persist a resolved light/dark value. Storage being
+unavailable still allows system appearance and changes for the current visit.
+
+The old `grimoire.theme` key is ignored because the previous implementation wrote
+it automatically on every visit, so it cannot distinguish a chosen preference
+from its forced dark default. Existing users start in System and can choose an
+override again. Grimoire does not read Paperclip's separate stored preference.
 
 Inter is served locally; there are no external font requests. Missing information
 remains amber and errors remain red. Cards have neutral borders, with 8px corner
@@ -200,7 +206,7 @@ the Layer 3 verification report. No mobile checks were added for this iteration.
 The Physical scope tab now uses a neutral stacked-layers glyph rather than a
 checkmark. A blocked physical binding is never represented by an approval icon.
 The Offers and comparison tab uses neutral side-by-side rectangles. Both retain
-the shared desktop type scale and the default dark theme.
+the shared desktop type scale and the selected appearance.
 
 Synthetic offer entry requires an explicit supplier identity, confirmed physical
 scope, offer reference and exact quotation claim locator. Commercial inputs
@@ -238,3 +244,15 @@ Paperclip connection is claimed.
 TypeScript and Vite production build checks passed for this slice. This frontend
 build does not establish live offer ingestion, comparison confirmation, dispatch
 or cancellation; those results belong in the Layer 4 integration evidence.
+
+## System appearance verification
+
+The production build passed after adding System, Light and Dark preferences.
+Browser checks on the connection screen confirmed System initially resolved to
+dark, both manual overrides survived reload, switching back to System restored
+the system palette, and an already open second tab synchronized the preference.
+The existing Inter font and 18px body text were preserved in computed styles.
+Native form color-scheme and the theme-color metadata matched each palette.
+An actual operating-system theme change during an open session was not exercised;
+the media-query change listener was reviewed in code. No API or database changes
+were needed for this appearance update.
