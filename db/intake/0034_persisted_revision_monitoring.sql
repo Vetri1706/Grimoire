@@ -113,6 +113,38 @@ CREATE TRIGGER intake_revision_monitoring
 AFTER INSERT ON grimoire.intake_revisions
 FOR EACH ROW EXECUTE FUNCTION grimoire.intake_revision_monitoring_trigger();
 
+-- A database may already contain proposals whose pinned Scion revision was
+-- superseded before this trigger existed. Replay every qualifying historical
+-- revision in a stable order while the migration transaction still owns the
+-- trigger-install lock. The helper's uniqueness rules make this replay safe if
+-- the same event is evaluated again after installation.
+DO $$
+DECLARE historical_event record;
+BEGIN
+  FOR historical_event IN
+    SELECT r.org_id,r.scion_id,r.number
+    FROM grimoire.intake_revisions r
+    WHERE r.number>1 AND (
+      EXISTS(
+        SELECT 1 FROM grimoire.intake_scope_proposals p
+        WHERE (p.org_id,p.scion_id)=(r.org_id,r.scion_id)
+          AND p.scion_revision<r.number
+      ) OR EXISTS(
+        SELECT 1 FROM grimoire.intake_comparison_proposals p
+        WHERE (p.org_id,p.scion_id)=(r.org_id,r.scion_id)
+          AND p.scion_revision<r.number
+      )
+    )
+    ORDER BY r.org_id,r.scion_id,r.number
+  LOOP
+    PERFORM grimoire.intake_record_revision_reactions(
+      historical_event.org_id,
+      historical_event.scion_id,
+      historical_event.number
+    );
+  END LOOP;
+END $$;
+
 CREATE TRIGGER intake_proposal_stale_transitions_immutable
 BEFORE UPDATE OR DELETE ON grimoire.intake_proposal_stale_transitions
 FOR EACH ROW EXECUTE FUNCTION grimoire.intake_deny_mutation();

@@ -35,11 +35,21 @@ inside the Rust revision request's existing PostgreSQL transaction, before its
 idempotency receipt and response commit. A failure rolls back the revision,
 transition, task, and receipt together.
 
+The same migration also enumerates every already-recorded revision greater than
+one that has a lower-revision scope or comparison proposal, ordered by
+organization, Scion, and revision, and evaluates it through the same helper
+before commit. `CREATE TRIGGER` holds the revision table lock until the
+migration commits, so a concurrent revision insert cannot fall between trigger
+installation and this backfill. This makes upgrade-time computed staleness and
+persisted reaction state agree without inventing a second event path.
+
 The trigger helper uses `ON CONFLICT DO NOTHING` on both uniqueness boundaries,
 so replaying the same event cannot duplicate either record. The existing Rust
 request receipt remains the first retry boundary: an exact HTTP retry replays
 the saved response without inserting another revision. The database uniqueness
 rules are the second boundary and also protect explicit event re-evaluation.
+They apply identically to the migration backfill: rerunning the helper for an
+already-backfilled revision inserts neither a transition nor a task.
 
 ## Read contract and safety check
 
