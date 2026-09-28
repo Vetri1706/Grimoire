@@ -2,15 +2,22 @@
 
 Date: 2026-09-28
 
-Repository base: `46f27bef19cea5c2fc4e48bbe57b94faf354ee37`
+Implementation under test: `2a65170833143ade4a8d0af15536dbf4b148d749`
 
 ## Test boundary
 
-The durability scenario used an isolated PostgreSQL 17 Docker volume and the actual Rust API binary. Migrations `0022` through `0034` were applied in order. Two synthetic proposals were inserted in one synthetic organization; only the proposal-version guard was disabled for that fixture seed so the test could isolate the revision reaction without configuring storage/provider dependencies. All revision changes and authorization checks then went through the HTTP runtime. No customer, supplier, or production data was used.
+The durability scenario used a fresh native PostgreSQL 17.11 cluster, a
+checksum-pinned native MinIO binary with a private versioned test bucket, and
+the actual Rust API binary. Migrations `0022` through `0034` were applied in
+order. The existing Layer 3 HTTP harness created the synthetic sources, claims,
+Scion, and two physical-scope proposals through the real API; no application or
+monitoring trigger was disabled. Docker was not invoked. No customer, supplier,
+or production data was used.
 
 ## Runtime scenario: PASS
 
-1. Revision 2 was recorded for a Scion with two dependent proposals.
+1. Revision 2 was recorded through the Rust HTTP API for a Scion with two
+   API-created dependent proposals.
 2. The same database transaction created two stale transitions and two required-review tasks: one pair per proposal.
 3. Proposal detail reported `computed_stale: true`, the persisted transition/task identifiers, and the existing stale-work blocker rejected confirmation.
 4. A second organization could neither read the review list nor record a revision for the Scion; both requests returned `404 SCION_NOT_FOUND`.
@@ -28,20 +35,32 @@ The durability scenario used an isolated PostgreSQL 17 Docker volume and the act
 - least-privilege write rejection for the runtime role; and
 - organization RLS hiding another organization's transitions and review work.
 
-## Regression commands: PASS
+## Native commands and results: PASS
 
 ```text
-cd api && cargo fmt -- --check
+cd api && cargo fmt --all -- --check
 cd api && cargo check --locked
-cd api && cargo test --locked                 # 14 passed
-cd api && cargo build --locked
-npm --prefix web ci
-npm --prefix web run build                   # Vite production build passed
-go test ./...                                # harness compiled
-psql ... -f api/tests/revision_monitoring_guards.sql
+cd api && cargo test --locked
+cd web && npm run build
+cd byoa && node --test bridge.test.mjs
+cd harness && GOPATH=<run-scratch>/go GOCACHE=<run-scratch>/go-cache go test ./...
+<run-scratch>/grimoire-harness -api-binary api/target/debug/grimoire-api -scope-only
+psql ... -c 'SET ROLE grimoire_migrator;' -f api/tests/revision_monitoring_guards.sql
 ```
 
-The browser check and screenshot are recorded separately in `docs/evidence/gg61-digital-scion-browser.md`.
+Observed results:
+
+- `cargo fmt`, `cargo check`, and `cargo test`: PASS (14/14 Rust tests).
+- Vite production build: PASS (38 modules transformed).
+- BYOA Node suite: PASS (13/13).
+- Go harness compilation: PASS.
+- Native PostgreSQL/Rust HTTP Layer 3/BYOA regression: PASS (33 checks).
+- Focused SQL guards: PASS, including atomic pairing, replay idempotency,
+  immutable history, least-privilege writes, and organization RLS.
+
+The native processes bound only to loopback and were stopped after the run.
+The browser check and screenshot are recorded separately in
+`docs/evidence/gg61-digital-scion-browser.md`.
 
 ## Acceptance mapping
 
