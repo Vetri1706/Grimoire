@@ -231,13 +231,15 @@ async fn setup_owner(
     headers: HeaderMap,
     input: Result<Json<OwnerSetupInput>, JsonRejection>,
 ) -> ApiResult {
-    // Setup is deliberately one-time and unauthenticated. Existing sessions,
-    // agents, and seeded bearer identities cannot act as the installation owner.
+    // Setup is deliberately one-time and unauthenticated. A stale browser
+    // cookie is harmless because PostgreSQL's singleton setup row remains the
+    // authority; agents and seeded bearer identities are rejected explicitly.
     if headers.contains_key(header::AUTHORIZATION) {
         return Err(ApiError(
             StatusCode::FORBIDDEN,
             "INSTALLATION_SETUP_IDENTITY_DENIED",
-            "Installation-owner setup cannot be invoked with a seeded or agent bearer identity.".into(),
+            "Installation-owner setup cannot be invoked with a seeded or agent bearer identity."
+                .into(),
         ));
     }
     let input = parse_json(input)?;
