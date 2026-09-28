@@ -402,9 +402,12 @@ pub(super) async fn confirmed(
 
 async fn view(tx: &mut Tx, proposal: ProposalRow) -> Result<Value, ApiError> {
     let mut blockers: Vec<String> = Vec::new();
-    if visible_revision(tx, proposal.scion_id, false).await? != proposal.scion_revision {
+    let computed_stale =
+        visible_revision(tx, proposal.scion_id, false).await? != proposal.scion_revision;
+    if computed_stale {
         blockers.push("The Scion has a newer revision; prepare a new scope proposal.".into());
     }
+    let persisted_reaction = monitoring::latest_reaction(tx, "physical_scope", proposal.id).await?;
     if proposal.input.identity_match != IdentityMatch::Exact {
         blockers.push("The physical identity match is ambiguous.".into());
     }
@@ -466,6 +469,7 @@ async fn view(tx: &mut Tx, proposal: ProposalRow) -> Result<Value, ApiError> {
         "input":if redacted {Value::Null} else {serde_json::to_value(&proposal.input)?},
         "blockers":blockers,"status":status,"confirmation":confirmation,"required_role":ROLE,
         "synthetic_only":true,"content_redacted":redacted,"reviewer_conflict":reviewer_conflict,
+        "computed_stale":computed_stale,"persisted_revision_reaction":persisted_reaction,
         "can_confirm_this_proposal":can_confirm && !reviewer_conflict && blockers.is_empty() && confirmation.is_none()}),
     )
 }

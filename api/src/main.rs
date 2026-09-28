@@ -1,6 +1,7 @@
 mod byoa;
 mod domain;
 mod error;
+mod monitoring;
 mod offers;
 mod scope;
 mod sources;
@@ -143,11 +144,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("The API runtime must not own Grimoire tables.".into());
     }
     let migrated: bool =
-        sqlx::query_scalar("SELECT to_regclass('grimoire.intake_revisions') IS NOT NULL AND to_regprocedure('app.intake_history_authors(uuid)') IS NOT NULL AND to_regclass('grimoire.intake_source_objects') IS NOT NULL AND to_regprocedure('app.intake_source_read_lock(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_agent_tasks') IS NOT NULL AND to_regprocedure('app.intake_scope_has_preparer_conflict(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_offer_submissions') IS NOT NULL")
+        sqlx::query_scalar("SELECT to_regclass('grimoire.intake_revisions') IS NOT NULL AND to_regprocedure('app.intake_history_authors(uuid)') IS NOT NULL AND to_regclass('grimoire.intake_source_objects') IS NOT NULL AND to_regprocedure('app.intake_source_read_lock(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_agent_tasks') IS NOT NULL AND to_regprocedure('app.intake_scope_has_preparer_conflict(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_offer_submissions') IS NOT NULL AND to_regclass('grimoire.intake_proposal_stale_transitions') IS NOT NULL AND to_regclass('grimoire.intake_proposal_review_tasks') IS NOT NULL")
             .fetch_one(&pool)
             .await?;
     if !migrated {
-        return Err("Apply unchanged migrations 0022 through 0030, then additive worker/offer migrations 0031 and 0032 before starting the API.".into());
+        return Err("Apply unchanged migrations 0022 through 0030, then additive worker/offer migrations 0031 through 0034 before starting the API.".into());
     }
     let app = Router::new()
         .route("/api/health", get(health))
@@ -162,6 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(sources::routes())
         .merge(scope::routes())
         .merge(offers::routes())
+        .merge(monitoring::routes())
         .merge(byoa::routes())
         .fallback(|| async {
             ApiError(

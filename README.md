@@ -53,7 +53,7 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 
 ## Migration and fixture handling
 
-`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033**. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
+`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034**. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
 
 - `db/gg40/0022_grimoire_contract.sql`, `0023_grimoire_review_corrections.sql`, and `fixture_one_case_two_event.sql` are unchanged supplied bytes.
 - `db/gg40/checksums.json` contains the supplied expected SHA-256 values. `.gitattributes` prevents newline conversion of these SQL files.
@@ -62,7 +62,7 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 - `db/intake/0026_intake_sources.sql` adds immutable synthetic draft source revisions, exact-locator manual claims, and revocation. This is new intake work in the same database, not a change to the verified GG-40 source contract.
 - `db/intake/0027_intake_source_objects.sql` adds immutable object-version references and the constrained administrator transition from inline source text. This is additive Layer 2B work, not verified GG-40 SQL. Apply it, then run `ExternalizeSources` for existing inline sources before reopening their content.
 - `0028_intake_scope.sql` adds immutable scope proposals and confirmation links to the existing governed tables. `0029_intake_agent_tasks.sql` adds the scoped BYOA preparation queue. `0030_scope_chain_guard.sql` strengthens exact-chain readback and prevents a task requester from confirming work returned by their agent. All three are new application migrations, not part of verified GG-40.
-- `0031_worker_controls.sql` adds explicit dispatch, cancellation, execution bounds and immutable task provenance. `0032_synthetic_offer_comparison.sql` adds synthetic offer staging and reviewed exact comparison through existing GG-40 tables. `0033_offer_review_identity_guards.sql` enforces jurisdiction-scoped supplier identity and review separation across full offer history. These are additive application migrations, not verified GG-40 files.
+- `0031_worker_controls.sql` adds explicit dispatch, cancellation, execution bounds and immutable task provenance. `0032_synthetic_offer_comparison.sql` adds synthetic offer staging and reviewed exact comparison through existing GG-40 tables. `0033_offer_review_identity_guards.sql` enforces jurisdiction-scoped supplier identity and review separation across full offer history. `0034_persisted_revision_monitoring.sql` atomically records one stale transition and required-review task for each proposal made stale by a new Scion revision; the existing computed blocker remains active. These are additive application migrations, not verified GG-40 files.
 - `public.grimoire_schema_migrations` records applied file hashes and refuses changed migrations.
 - `db/local-handlers.sql` creates no governed product, offer, price or approval records.
 - `db/local-scope-actors.sql` enrolls only separate synthetic reviewer and proposal-agent principals. `GRIMOIRE_TOKEN_REVIEWER_A` is a test identity, not a qualified real reviewer. `GRIMOIRE_TOKEN_AGENT_A` cannot confirm scope or edit intake/source history.
@@ -94,6 +94,13 @@ pwsh -File scripts/dev.ps1 -Task Web
 Open <http://127.0.0.1:5173> and enter the local Handler A token from `.env`. Create a Scion with just a name; the missing fields stay visible. Field-entry counts and unresolved questions are displayed separately from evidence readiness, which remains unassessed. Revision history selects the current snapshot immediately and shows the Handler's readable directory name, with the principal ID in details. A stale form must load the latest record and explicitly reapply intended changes; it never silently overwrites another save.
 
 Vite proxies `/api` to Rust at `127.0.0.1:8080`. Rust rejects non-loopback binds, non-PostgreSQL-17 databases and privileged/owning runtime roles. No database credential is sent to the browser. No deployment or paid service is required.
+
+Digital Scions expose only the case record, revision history, and sources/claims
+tabs. Physical scope and offer actions are absent rather than merely disabled.
+The current web target has no graph, feed, or monitoring surface; no unavailable
+runtime route is presented as implemented. See the
+[persisted revision reaction contract](docs/gg61-revision-monitoring-contract.md)
+for the separate database-backed monitoring increment.
 
 ## First Layer 2 slice: synthetic source and claim
 

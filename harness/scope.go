@@ -11,13 +11,29 @@ import (
 )
 
 type scopeProposal struct {
-	ID            string            `json:"id"`
-	ScionID       string            `json:"scion_id"`
-	ScionRevision int               `json:"scion_revision"`
-	CreatedBy     string            `json:"created_by"`
-	Input         json.RawMessage   `json:"input"`
-	Blockers      []json.RawMessage `json:"blockers"`
-	Confirmation  json.RawMessage   `json:"confirmation"`
+	ID                string            `json:"id"`
+	ScionID           string            `json:"scion_id"`
+	ScionRevision     int               `json:"scion_revision"`
+	CreatedBy         string            `json:"created_by"`
+	Input             json.RawMessage   `json:"input"`
+	Blockers          []json.RawMessage `json:"blockers"`
+	Confirmation      json.RawMessage   `json:"confirmation"`
+	ComputedStale     bool              `json:"computed_stale"`
+	PersistedReaction json.RawMessage   `json:"persisted_revision_reaction"`
+}
+type revisionReview struct {
+	TransitionID       string `json:"transition_id"`
+	ProposalKind       string `json:"proposal_kind"`
+	ProposalID         string `json:"proposal_id"`
+	ProposalRevision   int    `json:"proposal_scion_revision"`
+	SupersededRevision int    `json:"superseded_by_revision"`
+	Reason             string `json:"reason"`
+	ReviewTask         struct {
+		ID                  string `json:"id"`
+		TaskKind            string `json:"task_kind"`
+		Status              string `json:"status"`
+		RequiredForRevision int    `json:"required_for_revision"`
+	} `json:"review_task"`
 }
 type scopeFixture struct {
 	path          string
@@ -420,20 +436,124 @@ func (h *harness) runScope() error {
 	}); err != nil {
 		return err
 	}
-	if err := h.check("intake revision change blocks an earlier scope proposal from confirmation", func() error {
-		r, e := h.propose(other, "scope-stale-proposal", other.proposal, 201)
+	if err := h.check("Scion revision monitoring is atomic, idempotent, durable, tenant-scoped, and retains the computed blocker", func() error {
+		created := make([]scopeProposal, 0, 2)
+		for _, suffix := range []string{"a", "b"} {
+			r, e := h.propose(other, "scope-monitor-proposal-"+suffix, other.proposal, 201)
+			if e != nil {
+				return e
+			}
+			p, e := decode[scopeProposal](r)
+			if e != nil {
+				return e
+			}
+			created = append(created, p)
+		}
+		reviewsPath := other.path + "/revision-reviews"
+		before, e := h.sourceReq("GET", reviewsPath, h.tokenA, nil, "", "", 200)
 		if e != nil {
 			return e
 		}
-		p, e := decode[scopeProposal](r)
+		initial, e := decode[struct {
+			Items []revisionReview `json:"items"`
+		}](before)
+		if e != nil || len(initial.Items) != 0 {
+			return fmt.Errorf("review work existed before a revision change: %v %s", e, before.body)
+		}
+		changed := other.draft
+		changed.ChangeSummary = "Synthetic revision 2 monitoring event"
+		revisionTwo, e := h.req("POST", other.path+"/revisions", h.tokenA, changed, "scope-monitor-revision-2", `"1"`, 201)
 		if e != nil {
 			return e
 		}
-		if _, e = h.req("POST", other.path+"/revisions", h.tokenA, other.draft, "scope-new-intake", `"1"`, 201); e != nil {
+		after, e := h.sourceReq("GET", reviewsPath, h.tokenA, nil, "", "", 200)
+		if e != nil {
 			return e
 		}
-		_, e = h.sourceReq("POST", other.path+"/scope/proposals/"+p.ID+"/confirm", h.reviewer, confirmationBody(), "scope-stale-confirm", `"2"`, 412)
-		return e
+		items, e := decode[struct {
+			Items []revisionReview `json:"items"`
+		}](after)
+		if e != nil || len(items.Items) != 2 {
+			return fmt.Errorf("expected one transition and task for each of two proposals: %v %s", e, after.body)
+		}
+		proposalIDs := map[string]bool{created[0].ID: true, created[1].ID: true}
+		transitionIDs, taskIDs := map[string]bool{}, map[string]bool{}
+		for _, item := range items.Items {
+			if !proposalIDs[item.ProposalID] || item.ProposalKind != "physical_scope" || item.ProposalRevision != 1 || item.SupersededRevision != 2 || item.Reason != "scion_revision_changed" || item.ReviewTask.TaskKind != "revision_change_review" || item.ReviewTask.Status != "required" || item.ReviewTask.RequiredForRevision != 2 || item.TransitionID == "" || item.ReviewTask.ID == "" {
+				return fmt.Errorf("incorrect persisted revision reaction: %+v", item)
+			}
+			transitionIDs[item.TransitionID], taskIDs[item.ReviewTask.ID] = true, true
+		}
+		if len(transitionIDs) != 2 || len(taskIDs) != 2 {
+			return fmt.Errorf("duplicate transition or review-task identity")
+		}
+		detail, e := h.sourceReq("GET", other.path+"/scope/proposals/"+created[0].ID, h.tokenA, nil, "", "", 200)
+		if e != nil {
+			return e
+		}
+		stale, e := decode[scopeProposal](detail)
+		if e != nil || !stale.ComputedStale || len(stale.Blockers) == 0 || string(stale.PersistedReaction) == "null" {
+			return fmt.Errorf("computed and persisted stale state disagree: %v %s", e, detail.body)
+		}
+		if _, e = h.sourceReq("POST", other.path+"/scope/proposals/"+created[0].ID+"/confirm", h.reviewer, confirmationBody(), "scope-monitor-stale-confirm", `"2"`, 412); e != nil {
+			return e
+		}
+		if _, e = h.sourceReq("GET", reviewsPath, h.tokenB, nil, "", "", 404); e != nil {
+			return e
+		}
+		if _, e = h.req("POST", other.path+"/revisions", h.tokenB, changed, "scope-monitor-foreign-write", `"2"`, 404); e != nil {
+			return e
+		}
+		if e = h.process.stop(); e != nil {
+			return e
+		}
+		if e = h.process.start(h.client); e != nil {
+			return e
+		}
+		replay, e := h.req("POST", other.path+"/revisions", h.tokenA, changed, "scope-monitor-revision-2", `"1"`, 201)
+		if e != nil {
+			return e
+		}
+		if e = equalReplay(revisionTwo, replay); e != nil {
+			return e
+		}
+		durable, e := h.sourceReq("GET", reviewsPath, h.tokenA, nil, "", "", 200)
+		if e != nil {
+			return e
+		}
+		if !equalJSON(after.body, durable.body) {
+			return fmt.Errorf("restart or retry changed persisted revision reactions: before=%s after=%s", after.body, durable.body)
+		}
+		changed.ChangeSummary = "Synthetic revision 3 monitoring event"
+		revisionThree, e := h.req("POST", other.path+"/revisions", h.tokenA, changed, "scope-monitor-revision-3", `"2"`, 201)
+		if e != nil {
+			return e
+		}
+		replayThree, e := h.req("POST", other.path+"/revisions", h.tokenA, changed, "scope-monitor-revision-3", `"2"`, 201)
+		if e != nil {
+			return e
+		}
+		if e = equalReplay(revisionThree, replayThree); e != nil {
+			return e
+		}
+		later, e := h.sourceReq("GET", reviewsPath, h.tokenA, nil, "", "", 200)
+		if e != nil {
+			return e
+		}
+		laterItems, e := decode[struct {
+			Items []revisionReview `json:"items"`
+		}](later)
+		if e != nil || len(laterItems.Items) != 4 {
+			return fmt.Errorf("later revision did not create exactly one next reaction per proposal: %v %s", e, later.body)
+		}
+		counts := map[int]int{}
+		for _, item := range laterItems.Items {
+			counts[item.SupersededRevision]++
+		}
+		if counts[2] != 2 || counts[3] != 2 {
+			return fmt.Errorf("unexpected transition counts by revision: %+v", counts)
+		}
+		return nil
 	}); err != nil {
 		return err
 	}

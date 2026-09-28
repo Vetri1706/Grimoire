@@ -531,6 +531,9 @@ async fn load_comparison(tx: &mut Tx, scion: Uuid, id: Uuid) -> Result<Compariso
     sqlx::query_as(&format!("SELECT {COMPARISON_COLUMNS} FROM grimoire.intake_comparison_proposals WHERE scion_id=$1 AND id=$2")).bind(scion).bind(id).fetch_optional(&mut **tx).await?.ok_or_else(ApiError::not_found)
 }
 async fn comparison_view(tx: &mut Tx, row: ComparisonRow) -> Result<Value, ApiError> {
+    let current_revision = visible_revision(tx, row.scion_id, false).await?;
+    let computed_stale = current_revision != row.scion_revision;
+    let persisted_reaction = monitoring::latest_reaction(tx, "offer_comparison", row.id).await?;
     let error = verify_candidate(tx, row.scion_id, row.scion_revision, &row.input)
         .await
         .err();
@@ -583,7 +586,7 @@ async fn comparison_view(tx: &mut Tx, row: ComparisonRow) -> Result<Value, ApiEr
         "proposed"
     };
     Ok(
-        json!({"id":row.id,"scion_id":row.scion_id,"scion_revision":row.scion_revision,"input":if redacted{Value::Null}else{row.input.0},"snapshot":if redacted{Value::Null}else{row.snapshot},"created_by":row.created_by,"created_at":row.created_at,"status":status,"blockers":blockers,"confirmation":confirmation,"reviewer_conflict":reviewer_conflict,"can_confirm_this_proposal":can_confirm&&!reviewer_conflict&&blockers.is_empty()&&confirmation.is_none(),"content_redacted":redacted}),
+        json!({"id":row.id,"scion_id":row.scion_id,"scion_revision":row.scion_revision,"input":if redacted{Value::Null}else{row.input.0},"snapshot":if redacted{Value::Null}else{row.snapshot},"created_by":row.created_by,"created_at":row.created_at,"status":status,"blockers":blockers,"confirmation":confirmation,"reviewer_conflict":reviewer_conflict,"computed_stale":computed_stale,"persisted_revision_reaction":persisted_reaction,"can_confirm_this_proposal":can_confirm&&!reviewer_conflict&&blockers.is_empty()&&confirmation.is_none(),"content_redacted":redacted}),
     )
 }
 async fn list_comparisons(
