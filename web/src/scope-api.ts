@@ -1,3 +1,5 @@
+import type { RevisionReaction } from './flow-model';
+
 export const scopeKinds = ['configuration', 'component', 'occurrence', 'requirement'] as const;
 export type ScopeKind = typeof scopeKinds[number];
 export type ScopeReference = {
@@ -50,6 +52,8 @@ export type ScopeProposal = {
   required_role: 'synthetic_engineering_reviewer';
   reviewer_conflict: boolean;
   can_confirm_this_proposal: boolean;
+  computed_stale?: boolean;
+  persisted_revision_reaction?: RevisionReaction | null;
 };
 export type ScopeList = {
   proposals: ScopeProposal[];

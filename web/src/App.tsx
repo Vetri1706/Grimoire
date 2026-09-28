@@ -4,6 +4,8 @@ import { ApiError, request } from './api';
 import Evidence from './Evidence';
 import PhysicalScope from './PhysicalScope';
 import Offers from './Offers';
+import DirectionalFlow from './DirectionalFlow';
+import { parseFlowRoute, scionIdFromRoute } from './flow-model';
 import type { Category, Intake, Principal, Revision, RevisionHistory, Scion } from './api';
 
 type IconName = 'book' | 'plus' | 'arrow' | 'history' | 'file' | 'check' | 'search' | 'lock' | 'edit' | 'alert' | 'logout' | 'sun' | 'moon' | 'monitor' | 'layers' | 'columns';
@@ -76,9 +78,13 @@ export default function App() {
   const [edit, setEdit] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [notice, setNotice] = useState('');
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationPanel = useRef<HTMLElement>(null);
+  const navigationTrigger = useRef<HTMLButtonElement>(null);
   const dirty = useRef(false);
   const routeRef = useRef(route);
-  const id = route.startsWith('/scions/') ? route.slice('/scions/'.length) : null;
+  const id = scionIdFromRoute(route);
+  const routeLabel = route === '/new' ? 'New case' : id ? ({ context: 'Case context', scope: 'Exact scope', comparison: 'Offer comparison', 'decision-new': 'Record decision', decision: 'Decision', change: 'Change impact', review: 'Review task', history: 'Revision history', sources: 'Sources and claims', 'scope-workbench': 'Scope workbench', 'offers-workbench': 'Offer workbench', unknown: 'Case' } as const)[parseFlowRoute(route).kind] : 'Cases';
   const canWrite = principal?.can_write !== false;
 
   useEffect(() => {
@@ -111,7 +117,7 @@ export default function App() {
       if (dirty.current && !window.confirm('Leave this edit? Your unsaved changes will be lost.')) {
         window.history.replaceState(null, '', `#${routeRef.current}`); return;
       }
-      dirty.current = false; routeRef.current = next; setRoute(next); setEdit(false); setNotice('');
+      dirty.current = false; routeRef.current = next; setRoute(next); setEdit(false); setNotice(''); setNavigationOpen(false);
     };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
@@ -121,6 +127,22 @@ export default function App() {
     window.addEventListener('beforeunload', unload);
     return () => window.removeEventListener('beforeunload', unload);
   }, []);
+  useEffect(() => {
+    if (!navigationOpen) return;
+    const panel = navigationPanel.current;
+    const focusable = () => [...(panel?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled)') ?? [])];
+    window.requestAnimationFrame(() => focusable()[0]?.focus());
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setNavigationOpen(false); window.requestAnimationFrame(() => navigationTrigger.current?.focus()); return; }
+      if (event.key !== 'Tab') return;
+      const items = focusable(); if (!items.length) return;
+      const first = items[0]; const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => document.removeEventListener('keydown', keydown);
+  }, [navigationOpen]);
   useEffect(() => {
     if (!token) return;
     let active = true;
@@ -157,17 +179,17 @@ export default function App() {
   if (!principal) return <div className="boot-state" role="status"><Icon name="book" size={34} /><p>Opening your workspace…</p></div>;
   return <div className="app-shell">
     <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to content</a>
-    <aside className="sidebar">
+    {navigationOpen && <button className="navigation-backdrop" type="button" aria-label="Close navigation" onClick={() => setNavigationOpen(false)} />}
+    <aside ref={navigationPanel} className={`sidebar ${navigationOpen ? 'open' : ''}`} aria-label="Workspace navigation" role={navigationOpen ? 'dialog' : undefined} aria-modal={navigationOpen || undefined}>
       <button className="brand" onClick={() => navigate('/')} aria-label="Grimoire home"><span className="brand-icon"><Icon name="book" size={25} /></span><span>GRIMOIRE<small>THE CASE WORKSPACE</small></span></button>
-      <div className="workspace-switch"><span className="workspace-monogram">{principal.organization_name?.charAt(0) || 'G'}</span><span><strong>{principal.organization_name}</strong><small>Handler workspace</small></span><span className="online-dot" title="Connected" /></div>
-      <p className="nav-label">WORKSPACE</p><nav aria-label="Main navigation"><button className={`nav-item ${route !== '/new' ? 'active' : ''}`} onClick={() => navigate('/')}><Icon name="file" /><span>Scions</span><span className="nav-count">{scions.length}</span></button><button aria-label="Create a Scion" className={`nav-item ${route === '/new' ? 'active' : ''}`} onClick={() => navigate('/new')} disabled={!canWrite}><Icon name="plus" /><span>Create a Scion</span></button></nav>
-      <div className="sidebar-note"><span className="sidebar-note-rule" /><p>A record of what is known.<br />A clear view of what is missing.</p><small>Intake drafts are the starting point for a sourcing decision.</small></div>
+      <p className="organization-label">{principal.organization_name}</p>
+      <p className="nav-label">WORKSPACE</p><nav aria-label="Main navigation"><button className={`nav-item ${route !== '/new' ? 'active' : ''}`} onClick={() => navigate('/')}><Icon name="file" /><span>Cases</span><span className="nav-count">{scions.length}</span></button></nav>
       <div className="identity"><span className="avatar">{principal.display_name?.charAt(0) || 'H'}</span><span><strong>{principal.display_name}</strong><small>Handler</small></span><button className="icon-button" onClick={disconnect} aria-label="Disconnect workspace" title="Disconnect"><Icon name="logout" size={18} /></button></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="breadcrumb"><button onClick={() => navigate('/')}>Workspace</button><span>/</span><span>{route === '/new' ? 'New Scion' : id ? 'Case record' : 'Scions'}</span></div><div className="topbar-actions"><span className="environment"><span />Local development</span><ThemePicker theme={theme} onChangeTheme={changeTheme} /></div></header><main id="main-content" tabIndex={-1}>
+    <div className="workspace"><header className="topbar"><div className="breadcrumb"><button ref={navigationTrigger} className="navigation-toggle" type="button" onClick={() => setNavigationOpen(true)} aria-label="Open navigation" aria-expanded={navigationOpen}>☰</button><button onClick={() => navigate('/')}>Cases</button>{id && <><span>/</span><button onClick={() => navigate(`/scions/${id}/context`)}>{selected?.revision.name ?? 'Case'}</button></>}{route !== '/' && <><span>/</span><span>{routeLabel}</span></>}</div><div className="topbar-actions"><span className="environment"><span />Local development</span><ThemePicker theme={theme} onChangeTheme={changeTheme} /></div></header><main id="main-content" tabIndex={-1}>
       {!canWrite && <div className="info-notice"><Icon name="lock" size={18} /><p>This identity has read-only access. A Handler must create and revise Scion intakes.</p></div>}{notice && <div className="success-notice" role="status"><Icon name="check" size={18} />{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}
       {error && <ErrorMessage>{error}<button className="text-button" onClick={() => setRefresh(value => value + 1)}>Retry</button></ErrorMessage>}
-      {loading ? <div className="loading-panel" role="status">Loading the case record…</div> : route === '/new' ? !canWrite ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <IntakeForm token={token} onSaved={saved} onCancel={() => navigate('/')} onDirty={setDirty} /> : selected && id ? edit ? <IntakeForm key={`${selected.id}-edit`} token={token} scion={selected} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /> : <CaseRecord key={selected.id} token={token} scion={selected} principalId={principal.principal_id} canWrite={canWrite} onDirty={setDirty} onEdit={() => setEdit(true)} /> : !id ? <ScionList scions={scions} canWrite={canWrite} loading={listLoading} onOpen={value => navigate(`/scions/${value}`)} onNew={() => navigate('/new')} /> : !error && <div className="loading-panel">Choose a Scion to open its case record.</div>}
+      {loading ? <div className="loading-panel" role="status">Loading the case record…</div> : route === '/new' ? !canWrite ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <IntakeForm token={token} onSaved={saved} onCancel={() => navigate('/')} onDirty={setDirty} /> : selected && id ? edit ? <IntakeForm key={`${selected.id}-edit`} token={token} scion={selected} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /> : <CaseRecord key={selected.id} token={token} scion={selected} route={route} navigate={navigate} principalId={principal.principal_id} canWrite={canWrite} onDirty={setDirty} onEdit={() => setEdit(true)} /> : !id ? <ScionList scions={scions} canWrite={canWrite} loading={listLoading} onOpen={value => navigate(`/scions/${value}/context`)} onNew={() => navigate('/new')} /> : !error && <div className="loading-panel">Choose a case to open its record.</div>}
     </main><footer className="workspace-footer"><span>GRIMOIRE <b>·</b> SCION INTAKE</span><span>Facts first. Decisions remain with the Handler.</span></footer></div>
   </div>;
 }
@@ -185,43 +207,30 @@ function IntakeCoverage({ revision }: { revision: Intake }) {
 function ScionList({ scions, loading, onOpen, onNew, canWrite }: { scions: Scion[]; canWrite: boolean; loading: boolean; onOpen: (id: string) => void; onNew: () => void }) {
   const [query, setQuery] = useState('');
   const visible = scions.filter(scion => `${scion.revision.name} ${scion.id}`.toLowerCase().includes(query.toLowerCase()));
-  return <><div className="page-heading"><div><p className="eyebrow">YOUR CASE RECORDS</p><h1>Scions</h1><p>Capture the product. Clarify the decision. Keep the history.</p></div><button className="button primary" onClick={onNew} disabled={!canWrite}><Icon name="plus" size={18} />Create a Scion</button></div>
-    <section className="intake-banner"><div className="banner-symbol"><Icon name="book" size={27} /></div><div><h2>Start with what you know.</h2><p>Save an incomplete intake. Missing information stays visible, and every edit becomes a new revision.</p></div><span className="badge emphasis">Layer 1 · Intake</span></section>
-    <div className="list-toolbar"><h2>All Scions <span>{scions.length}</span></h2><label className="search-field"><Icon name="search" size={18} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search by name or ID" aria-label="Search Scions" /></label></div>
-    {loading ? <div className="loading-panel" role="status">Loading Scions…</div> : scions.length === 0 ? <div className="empty-state"><span className="empty-symbol"><Icon name="file" size={36} /></span><h2>Your first case starts here.</h2><p>A name is enough to begin. Add the product details you have, and return to the unknowns when you’re ready.</p><button className="button primary" onClick={onNew} disabled={!canWrite}><Icon name="plus" size={18} />Create your first Scion</button><small>No sourcing decision is made when you save an intake.</small></div> : visible.length === 0 ? <div className="empty-state compact"><h2>No matching Scions</h2><p>Try another name or ID.</p><button className="button secondary" onClick={() => setQuery('')}>Clear search</button></div> : <div className="scion-list">{visible.map(scion => <button key={scion.id} className="scion-row" onClick={() => onOpen(scion.id)}><span className="record-icon"><Icon name="file" size={23} /></span><div className="scion-row-main"><div className="scion-row-title"><h3>{scion.revision.name}</h3><span className="badge">Intake draft</span></div><p>{category(scion.revision.product_category)}<span>·</span>Revision {scion.current_revision}<span>·</span>{date(scion.revision.created_at)}</p><IntakeCoverage revision={scion.revision} /></div><div className="scion-row-end">{enteredFieldCount(scion.revision) < 5 && <span className="gap-count">{5 - enteredFieldCount(scion.revision)} field{5 - enteredFieldCount(scion.revision) === 1 ? '' : 's'} not entered</span>}<Icon name="arrow" size={20} /></div></button>)}</div>}
+  return <><div className="page-heading"><div><p className="eyebrow">YOUR SOURCING CASES</p><h1>Cases</h1><p>Open a case by product context and follow its single recommended next action.</p></div>{scions.length > 0 && <button className="text-button" onClick={onNew} disabled={!canWrite}><Icon name="plus" size={18} />Create a case</button>}</div>
+    <div className="list-toolbar"><h2>All cases <span>{scions.length}</span></h2><label className="search-field"><Icon name="search" size={18} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search cases" aria-label="Search cases" /></label></div>
+    {loading ? <div className="case-list-skeleton" role="status" aria-live="polite"><span className="sr-only">Loading cases</span><i /><i /><i /></div> : scions.length === 0 ? <div className="empty-state"><span className="empty-symbol"><Icon name="file" size={36} /></span><h2>No cases yet.</h2><p>Create a case to begin with a product configuration.</p><button className="button primary" onClick={onNew} disabled={!canWrite}><Icon name="plus" size={18} />Create a case</button><small>No sourcing decision is made when you save an intake.</small></div> : visible.length === 0 ? <div className="empty-state compact"><h2>No cases match “{query}”</h2><p>Clear the search to return to all permitted cases.</p><button className="button primary" onClick={() => setQuery('')}>Clear search</button></div> : <div className="scion-list">{visible.map(scion => <button key={scion.id} className="scion-row" onClick={() => onOpen(scion.id)}><div className="scion-row-main"><div className="scion-row-title"><h3>{scion.revision.name}</h3><span className="badge">{scion.revision.product_category === 'physical' ? 'Current' : 'Intake only'}</span></div><p>{scion.revision.product_category === 'physical' ? 'Scope status available in case' : category(scion.revision.product_category)}<span>·</span>Scion r{scion.current_revision}</p><p className="case-row-action">{scion.revision.product_category === 'physical' ? 'Open the exact sourcing context' : 'Open intake and evidence'} </p></div><div className="scion-row-end"><Icon name="arrow" size={20} /></div></button>)}</div>}
   </>;
 }
 
-function CaseRecord({ token, scion, principalId, onEdit, canWrite, onDirty }: { token: string; scion: Scion; principalId: string; canWrite: boolean; onEdit: () => void; onDirty: (value: boolean) => void }) {
-  const [tab, setTab] = useState<'record' | 'history' | 'sources' | 'scope' | 'offers'>('record');
+function CaseRecord({ token, scion, route, navigate, principalId, onEdit, canWrite, onDirty }: { token: string; scion: Scion; route: string; navigate: (route: string) => void; principalId: string; canWrite: boolean; onEdit: () => void; onDirty: (value: boolean) => void }) {
+  const parsed = parseFlowRoute(route);
   const [scopeProposalId, setScopeProposalId] = useState<string | null>(null);
   const [comparisonProposalId, setComparisonProposalId] = useState<string | null>(null);
   const sourceDirty = useRef(false);
-  const physical = scion.revision.product_category === 'physical';
-  const visibleTab = physical || (tab !== 'scope' && tab !== 'offers') ? tab : 'record';
   const markSourceDirty = useCallback((value: boolean) => { sourceDirty.current = value; onDirty(value); }, [onDirty]);
-  function leaveSource() {
-    if (sourceDirty.current && !window.confirm('Discard this unsaved case edit?')) return false;
-    markSourceDirty(false); return true;
-  }
-  useEffect(() => {
-    if (!physical && (tab === 'scope' || tab === 'offers')) {
-      markSourceDirty(false);
-      setTab('record');
-    }
-  }, [physical, tab, markSourceDirty]);
-  function changeTab(next: typeof tab) {
-    if (!physical && (next === 'scope' || next === 'offers')) return;
-    if (next !== tab && leaveSource()) setTab(next);
-  }
-  function editIntake() { if (leaveSource()) onEdit(); }
-  function openScopeProposal(id: string) { if (leaveSource()) { setScopeProposalId(id); setTab('scope'); } }
-  function openOfferProposal(id: string) { if (leaveSource()) { setComparisonProposalId(id); setTab('offers'); } }
-  return <><div className="case-heading"><div><div className="case-kicker"><span className="eyebrow">SCION CASE RECORD</span><span className="badge">Intake draft</span></div><h1>{scion.revision.name}</h1><div className="case-meta"><span className="revision-marker">Revision {scion.current_revision}</span><span>{category(scion.revision.product_category)}</span><span>Updated {date(scion.revision.created_at)}</span></div><div className="record-id">SCION ID <code>{scion.id}</code></div></div><button className="button primary" onClick={editIntake} disabled={!canWrite}><Icon name="edit" size={18} />Edit as new revision</button></div>
-    {scion.revision.product_category === 'digital' && <div className="info-notice"><Icon name="file" size={18} /><p><strong>Digital product · intake, history, and evidence only.</strong> Physical scope and offer workflows are unavailable for this Scion.</p></div>}
-    <div className="case-tabs" role="tablist" aria-label="Case record views"><button role="tab" aria-selected={visibleTab === 'record'} aria-controls="record-panel" id="record-tab" className={visibleTab === 'record' ? 'selected' : ''} onClick={() => changeTab('record')}><Icon name="file" size={17} />Case record</button><button role="tab" aria-selected={visibleTab === 'history'} aria-controls="history-panel" id="history-tab" className={visibleTab === 'history' ? 'selected' : ''} onClick={() => changeTab('history')}><Icon name="history" size={17} />Revision history<span>{scion.current_revision}</span></button><button role="tab" aria-selected={visibleTab === 'sources'} aria-controls="sources-panel" id="sources-tab" className={visibleTab === 'sources' ? 'selected' : ''} onClick={() => changeTab('sources')}><Icon name="book" size={17} />Sources and claims</button>{physical && <><button role="tab" aria-selected={visibleTab === 'scope'} aria-controls="scope-panel" id="scope-tab" className={visibleTab === 'scope' ? 'selected' : ''} onClick={() => changeTab('scope')}><Icon name="layers" size={17} />Physical scope</button><button role="tab" aria-selected={visibleTab === 'offers'} aria-controls="offers-panel" id="offers-tab" className={visibleTab === 'offers' ? 'selected' : ''} onClick={() => changeTab('offers')}><Icon name="columns" size={17} />Offers and comparison</button></>}</div>
-    {visibleTab === 'record' ? <div className="case-columns" role="tabpanel" id="record-panel" aria-labelledby="record-tab"><section className="facts-card"><div className="section-heading"><h2>Known facts</h2><span className="source-label">Handler-provided</span></div><p className="section-description">Recorded understanding. These facts have not been independently verified.</p><RecordFacts revision={scion.revision} /></section><aside className="evidence-column"><section className="next-action"><p className="eyebrow">NEXT SAFE ACTION</p><span className="action-symbol"><Icon name="arrow" size={20} /></span><h2>{scion.next_safe_action}</h2><p>Saving a draft records information. It does not qualify the product or authorize sourcing.</p><button className="text-button" onClick={editIntake} disabled={!canWrite}>Update the intake<Icon name="arrow" size={16} /></button></section><section className="gaps-card"><div className="section-heading"><h2>Open intake items</h2><span className="gap-number">{scion.missing_information.length}</span></div><IntakeCoverage revision={scion.revision} />{scion.missing_information.length > 0 ? <ul className="gap-list">{scion.missing_information.map(gap => <li key={gap.field}><span className="gap-dot" /><div><strong>{gap.message}</strong><p>{gap.next_action}</p></div></li>)}</ul> : <p className="all-recorded">All intake sections have a recorded answer. Evidence review and qualification remain separate steps.</p>}<div className="evidence-note"><Icon name="lock" size={16} /><div><strong>Evidence readiness: not assessed</strong><p>Entered fields remain Handler-provided. Field completion is not verification or sourcing approval.</p></div></div></section></aside></div> : visibleTab === 'history' ? <div role="tabpanel" id="history-panel" aria-labelledby="history-tab"><History token={token} scion={scion} /></div> : visibleTab === 'sources' ? <div role="tabpanel" id="sources-panel" aria-labelledby="sources-tab"><Evidence token={token} scion={scion} canWrite={canWrite} onDirty={markSourceDirty} /></div> : visibleTab === 'scope' ? <div role="tabpanel" id="scope-panel" aria-labelledby="scope-tab"><PhysicalScope token={token} scion={scion} principalId={principalId} canWrite={canWrite} onDirty={markSourceDirty} onSources={() => changeTab('sources')} onOfferProposal={openOfferProposal} preferredProposalId={scopeProposalId} /></div> : visibleTab === 'offers' ? <div role="tabpanel" id="offers-panel" aria-labelledby="offers-tab"><Offers token={token} scion={scion} canWrite={canWrite} preferredProposalId={comparisonProposalId} onDirty={markSourceDirty} onSources={() => changeTab('sources')} onScopeProposal={openScopeProposal} /></div> : null}
-  </>;
+  function leave(next: string) { if (sourceDirty.current && !window.confirm('Discard this unsaved case edit?')) return; sourceDirty.current = false; onDirty(false); navigate(next); }
+  function openScopeProposal(id: string) { setScopeProposalId(id); leave(`/scions/${scion.id}/scope/${id}`); }
+  function openOfferProposal(id: string) { setComparisonProposalId(id); leave(`/scions/${scion.id}/comparisons/${id}`); }
+  if (parsed.kind === 'history') return <><UtilityHeading scion={scion} title="Revision history" onBack={() => leave(`/scions/${scion.id}/context`)} /><History token={token} scion={scion} /></>;
+  if (parsed.kind === 'sources') return <><UtilityHeading scion={scion} title="Sources and claims" onBack={() => leave(`/scions/${scion.id}/context`)} /><Evidence token={token} scion={scion} canWrite={canWrite} onDirty={markSourceDirty} /></>;
+  if (parsed.kind === 'scope-workbench') return <><UtilityHeading scion={scion} title="Complete exact scope" onBack={() => leave(`/scions/${scion.id}/context`)} /><PhysicalScope token={token} scion={scion} principalId={principalId} canWrite={canWrite} onDirty={markSourceDirty} onSources={() => leave(`/scions/${scion.id}/sources`)} onOfferProposal={openOfferProposal} preferredProposalId={scopeProposalId} /></>;
+  if (parsed.kind === 'offers-workbench') return <><UtilityHeading scion={scion} title="Prepare exact comparison" onBack={() => leave(`/scions/${scion.id}/context`)} /><Offers token={token} scion={scion} canWrite={canWrite} preferredProposalId={comparisonProposalId} onDirty={markSourceDirty} onSources={() => leave(`/scions/${scion.id}/sources`)} onScopeProposal={openScopeProposal} /></>;
+  return <DirectionalFlow token={token} scion={scion} route={route} canWrite={canWrite} onEdit={onEdit} navigate={navigate} />;
+}
+
+function UtilityHeading({ scion, title, onBack }: { scion: Scion; title: string; onBack: () => void }) {
+  return <div className="utility-heading"><button className="flow-back" type="button" onClick={onBack}>← Back to case context</button><p className="eyebrow">{scion.revision.name} · SCION R{scion.current_revision}</p><h1>{title}</h1></div>;
 }
 
 function Missing({ children = 'Not provided' }: { children?: ReactNode }) { return <span className="missing-inline"><span />{children}</span>; }
