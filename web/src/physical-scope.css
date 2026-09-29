@@ -1,25 +1,27 @@
-/* Physical scope keeps the shared desktop reading scale and neutral theme. */
+/* Physical workflows share the global theme and retain their review boundaries. */
 .case-tabs { flex-wrap: wrap; row-gap: 16px; }
 .scope-workspace, .scope-detail, .scope-form { min-width: 0; }
 .scope-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; margin-bottom: 24px; }
 .scope-toolbar h2 { margin-top: 8px; }
 .scope-toolbar p:not(.eyebrow) { margin-top: 8px; color: var(--muted-foreground); max-width: 790px; }
 .scope-toolbar>.button { flex-shrink: 0; margin-top: 8px; }
-.scope-boundary { padding: 20px 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted); margin-bottom: 28px; }
+.scope-boundary { padding: 20px 24px; border: 1px solid var(--info-border); border-radius: var(--radius); background: var(--info-surface); margin-bottom: 28px; }
 .scope-boundary strong { font-size: var(--text-body); }
 .scope-boundary p { margin-top: 8px; color: var(--muted-foreground); font-size: var(--text-meta); }
 .scope-layout { display: grid; grid-template-columns: minmax(260px,.6fr) minmax(0,1.65fr); gap: 24px; align-items: start; }
-.scope-proposals { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 24px 16px; }
+.scope-proposals { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-background); padding: 24px 16px; box-shadow: var(--panel-shadow); }
 .scope-proposals>.section-heading, .scope-proposals>.section-description { margin-left: 8px; margin-right: 8px; }
 .scope-proposals ol, .scope-task-list { list-style: none; padding: 0; margin: 24px 0 0; }
 .scope-proposals li+li { margin-top: 8px; }
 .scope-proposal-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; padding: 16px 12px; background: var(--card); border: 1px solid transparent; border-radius: var(--radius-md); text-align: left; overflow-wrap: anywhere; }
-.scope-proposal-choice:hover, .scope-proposal-choice.active { background: var(--accent); border-color: var(--border); }
+.scope-proposal-choice:hover { background: var(--accent); border-color: var(--border); }
+.scope-proposal-choice.active { background: var(--info-surface); border-color: var(--info-border); }
+.scope-proposal-choice.active strong { color: var(--info); }
 .scope-proposal-choice strong { font-size: var(--text-body); }
 .scope-proposal-choice span { color: var(--muted-foreground); font-size: var(--text-meta); }
 .scope-proposal-choice .scope-status-blocked { color: var(--warning); }
 .badge.scope-status-blocked { color: var(--warning); border-color: var(--warning-border); background: var(--warning-surface); white-space: normal; }
-.scope-card { padding: 28px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); min-width: 0; }
+.scope-card { padding: 28px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-background); min-width: 0; box-shadow: var(--panel-shadow); }
 .scope-card+.scope-card, .scope-detail>.scope-card+.scope-identities, .scope-identities+.scope-card { margin-top: 24px; }
 .scope-card h2 { overflow-wrap: anywhere; }
 .scope-card h3 { font-size: var(--text-section); }
@@ -30,7 +32,7 @@
 .scope-values dt, .scope-reference dt { font-size: var(--text-meta); color: var(--muted-foreground); }
 .scope-values dd, .scope-reference dd { min-width: 0; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .scope-values code, .scope-reference code, .scope-revision-id code { font-size: var(--text-meta); overflow-wrap: anywhere; }
-.scope-json { margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); font-family: var(--font-mono); font-size: var(--text-meta); white-space: pre-wrap; overflow-wrap: anywhere; }
+.scope-json { margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-inset); font-family: var(--font-mono); font-size: var(--text-meta); white-space: pre-wrap; overflow-wrap: anywhere; }
 .scope-reference { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
 .scope-reference strong { font-size: var(--text-meta); }
 .scope-reference dl { margin-top: 16px; font-size: var(--text-meta); }
@@ -54,7 +56,7 @@
 .scope-form-actions+.field-help { margin-top: 16px; }
 .scope-claim-selector { margin-top: 24px; }
 .scope-claim-selector>label:not(:first-child) { margin-top: 24px; }
-.scope-inspected-claim { margin-top: 24px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); }
+.scope-inspected-claim { margin-top: 24px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-inset); }
 .scope-inspected-claim p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .scope-inspected-claim p+p { margin-top: 12px; }
 .scope-inspected-claim blockquote { margin: 20px 0; border-left: 2px solid var(--ring); padding-left: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -62,7 +64,7 @@
 .scope-reference-list { margin-top: 24px; }
 .scope-agent-queue { margin-top: 40px; padding: 28px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); }
 .scope-agent-queue h2 { margin-top: 8px; }
-.scope-agent-boundary { padding: 16px 20px; margin-top: 20px; background: var(--muted); border-radius: var(--radius-md); font-size: var(--text-meta); }
+.scope-agent-boundary { padding: 16px 20px; margin-top: 20px; background: var(--surface-inset); border-radius: var(--radius-md); font-size: var(--text-meta); }
 .scope-task-list>li { padding: 24px 0; border-top: 1px solid var(--border); }
 .scope-task-list>li:last-child { padding-bottom: 0; }
 .scope-footnote { font-size: var(--text-meta); color: var(--muted-foreground); margin-top: 24px; }

@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Principal, Scion } from './api';
+import type { HandlerIdentity, OrganizationSummary, Principal, Scion } from './api';
+import { useTheme } from './theme';
 import type { ControlSurfaceConnection } from './control-api';
 import { proposalPath } from './workspace-api';
 import type { ProposalSummary, WorkspaceState, useWorkspace } from './workspace-api';
 
-export const pageNames: Record<string, string> = { dashboard: 'Dashboard', inbox: 'Inbox', search: 'Search', proposals: 'Proposals', scions: 'Scions', tasks: 'Agent work', watchtower: 'Watchtower', agents: 'Agents', skills: 'Skills', connectors: 'Connectors', audit: 'Activity' };
+export const pageNames: Record<string, string> = { dashboard: 'Dashboard', inbox: 'Inbox', search: 'Search', proposals: 'Proposals', scions: 'Scions', tasks: 'Agent work', watchtower: 'Watchtower', agents: 'Agents', skills: 'Skills', connectors: 'Connectors', audit: 'Activity', settings: 'Settings', profile: 'Profile' };
 const humanize = (text: string) => text.replaceAll('_', ' ');
 export const workTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Never checked';
 export function WorkIcon({ name }: { name: string }) {
@@ -30,6 +31,12 @@ export function WorkIcon({ name }: { name: string }) {
     new: <><path d="M12 5v14M5 12h14" /></>,
     arrow: <><path d="M5 12h14m-5-5 5 5-5 5" /></>,
     exit: <><path d="M9 3H3v18h6M9 12h12m-5-5 5 5-5 5" /></>,
+    settings: <><path d="M10 3h4l1 3 3-1 2 3-2 3 2 3-2 3-3-1-1 3h-4l-1-3-3 1-2-3 2-3-2-3 2-3 3 1Z" /><circle cx="12" cy="11" r="3" /></>,
+    profile: <><circle cx="12" cy="7" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></>,
+    edit: <><path d="m14 4 6 6M4 20l4-1L21 6l-4-4L4 15Z" /></>,
+    moon: <path d="M21 13A9 9 0 0 1 11 3a9 9 0 1 0 10 10Z" />,
+    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5" /></>,
+    chevrons: <><path d="m8 8 4-4 4 4m-8 8 4 4 4-4" /></>,
   };
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] ?? paths.proposals}</svg>;
 }
@@ -39,16 +46,70 @@ export function WorkStatus({ value }: { value: string }) {
   return <span className={`work-status ${tone}`}><i />{label[value] ?? humanize(value)}</span>;
 }
 
-export function CompanyNavigation({ principal, data, route, onNavigate, onDisconnect, disconnectBusy, canWrite }: { principal: Principal; data: WorkspaceState | null; route: string; onNavigate: (route: string) => void; onDisconnect: () => void; disconnectBusy: boolean; canWrite: boolean }) {
+export function CompanyNavigation({ principal, handler, organizations, data, route, onNavigate, onSwitchOrganization, onCreateOrganization, onDisconnect, disconnectBusy, canWrite }: { principal: Principal; handler: HandlerIdentity; organizations: OrganizationSummary[]; data: WorkspaceState | null; route: string; onNavigate: (route: string) => void; onSwitchOrganization: (id: string) => void; onCreateOrganization: () => void; onDisconnect: () => void; disconnectBusy: boolean; canWrite: boolean }) {
   const page = route === '/' ? 'dashboard' : route.split('/')[1];
   const inboxCount = data ? data.reviews.length + data.scions.filter(scion => !scion.revision.decision?.trim()).length : null;
   function item(name: string, count?: number | null) { return <button key={name} title={pageNames[name]} aria-label={pageNames[name]} aria-current={page === name ? 'page' : undefined} className={`company-nav-item ${page === name ? 'active' : ''}`} onClick={() => onNavigate(`/${name}`)}><WorkIcon name={name} /><span>{pageNames[name]}</span>{typeof count === 'number' && count > 0 && <small>{count}</small>}</button>; }
-  return <aside className="company-sidebar"><button className="company-brand" onClick={() => onNavigate('/dashboard')} aria-label="Grimoire dashboard"><span className="company-avatar">G</span><span><strong>Grimoire</strong><small>{principal.organization_name}</small></span></button>
+  return <aside className="company-sidebar"><OrganizationMenu principal={principal} organizations={organizations} route={route} onNavigate={onNavigate} onSwitch={onSwitchOrganization} onCreate={onCreateOrganization} busy={disconnectBusy} />
     <nav aria-label="Company navigation"><div className="company-nav-group"><button className="company-nav-item" aria-label="New Scion" title="New Scion" disabled={!canWrite} onClick={() => onNavigate('/new')}><WorkIcon name="new" /><span>New Scion</span></button>{item('search')}{item('dashboard')}{item('inbox', inboxCount)}</div>
       <div className="company-nav-group"><h2>Work</h2>{item('proposals')}{item('scions')}{item('tasks')}{item('watchtower')}</div>
       <div className="company-nav-group"><h2>Organization</h2>{item('agents')}{item('skills')}{item('connectors')}{item('audit')}</div>
       {data && data.scions.length > 0 && <div className="company-nav-group company-recents"><h2>Recent Scions</h2>{data.scions.slice(0, 3).map(scion => <button className="company-nav-item" key={scion.id} title={scion.revision.name} onClick={() => onNavigate(`/scions/${scion.id}`)}><span className="work-record-dot" /><span>{scion.revision.name}</span></button>)}</div>}
-    </nav><div className="company-user"><span className="company-avatar">{principal.display_name.charAt(0)}</span><span>{principal.display_name}<small>Handler workspace</small></span><button title="Sign out" aria-label="Sign out" disabled={disconnectBusy} onClick={onDisconnect}><WorkIcon name="exit" /></button></div></aside>;
+    </nav><AccountMenu handler={handler} route={route} onNavigate={onNavigate} onDisconnect={onDisconnect} disconnectBusy={disconnectBusy} /></aside>;
+}
+
+function OrganizationMenu({ principal, organizations, route, onNavigate, onSwitch, onCreate, busy }: { principal: Principal; organizations: OrganizationSummary[]; route: string; onNavigate: (route: string) => void; onSwitch: (id: string) => void; onCreate: () => void; busy: boolean }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => setOpen(false), [route, principal.org_id]);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+  }, [open]);
+  const act = (action: () => void) => { setOpen(false); trigger.current?.focus(); action(); };
+  return <div className="company-organization" ref={root} onBlur={event => { if (!root.current?.contains(event.relatedTarget as Node)) setOpen(false); }}>
+    <button ref={trigger} className="company-brand" aria-label="Organization menu" title={principal.organization_name} data-organization-id={principal.org_id} aria-expanded={open} aria-controls={open ? 'organization-options' : undefined} onClick={() => setOpen(value => !value)}><span className="company-avatar">G</span><span><strong>Grimoire</strong><small>{principal.organization_name}</small></span><WorkIcon name="chevrons" /></button>
+    {open && <div id="organization-options" className="company-organization-options" role="group" aria-label="Organizations" aria-busy={busy}>
+      <p className="company-menu-label">Your organizations</p>
+      <div className="company-organization-list">{organizations.map(organization => <button key={organization.org_id} autoFocus={organization.org_id === principal.org_id} aria-label={`Switch to ${organization.organization_name}`} aria-current={organization.org_id === principal.org_id ? 'true' : undefined} data-organization-id={organization.org_id} disabled={busy} onClick={() => act(() => { if (organization.org_id !== principal.org_id) onSwitch(organization.org_id); })}><span className="company-avatar">{organization.organization_name.charAt(0)}</span><span>{organization.organization_name}</span>{organization.org_id === principal.org_id && <span className="company-organization-check" aria-hidden="true">✓</span>}</button>)}</div>
+      <div className="company-organization-actions"><button onClick={() => act(() => onNavigate('/settings/organization'))}><WorkIcon name="settings" />Organization settings</button><button disabled={busy} onClick={() => act(onCreate)} aria-label="Create another organization"><WorkIcon name="new" />Create organization</button></div>
+    </div>}
+  </div>;
+}
+
+function AccountMenu({ handler, route, onNavigate, onDisconnect, disconnectBusy }: { handler: HandlerIdentity; route: string; onNavigate: (route: string) => void; onDisconnect: () => void; disconnectBusy: boolean }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const { changeTheme } = useTheme();
+  const dark = document.documentElement.dataset.theme === 'dark';
+  useEffect(() => setOpen(false), [route]);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+  }, [open]);
+  const go = (path: string) => { setOpen(false); onNavigate(path); };
+  return <div className="company-user" ref={root}>
+    {open && <div id="account-options" className="company-account-options" aria-label="Account options" onBlur={event => { if (!root.current?.contains(event.relatedTarget as Node)) setOpen(false); }}>
+      <div className="company-account-identity"><span className="company-avatar">{handler.display_name.charAt(0)}</span><span><strong>{handler.display_name}</strong><small>{handler.login_name}</small></span></div>
+      <button autoFocus onClick={() => go('/settings/account')}><WorkIcon name="settings" />Settings</button>
+      <button onClick={() => go('/profile')}><WorkIcon name="profile" />View profile</button>
+      <button onClick={() => go('/profile/edit')}><WorkIcon name="edit" />Edit profile</button>
+      <button onClick={() => go('/settings/appearance')}><WorkIcon name="sun" />Appearance</button>
+      <button onClick={() => go('/settings/about')}><WorkIcon name="instructions" />Documentation</button>
+      <a href="/demo" target="_blank" rel="noreferrer" onClick={() => { setOpen(false); trigger.current?.focus(); }}><WorkIcon name="arrow" />Judge demo ↗</a>
+      <button onClick={() => { changeTheme(dark ? 'light' : 'dark'); setOpen(false); trigger.current?.focus(); }}><WorkIcon name={dark ? 'sun' : 'moon'} />Switch to {dark ? 'Pearl' : 'Midnight Blue'}</button>
+      <button className="company-account-signout" disabled={disconnectBusy} onClick={() => { setOpen(false); onDisconnect(); }}><WorkIcon name="exit" />{disconnectBusy ? 'Signing out…' : 'Sign out'}</button>
+    </div>}
+    <button ref={trigger} className="company-account-trigger" aria-label="Account menu" aria-expanded={open} aria-controls={open ? 'account-options' : undefined} onClick={() => setOpen(value => !value)}><span className="company-avatar">{handler.display_name.charAt(0)}</span><span><strong>{handler.display_name}</strong><small>Handler account</small></span><WorkIcon name="chevrons" /></button>
+  </div>;
 }
 
 function Empty({ children }: { children: ReactNode }) { return <div className="work-empty">{children}</div>; }
@@ -57,7 +118,7 @@ function CollectionNote({ count, limit }: { count: number; limit: number }) { re
 
 export function WorkspacePage({ page, connection, onNavigate, canWrite }: { page: string; connection: ReturnType<typeof useWorkspace>; onNavigate: (route: string) => void; canWrite: boolean }) {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState(page === 'tasks' ? 'active' : 'all');
+  const [filter, setFilter] = useState('all');
   const { data, loading, error, refresh } = connection;
   if (!data) return <section className="work-page"><PageHeading title={pageNames[page] ?? 'Workspace'} description="Organization-scoped Grimoire state" />{loading ? <p role="status">Loading workspace…</p> : <div className="work-empty" role="alert"><h2>Workspace disconnected</h2><p>{error || 'Current access could not be checked. Records are hidden.'}</p><button className="button secondary" onClick={() => void refresh()}>Reconnect</button></div>}</section>;
   const scionName = (id: string) => data.scions.find(scion => scion.id === id)?.revision.name ?? 'Scion';
@@ -90,8 +151,8 @@ export function WorkspacePage({ page, connection, onNavigate, canWrite }: { page
   }
   if (page === 'inbox') return <section className="work-page"><PageHeading title="Inbox" description="Human decisions and review obligations. No automated approvals." /><h2 className="work-group-heading">Handler decisions <span>{decisions.length}</span></h2>{decisions.length ? scionRows(decisions) : <Empty>No missing Handler decisions.</Empty>}<h2 className="work-group-heading">Watchtower reviews <span>{data.reviews.length}</span></h2>{data.reviews.length ? <div className="work-list">{data.reviews.map(review => <button className="work-row" key={review.id} onClick={() => onNavigate(`/scions/${review.scion_id}/activity/${review.id}`)}><WorkIcon name="inbox" /><span className="work-row-body"><strong>{scionName(review.scion_id)}</strong><small>{review.reason}</small></span><WorkStatus value={review.status} /><time>{workTime(review.created_at)}</time><WorkIcon name="arrow" /></button>)}</div> : <Empty>No watch-generated reviews. Scion decision gates still apply.</Empty>}<CollectionNote count={data.reviews.length} limit={data.collection_limit} /></section>;
   if (page === 'tasks') {
-    const tasks = data.tasks.filter(task => filter === 'all' || (filter === 'active' ? active.includes(task) : filter === 'blocked' ? task.blocked || task.stale || task.status === 'failed' : task.status === 'completed'));
-    return <section className="work-page"><PageHeading title="Agent work" description="Existing Rust tasks. Open a Scion to dispatch, cancel, or inspect a result." />{tabs([['active', 'Active'], ['blocked', 'Blocked'], ['completed', 'Prepared'], ['all', 'All']])}{tasks.length ? <div className="work-list">{tasks.map(task => <button className="work-row" key={task.id} onClick={() => onNavigate(`/scions/${task.scion_id}/agent-work/${task.id}`)}><WorkIcon name="tasks" /><span className="work-row-body"><strong>{humanize(task.task_kind)}</strong><small>{scionName(task.scion_id)} · r{task.scion_revision}</small></span><WorkStatus value={task.blocked ? 'blocked' : task.stale ? 'stale' : task.status} /><time>{workTime(task.created_at)}</time><WorkIcon name="arrow" /></button>)}</div> : <Empty>No {filter === 'all' ? '' : filter} work is recorded.</Empty>}<CollectionNote count={data.tasks.length} limit={data.collection_limit} /></section>;
+    const tasks = data.tasks.filter(task => matches(`${task.task_kind} ${scionName(task.scion_id)}`) && (filter === 'all' || (filter === 'active' ? active.includes(task) : filter === 'blocked' ? task.blocked || task.stale || task.status === 'failed' : task.status === 'completed')));
+    return <section className="work-page"><PageHeading title="Agent work" description="Assigned work, blockers, and results awaiting your review." /><div className="work-list-toolbar">{tabs([['all', 'All'], ['active', 'Active'], ['blocked', 'Blocked'], ['completed', 'Prepared']])}{search('Search agent work')}</div>{tasks.length ? <div className="work-list">{tasks.map(task => <button className="work-row" key={task.id} onClick={() => onNavigate(`/scions/${task.scion_id}/agent-work/${task.id}`)}><WorkIcon name="tasks" /><span className="work-row-body"><strong>{humanize(task.task_kind)}</strong><small>{scionName(task.scion_id)} · r{task.scion_revision}</small></span><WorkStatus value={task.blocked ? 'blocked' : task.stale ? 'stale' : task.status} /><time>{workTime(task.created_at)}</time><WorkIcon name="arrow" /></button>)}</div> : <Empty>No matching {filter === 'all' ? '' : filter} work.</Empty>}<CollectionNote count={data.tasks.length} limit={data.collection_limit} /></section>;
   }
   if (page === 'watchtower') return <section className="work-page"><PageHeading title="Watchtower" description="Persisted internal monitoring. Server checks continue when this page is closed." /><div className="work-list-toolbar">{search('Filter watched Scions')}<span className="work-muted">3 internal watches per Scion</span></div><div className="work-list">{data.scions.filter(scion => matches(scion.revision.name)).map(scion => {
     const watches = data.watches.filter(watch => watch.scion_id === scion.id); const checked = watches.map(watch => watch.last_successful_check).filter((value): value is string => Boolean(value)).sort();
@@ -99,7 +160,11 @@ export function WorkspacePage({ page, connection, onNavigate, canWrite }: { page
     return <details className="work-watch" key={scion.id}><summary><WorkIcon name="watchtower" /><strong>{scion.revision.name}</strong><WorkStatus value={status} /><span>Checked {workTime(checked.length === 3 ? checked[0] : null)}</span></summary><div className="work-watch-detail">{watches.map(watch => <div key={watch.id}><span>{humanize(watch.kind)}</span><WorkStatus value={watch.status} /><time>{workTime(watch.last_successful_check)}</time></div>)}<button className="text-button" onClick={() => onNavigate(`/scions/${scion.id}/activity`)}>Open Scion activity →</button></div></details>;
   })}</div>{!data.scions.length && <Empty>No Scions are being watched yet.</Empty>}<p className="work-muted work-endnote">External monitoring is unavailable until an authorized connector implements it. No vendor checks are simulated.</p></section>;
 
-  if (page === 'connectors') return <section className="work-page"><PageHeading title="Connectors" description="Data access available to this organization. Agent runtimes are managed separately." /><div className="work-list">{data.connectors.map(connector => <details className="work-watch" key={connector.id}><summary><WorkIcon name="connectors" /><strong>{connector.name}</strong><WorkStatus value={connector.status} /></summary><p className="work-watch-detail">{connector.description}</p></details>)}<div className="work-row"><WorkIcon name="connectors" /><span className="work-row-body"><strong>External provider connector</strong><small>No authorized provider or monitoring implementation configured.</small></span><WorkStatus value="unavailable" /></div></div></section>;
+  if (page === 'connectors') {
+    const connectors = data.connectors.filter(connector => matches(`${connector.name} ${connector.description}`));
+    const external = matches('External provider connector No authorized provider or monitoring implementation configured');
+    return <section className="work-page"><PageHeading title="Connectors" description="Evidence sources available to this organization."><button className="button secondary" onClick={() => onNavigate('/settings/runtime')}>Runtime settings</button></PageHeading><div className="work-list-toolbar">{search('Search connectors')}<span className="work-muted">{data.connectors.length} internal sources</span></div><div className="work-connectors">{connectors.map(connector => <article className="work-connector" key={connector.id}><span className="work-connector-icon"><WorkIcon name="connectors" /></span><div><h2>{connector.name}</h2><p>{connector.description}</p></div><WorkStatus value={connector.status} /></article>)}{external && <article className="work-connector"><span className="work-connector-icon"><WorkIcon name="connectors" /></span><div><h2>External provider connector</h2><p>No authorized provider or monitoring implementation configured.</p></div><WorkStatus value="unavailable" /></article>}{!connectors.length && !external && <Empty>No matching connectors.</Empty>}</div></section>;
+  }
   return <section className="work-page"><PageHeading title="Activity" description="Auditable internal watch events. Source content is never included here." /><div className="work-list-toolbar">{search('Filter activity')}<span className="work-muted">Newest first</span></div>{data.events.filter(event => matches(`${event.kind} ${scionName(event.scion_id)}`)).map(event => <div className="work-audit-row" key={event.id}><WorkIcon name="audit" /><div><strong>{humanize(event.kind)}</strong><button className="work-link" onClick={() => onNavigate(`/scions/${event.scion_id}/activity`)}>{scionName(event.scion_id)}</button><p>{event.summary}</p><details><summary>Audit reference</summary><code>{event.event_key}</code></details></div><time>{workTime(event.recorded_at)}</time></div>)}{data.events.length === 0 && <Empty>No watch events have been recorded.</Empty>}<CollectionNote count={data.events.length} limit={data.collection_limit} /></section>;
 }
 

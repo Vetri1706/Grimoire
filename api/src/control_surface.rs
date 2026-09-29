@@ -85,28 +85,37 @@ fn blocker(reason: Option<&str>) -> &'static str {
 async fn read(State(pool): State<PgPool>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     let id = parse_id(&id)?;
+    let body = snapshot(&mut tx, &actor, id).await?;
+    tx.commit().await?;
+    Ok(Json(body).into_response())
+}
+
+/// Builds the same permission-filtered graph for authenticated workspaces and
+/// the registered public synthetic scenarios. The caller owns the transaction
+/// and must establish its organization and principal before invoking this.
+pub(super) async fn snapshot(tx: &mut Tx, actor: &Actor, id: Uuid) -> Result<Value, ApiError> {
     let revision: Option<i32> = sqlx::query_scalar("SELECT app.intake_scope_lock_scion($1)")
         .bind(id)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
     let revision = revision.ok_or_else(ApiError::not_found)?;
     let record = sqlx::query_as::<_, RevisionRow>(&format!("SELECT {REVISION_COLUMNS} FROM grimoire.intake_revisions r WHERE r.scion_id=$1 AND r.number=$2"))
-        .bind(id).bind(revision).fetch_one(&mut *tx).await?.into_scion();
-    let adaptive = capabilities::snapshot(&mut tx, id, revision).await?;
-    let sources = sources::control_snapshot(&mut tx, id).await?;
-    let mut tasks = byoa::control_snapshot(&mut tx, id).await?;
+        .bind(id).bind(revision).fetch_one(&mut **tx).await?.into_scion();
+    let adaptive = capabilities::snapshot(tx, id, revision).await?;
+    let sources = sources::control_snapshot(tx, id).await?;
+    let mut tasks = byoa::control_snapshot(tx, id).await?;
     let dependencies: Vec<(String, Uuid, Option<Uuid>, Option<i32>)> = sqlx::query_as("SELECT node_kind,node_id,source_id,source_revision FROM grimoire.intake_watch_dependencies WHERE scion_id=$1 ORDER BY node_kind,node_id,source_id")
-        .bind(id).fetch_all(&mut *tx).await?;
+        .bind(id).fetch_all(&mut **tx).await?;
     let states: Vec<(String, Uuid, bool, bool, Option<String>)> = sqlx::query_as("SELECT node_kind,node_id,stale,blocked,reason FROM grimoire.intake_watch_node_states WHERE scion_id=$1")
-        .bind(id).fetch_all(&mut *tx).await?;
+        .bind(id).fetch_all(&mut **tx).await?;
     let events: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'event_key',event_key,'kind',kind,'subject_id',subject_id,'subject_revision',subject_revision,'recorded_at',recorded_at,'summary',summary) FROM grimoire.intake_watch_events WHERE scion_id=$1 ORDER BY recorded_at DESC,id LIMIT 100")
-        .bind(id).fetch_all(&mut *tx).await?;
+        .bind(id).fetch_all(&mut **tx).await?;
     let reviews: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'event_id',event_id,'status',status,'reason',reason,'created_at',created_at) FROM grimoire.intake_watch_reviews WHERE scion_id=$1 AND event_id IN (SELECT id FROM grimoire.intake_watch_events WHERE scion_id=$1 ORDER BY recorded_at DESC,id LIMIT 100) ORDER BY created_at DESC,id")
-        .bind(id).fetch_all(&mut *tx).await?;
+        .bind(id).fetch_all(&mut **tx).await?;
     let watches: Vec<Watch> = sqlx::query_as("SELECT id,kind,last_successful_check,last_event_at FROM grimoire.intake_watches WHERE scion_id=$1 ORDER BY kind")
-        .bind(id).fetch_all(&mut *tx).await?;
+        .bind(id).fetch_all(&mut **tx).await?;
     let now: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
     let last_check = if watches.len() == 3
         && watches
@@ -448,12 +457,13 @@ async fn read(State(pool): State<PgPool>, headers: HeaderMap, Path(id): Path<Str
             && identities.contains(text(&entry["target"]))
             && edge_ids.insert(text(&entry["id"]).to_string())
     });
-    let agent_runtime = agents::runtime(&mut tx).await?;
-    tx.commit().await?;
-    Ok(Json(json!({"scion_id":id,"scion_revision":revision,"generated_at":now,"nodes":nodes,"edges":edges,
+    let agent_runtime = agents::runtime(tx).await?;
+    Ok(
+        json!({"scion_id":id,"scion_revision":revision,"generated_at":now,"nodes":nodes,"edges":edges,
         "watchtower":{"health":health(last_check,now),"last_successful_check":last_check,"mode":"transactional_internal_events","poll_interval_ms":2000,"watches":watch_values,"alerts":reviews},
         "operations":{"tasks":tasks,"events":events,"human_review":reviews,"agent_runtime":agent_runtime},
-        "approval_available":false})).into_response())
+        "approval_available":false}),
+    )
 }
 
 #[cfg(test)]

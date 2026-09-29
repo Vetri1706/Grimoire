@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiError, SESSION_AUTH, announceSessionChange, organizationSession, request, sessionChangedStorageKey, sessionInvalidatedEvent } from './api';
 import { IdentityAccess, OrganizationOnboarding } from './Onboarding';
+import { ThemePicker } from './theme';
 import Evidence from './Evidence';
 import PhysicalScope from './PhysicalScope';
 import Offers from './Offers';
 import AdaptiveScion from './AdaptiveScion';
 import ControlSurface from './ControlSurface';
 import NativeAgents from './NativeAgents';
+import { Settings } from './Settings';
+import ScionCreation from './ScionCreation';
 import type { NativeAgent } from './agents-api';
 import { useControlSurface } from './control-api';
 import type { CaseNode } from './control-api';
@@ -15,7 +18,7 @@ import { CompanyNavigation, WorkspacePage, ScionOverview, ScionActivity, pageNam
 import { useWorkspace } from './workspace-api';
 import type { Category, Intake, Revision, RevisionHistory, Scion, SessionState } from './api';
 
-type IconName = 'book' | 'plus' | 'arrow' | 'history' | 'file' | 'check' | 'search' | 'lock' | 'edit' | 'alert' | 'logout' | 'sun' | 'moon' | 'monitor' | 'layers' | 'columns';
+type IconName = 'book' | 'plus' | 'arrow' | 'history' | 'file' | 'check' | 'search' | 'lock' | 'edit' | 'alert' | 'logout' | 'layers' | 'columns';
 function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
     book: <><path d="M3 4h6a4 4 0 0 1 3 1.4A4 4 0 0 1 15 4h6v16h-6a4 4 0 0 0-3 1.4A4 4 0 0 0 9 20H3Z" /><path d="M12 5v16M6 8h3M15 8h3M6 12h3M15 12h3" /></>,
@@ -29,9 +32,6 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
     edit: <><path d="m14 5 5 5M4 20l5-1L21 7a2 2 0 0 0-4-4L5 15Z" /></>,
     alert: <><path d="m12 3 10 18H2Z" /><path d="M12 9v5M12 17h.01" /></>,
     logout: <><path d="M9 3H3v18h6M8 12h13m-5-5 5 5-5 5" /></>,
-    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5" /></>,
-    moon: <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />,
-    monitor: <><rect x="3" y="3" width="18" height="13" rx="2" /><path d="M12 16v5M8 21h8" /></>,
     layers: <><path d="m12 3 9 5-9 5-9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></>,
     columns: <><rect x="3" y="4" width="7" height="16" rx="1" /><rect x="14" y="4" width="7" height="16" rx="1" /></>,
   };
@@ -42,16 +42,7 @@ const category = (value: Category) => value === 'unspecified' ? 'Category missin
 const errorText = (error: unknown) => error instanceof Error ? error.message : 'The request failed. Please retry.';
 const routeFromHash = () => window.location.hash.replace(/^#/, '') || '/';
 
-type ThemePreference = 'system' | 'dark' | 'light';
-type ThemeControl = { theme: ThemePreference; onChangeTheme: (theme: ThemePreference) => void };
-const themeKey = 'grimoire.theme-preference';
-const parseTheme = (value: string | null | undefined): ThemePreference => value === 'light' || value === 'dark' ? value : 'system';
-function ThemePicker({ theme, onChangeTheme }: ThemeControl) {
-  return <label className="theme-picker"><Icon name={theme === 'system' ? 'monitor' : theme === 'dark' ? 'moon' : 'sun'} size={18} /><select aria-label="Appearance" value={theme} onChange={event => onChangeTheme(parseTheme(event.target.value))}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>;
-}
-
 export default function App() {
-  const [theme, setTheme] = useState<ThemePreference>(() => parseTheme(document.documentElement.dataset.themePreference));
   const [setupRequired, setSetupRequired] = useState<boolean | null>(null);
   const [session, setSession] = useState<SessionState | null>(null);
   const [accessLoading, setAccessLoading] = useState(true);
@@ -81,26 +72,8 @@ export default function App() {
   const canManage = principal?.can_manage_workspace === true;
   const workspace = useWorkspace(token, principal?.org_id);
 
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => {
-      const dark = theme === 'dark' || (theme === 'system' && media.matches);
-      document.documentElement.dataset.themePreference = theme;
-      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#171717' : '#ffffff');
-    };
-    apply(); if (theme !== 'system') return;
-    media.addEventListener('change', apply);
-    return () => media.removeEventListener('change', apply);
-  }, [theme]);
-  useEffect(() => {
-    const sync = (event: StorageEvent) => { if (event.key === themeKey || event.key === null) setTheme(parseTheme(event.newValue)); };
-    window.addEventListener('storage', sync); return () => window.removeEventListener('storage', sync);
-  }, []);
-  function changeTheme(value: ThemePreference) {
-    setTheme(value);
-    try { localStorage.setItem(themeKey, value); } catch { return; }
-  }
+  useEffect(() => { document.getElementById('main-content')?.scrollTo(0, 0); }, [route]);
+
   useEffect(() => {
     const change = () => {
       const next = routeFromHash(); if (next === routeRef.current) return;
@@ -123,7 +96,6 @@ export default function App() {
         const status = await request<{ setup_required: boolean }>(SESSION_AUTH, '/setup/status');
         if (!active) return;
         setSetupRequired(status.setup_required);
-        if (status.setup_required) { setSession(null); return; }
         try {
           const state = await request<SessionState>(SESSION_AUTH, '/session', { cache: 'no-store' });
           if (active) setSession(state);
@@ -159,7 +131,7 @@ export default function App() {
   const setDirty = useCallback((value: boolean) => { dirty.current = value; }, []);
   function navigate(next: string) { window.location.hash = next; }
   function acceptSession(state: SessionState) {
-    dirty.current = false; setSession(state); setSetupRequired(false); setAccessError(''); setError('');
+    dirty.current = false; setSession(state); if (state.handler.installation_owner) setSetupRequired(false); setAccessError(''); setError('');
     setCreatingOrganization(false); setSelected(null); setEdit(false); setNotice('');
     setRefresh(value => value + 1); routeRef.current = '/';
     window.history.replaceState(null, '', '#/'); setRoute('/'); announceSessionChange();
@@ -191,7 +163,7 @@ export default function App() {
     void workspace.refresh(); navigate(`/scions/${scion.id}`);
     setNotice(`Revision ${scion.current_revision} saved.`);
   }
-  const appearance = <ThemePicker theme={theme} onChangeTheme={changeTheme} />;
+  const appearance = <ThemePicker />;
   if (accessLoading) return <div className="boot-state" role="status"><Icon name="book" size={28} /><p>Opening Grimoire...</p></div>;
   if (accessError || setupRequired === null) return <main className="boot-state"><Icon name="alert" /><p>{accessError || 'Installation state could not be checked.'}</p><button className="button primary" onClick={() => setSessionRefresh(value => value + 1)}>Retry</button></main>;
   if (!session) return <IdentityAccess setupRequired={setupRequired} appearance={appearance} onReady={acceptSession} />;
@@ -199,13 +171,14 @@ export default function App() {
   const record = selected?.id === id ? selected : null;
   return <div className="company-app">
     <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to content</a>
-    <CompanyNavigation principal={principal} data={workspace.data} route={route} onNavigate={navigate} onDisconnect={() => void disconnect()} disconnectBusy={authBusy} canWrite={canManage} />
-<div className="company-main"><header className="company-topbar"><nav aria-label="Breadcrumb"><button onClick={() => navigate(id ? '/scions' : '/dashboard')}>{id ? 'Scions' : 'Workspace'}</button><span>›</span><strong>{route === '/new' ? 'New Scion' : id ? record?.revision.name ?? 'Scion' : pageNames[page] ?? 'Workspace'}</strong>{(page === 'agents' || page === 'skills') && parts[2] && <><span>›</span><span>{parts[2] === 'new' ? 'Create' : (page === 'agents' ? workspace.data?.agents : workspace.data?.skills)?.find(item => item.id === parts[2])?.config.name ?? 'Record'}</span></>}{id && view !== 'overview' && <><span>›</span><span>{scionViewNames[view] ?? 'Record'}</span></>}</nav><div className="company-topbar-tools"><label className="company-organization-switch"><span className="sr-only">Active organization</span><select aria-label="Active organization" value={principal.org_id} disabled={authBusy} onChange={event => void switchOrganization(event.target.value)}>{session.organizations.map(organization => <option key={organization.org_id} value={organization.org_id}>{organization.organization_name}</option>)}</select></label><button type="button" className="icon-button" disabled={authBusy} onClick={createOrganization} aria-label="Create another organization" title="Create another organization"><Icon name="plus" size={17} /></button><span className="company-connection" title={workspace.error || 'Authenticated organization state'}><i className={workspace.data ? 'connected' : ''} />{workspace.data ? 'Local' : workspace.loading ? 'Checking' : 'Disconnected'}</span><ThemePicker theme={theme} onChangeTheme={changeTheme} /></div></header>
+    <CompanyNavigation principal={principal} handler={session.handler} organizations={session.organizations} data={workspace.data} route={route} onNavigate={navigate} onSwitchOrganization={organizationId => void switchOrganization(organizationId)} onCreateOrganization={createOrganization} onDisconnect={() => void disconnect()} disconnectBusy={authBusy} canWrite={canManage} />
+<div className="company-main"><header className="company-topbar"><nav aria-label="Breadcrumb">{id ? <><button onClick={() => navigate('/scions')}>Scions</button><span>›</span><strong>{record?.revision.name ?? 'Scion'}</strong></> : <strong className="company-page-label">{route === '/new' ? 'New Scion' : pageNames[page] ?? 'Workspace'}</strong>}{(page === 'agents' || page === 'skills') && parts[2] && <><span>›</span><span>{parts[2] === 'new' ? 'Create' : (page === 'agents' ? workspace.data?.agents : workspace.data?.skills)?.find(item => item.id === parts[2])?.config.name ?? 'Record'}</span></>}{id && view !== 'overview' && <><span>›</span><span>{scionViewNames[view] ?? 'Record'}</span></>}</nav></header>
     <main id="main-content" tabIndex={-1}>
       {notice && <div className="work-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}
       {error && <ErrorMessage>{error}<button className="text-button" onClick={() => setRefresh(value => value + 1)}>Retry</button></ErrorMessage>}
       {id ? loading ? <div className="loading-panel" role="status">Loading Scion…</div> : record ? edit ? <div className="work-form-page"><IntakeForm key={`${record.id}-edit`} token={token} scion={record} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /></div> : <CaseRecord nativeAgents={workspace.data?.agents ?? []} key={record.id} token={token} scion={record} view={view} focusedId={focusedId} onNavigate={navigate} principalId={principal.principal_id} canManage={canManage} canWrite={canWrite} onDirty={setDirty} onEdit={current => { setSelected(current); setEdit(true); }} /> : null
-      : route === '/new' ? !canManage ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <div className="work-form-page"><IntakeForm token={token} onSaved={saved} onCancel={() => navigate('/scions')} onDirty={setDirty} /></div>
+      : route === '/new' ? !canManage ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <ScionCreation token={token} onSaved={saved} onCancel={() => navigate('/scions')} onDirty={setDirty} />
+      : (page === 'settings' || page === 'profile') ? <Settings session={session} connection={workspace} route={route} onSession={next => { setSession(next); announceSessionChange(); }} onSwitchOrganization={organizationId => void switchOrganization(organizationId)} onCreateOrganization={createOrganization} onNavigate={navigate} onDirty={setDirty} busy={authBusy} />
       : (page === 'agents' || page === 'skills') && workspace.data ? <NativeAgents token={token} page={page} route={route} data={workspace.data} canWrite={canManage} canExecute={canWrite} onNavigate={navigate} onChanged={workspace.refresh} onDirty={setDirty} />
       : <WorkspacePage key={page} page={pageNames[page] ? page : 'dashboard'} connection={workspace} onNavigate={navigate} canWrite={canManage} />}
     </main></div>

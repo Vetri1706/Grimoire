@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import type { FocusEvent, FormEvent, ReactNode } from 'react';
 import { request } from './api';
 import { useAgent } from './agents-api';
 import type { AgentConfig, AgentDetail, NativeAgent, NativeSkill, NativeTask, SkillConfig } from './agents-api';
 import type { WorkspaceState } from './workspace-api';
 import { WorkIcon, WorkStatus, workTime } from './Workbench';
+import AgentCreation from './AgentCreation';
 import './native-agents.css';
+import './native-directory.css';
 
 type Props = { token: string; page: string; route: string; data: WorkspaceState; canWrite: boolean; canExecute: boolean; onNavigate: (path: string) => void; onChanged: () => Promise<void>; onDirty: (dirty: boolean) => void };
 const defaultAgent: AgentConfig = { name: '', role: 'planner', title: '', capabilities: '', instructions: 'Prepare evidence-bound Scion proposals. Keep unknowns explicit and require human review.', reports_to: null, adapter: 'codex_cli', timeout_seconds: 240, skill_ids: [], paused: false };
@@ -16,19 +18,58 @@ const sections = [
   { label: 'Audit', items: [['activity', 'Activity'], ['runs', 'Runs'], ['usage', 'Usage & limits']] },
 ];
 
+function revealAgentNavigationFocus(event: FocusEvent<HTMLElement>) {
+  const navigation = event.currentTarget;
+  if (!(event.target instanceof HTMLButtonElement) || navigation.scrollWidth <= navigation.clientWidth) return;
+  const item = event.target.getBoundingClientRect();
+  const viewport = navigation.getBoundingClientRect();
+  // Keep the whole focused control and its outline inside the mobile scroll strip.
+  const inset = 6;
+  if (item.left < viewport.left + inset) navigation.scrollLeft += item.left - viewport.left - inset;
+  else if (item.right > viewport.right - inset) navigation.scrollLeft += item.right - viewport.right + inset;
+}
+
 function Empty({ children }: { children: ReactNode }) { return <div className="work-empty">{children}</div>; }
 function Card({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) { return <section className="agent-card"><div className="work-section-title"><h2>{title}</h2>{action}</div>{children}</section>; }
 function Avatar({ name, large = false }: { name: string; large?: boolean }) { return <span className={`native-avatar ${large ? 'large' : ''}`} aria-hidden="true">{name.split(' ').map(word => word[0]).slice(0, 2).join('').toUpperCase()}</span>; }
 
 export default function NativeAgents(props: Props) {
-  const { token, page, route, data, onNavigate, canWrite } = props;
+  const { token, page, route } = props;
   const [, , recordId, view = 'overview'] = route.split('/');
   const connection = useAgent(token, page === 'agents' && recordId && recordId !== 'new' ? recordId : undefined);
   if (page === 'skills') return <SkillsPage {...props} recordId={recordId} />;
-  if (recordId === 'new') return <section className="work-page native-form-page"><div className="work-page-heading"><div><h1>Create agent</h1><p>A Grimoire-owned identity for Scion proposal work.</p></div></div><AgentEditor {...props} agent={null} view="identity" /></section>;
-  if (!recordId) return <section className="work-page"><div className="work-page-heading"><div><h1>Agents</h1><p>Your team. Configured and operated by Grimoire.</p></div><button className="button primary" disabled={!canWrite} onClick={() => onNavigate('/agents/new')}>+ Create agent</button></div><div className="work-runtime-status"><WorkStatus value={data.agent_runtime.status} /><span>Grimoire worker · Last seen {workTime(data.agent_runtime.last_seen)}</span></div>{data.agents.length ? <div className="work-list">{data.agents.map(agent => <button className="work-row" key={agent.id} onClick={() => onNavigate(`/agents/${agent.id}`)}><Avatar name={agent.config.name} /><span className="work-row-body"><strong>{agent.config.name}</strong><small>{agent.config.title || agent.config.role} · Codex CLI · {agent.config.skill_ids.length} skills</small></span><WorkStatus value={agent.status} /><WorkIcon name="arrow" /></button>)}</div> : <Empty><h2>Build your Scion team</h2><p>Create an agent, give it instructions and skills, then assign a Scion. Nothing runs until a Handler dispatches work.</p><button className="button primary" disabled={!canWrite} onClick={() => onNavigate('/agents/new')}>Create your first agent</button></Empty>}</section>;
+  if (recordId === 'new') return <AgentCreation {...props} />;
+  if (!recordId) return <AgentDirectory {...props} />;
   if (!connection.data) return <section className="work-page"><h1>Agent</h1><Empty>{connection.error || 'Checking agent access…'}{connection.error && <button className="button secondary" onClick={() => void connection.refresh()}>Reconnect</button>}</Empty></section>;
   return <AgentProfile key={recordId} {...props} detail={connection.data} view={view} refresh={connection.refresh} />;
+}
+
+function AgentDirectory({ data, onNavigate, canWrite }: Props) {
+  const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'error'>('all');
+  const [query, setQuery] = useState('');
+  const connected = data.agent_runtime.status === 'connected';
+  const state = (agent: NativeAgent) => agent.config.paused ? 'paused' : agent.status;
+  const matches = (agent: NativeAgent, tab: typeof filter) => tab === 'all' || (tab === 'active' ? connected && state(agent) === 'running' : tab === 'paused' ? state(agent) === 'paused' : ['error', 'failed'].includes(state(agent)));
+  const search = query.trim().toLocaleLowerCase();
+  const agents = data.agents.filter(agent => matches(agent, filter) && `${agent.config.name} ${agent.config.title} ${agent.config.role} ${agent.config.capabilities}`.toLocaleLowerCase().includes(search)).sort((left, right) => left.config.name.localeCompare(right.config.name));
+  return <section className="work-page native-directory">
+    <header className="native-directory-heading"><div><h1>Agents <span>{data.agents.length}</span></h1><p>Your organization’s Grimoire agents.</p></div><button className="button primary" disabled={!canWrite} onClick={() => onNavigate('/agents/new')}>+ Create agent</button></header>
+    <div className="native-directory-toolbar"><div className="native-directory-tabs" role="group" aria-label="Filter agents by status">{(['all', 'active', 'paused', 'error'] as const).map(tab => <button key={tab} type="button" aria-pressed={filter === tab} onClick={() => setFilter(tab)}>{tab[0].toUpperCase() + tab.slice(1)}<span>{data.agents.filter(agent => matches(agent, tab)).length}</span></button>)}</div><label className="native-directory-search"><WorkIcon name="search" /><input aria-label="Search agents" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search agents…" /></label></div>
+    <div className="native-directory-runtime"><span>Grimoire worker <WorkStatus value={data.agent_runtime.status} /></span><span>Last seen {workTime(data.agent_runtime.last_seen)}</span></div>
+    {!connected && <p className="native-directory-note">Active work cannot be verified while the worker is disconnected.</p>}
+    {filter === 'active' && <p className="native-directory-note">Agents with a recorded running task and a connected worker.</p>}
+    {filter === 'error' && <p className="native-directory-note">Reported agent errors. Individual task failures remain in each agent’s Runs.</p>}
+    {agents.length ? <div className="native-directory-list"><div className="native-directory-columns" aria-hidden="true"><span>Agent</span><span>Runtime</span><span>Status</span><span /></div>{agents.map(agent => {
+      const reported = state(agent);
+      const unverified = reported === 'running' && !connected;
+      return <button className="native-directory-row" key={agent.id} onClick={() => onNavigate(`/agents/${agent.id}`)}>
+        <span className="native-directory-identity"><Avatar name={agent.config.name} /><span><strong>{agent.config.name}</strong><small>{agent.config.title || agent.config.role}</small></span></span>
+        <span className="native-directory-adapter"><strong>{agent.config.adapter === 'codex_cli' ? 'Codex CLI' : agent.config.adapter}</strong><small>{agent.config.skill_ids.length} {agent.config.skill_ids.length === 1 ? 'skill' : 'skills'} · r{agent.revision}</small></span>
+        <span className="native-directory-state"><WorkStatus value={unverified ? 'disconnected' : reported} />{unverified && <small>Last recorded: running</small>}</span><WorkIcon name="arrow" />
+      </button>;
+    })}</div> : <Empty>{data.agents.length ? <><h2>No matching agents</h2><p>{search ? 'Try another name, role, or title.' : `No agents match the ${filter} filter.`}</p><button className="text-button" type="button" onClick={() => { setQuery(''); setFilter('all'); }}>Clear filters</button></> : <><h2>Create your first agent</h2><p>Give an agent instructions and skills, then assign a Scion. Work starts only when a Handler dispatches it.</p><button className="button primary" disabled={!canWrite} onClick={() => onNavigate('/agents/new')}>Create your first agent</button></>}</Empty>}
+    <p className="native-directory-count" role="status">{agents.length} of {data.agents.length} agents</p>
+  </section>;
 }
 
 function AgentProfile(props: Props & { detail: AgentDetail; view: string; refresh: () => Promise<void> }) {
@@ -54,7 +95,7 @@ function AgentProfile(props: Props & { detail: AgentDetail; view: string; refres
     finally { setBusy(false); }
   }
   const taskRows = (items: NativeTask[]) => items.length ? <div className="work-list">{items.map(task => <div className="work-row" key={task.id}><button className="work-row-body work-task-link" onClick={() => onNavigate(`/scions/${task.scion_id}/agent-work/${task.id}`)}><strong>{data.scions.find(scion => scion.id === task.scion_id)?.revision.name ?? 'Scion'}</strong><small>{task.task_kind.replaceAll('_', ' ')} · Agent r{task.agent_revision}</small></button><WorkStatus value={task.blocked ? 'blocked' : task.stale ? 'stale' : task.status} />{task.status === 'queued' && <button className="button secondary" disabled={!canExecute || busy || agent.config.paused || task.stale || task.blocked || runtime.status !== 'connected'} onClick={() => void command(task, 'dispatch')}>Run</button>}{['queued', 'dispatched', 'running'].includes(task.status) && <button className="text-button" disabled={!canExecute || busy} onClick={() => void command(task, 'cancel')}>Cancel</button>}<time>{workTime(task.completed_at || task.created_at)}</time></div>)}</div> : <Empty>No tasks assigned to this agent yet.</Empty>;
-  return <div className="native-agent-layout"><nav className="agent-local-nav" aria-label="Agent navigation">{sections.map(group => <section key={group.label}><h2>{group.label}</h2>{group.items.map(([key, title]) => <button key={key} className={view === key ? 'selected' : ''} aria-current={view === key ? 'page' : undefined} onClick={() => go(key)}><WorkIcon name={key === 'overview' ? 'dashboard' : key === 'activity' || key === 'revisions' ? 'audit' : key === 'tools' ? 'connectors' : key} />{title}</button>)}</section>)}</nav><div className="native-agent-content"><header className="native-agent-header"><Avatar large name={agent.config.name} /><div><h1>{agent.config.name}</h1><p>Codex CLI <span>·</span> {agent.config.role} <span>·</span> <WorkStatus value={agent.status} /></p></div><div className="native-agent-actions"><button className="button secondary" disabled={!canExecute || agent.config.paused} onClick={() => go('assign')}>+ Assign task</button><button className="button secondary" disabled={!canExecute || busy || !next || agent.config.paused || runtime.status !== 'connected'} title={runtime.status !== 'connected' ? 'Start the Grimoire worker to run assigned work.' : 'Dispatch the oldest eligible assigned task'} onClick={() => next && void command(next, 'dispatch')}>▷ Run now</button><button className="button secondary" disabled={!canWrite || busy} onClick={() => void pause()}>{agent.config.paused ? 'Resume' : 'Ⅱ Pause'}</button></div></header>{error && <div role="alert" className="work-empty">{error}</div>}
+  return <div className="native-agent-layout"><nav className="agent-local-nav" aria-label="Agent navigation" onFocus={revealAgentNavigationFocus}>{sections.map(group => <section key={group.label}><h2>{group.label}</h2>{group.items.map(([key, title]) => <button key={key} className={view === key ? 'selected' : ''} aria-current={view === key ? 'page' : undefined} onClick={() => go(key)}><WorkIcon name={key === 'overview' ? 'dashboard' : key === 'activity' || key === 'revisions' ? 'audit' : key === 'tools' ? 'connectors' : key} />{title}</button>)}</section>)}</nav><div className="native-agent-content"><header className="native-agent-header"><Avatar large name={agent.config.name} /><div><h1>{agent.config.name}</h1><p>Codex CLI <span>·</span> {agent.config.role} <span>·</span> <WorkStatus value={agent.status} /></p></div><div className="native-agent-actions"><button className="button secondary" disabled={!canExecute || agent.config.paused} onClick={() => go('assign')}>+ Assign task</button><button className="button secondary" disabled={!canExecute || busy || !next || agent.config.paused || runtime.status !== 'connected'} title={runtime.status !== 'connected' ? 'Start the Grimoire worker to run assigned work.' : 'Dispatch the oldest eligible assigned task'} onClick={() => next && void command(next, 'dispatch')}>▷ Run now</button><button className="button secondary" disabled={!canWrite || busy} onClick={() => void pause()}>{agent.config.paused ? 'Resume' : 'Ⅱ Pause'}</button></div></header>{error && <div role="alert" className="work-empty">{error}</div>}
     {view === 'overview' && <><h2 className="native-view-title">Overview</h2><Card title="Latest run" action={<button className="text-button" onClick={() => go('runs')}>All runs →</button>}>{runs.length ? <><WorkStatus value={runs[0].status} /><p>{data.scions.find(scion => scion.id === runs[0].scion_id)?.revision.name ?? 'Scion'}</p><p className="work-muted">{runs[0].failure_code || (runs[0].status === 'completed' ? 'Proposal prepared. Human review remains required.' : 'Recorded task state; completion has not been confirmed.')}</p></> : <p className="work-muted">No run recorded. Assign a Scion task to get started.</p>}</Card><div className="native-card-grid"><Card title="Identity" action={<button className="text-button" onClick={() => go('identity')}>Edit</button>}><dl><div><dt>Role</dt><dd>{agent.config.role}</dd></div><div><dt>Title</dt><dd>{agent.config.title || 'Not set'}</dd></div><div><dt>Reports to</dt><dd>{data.agents.find(item => item.id === agent.config.reports_to)?.config.name ?? 'Handler board'}</dd></div><div><dt>Direct reports</dt><dd>{data.agents.filter(item => item.config.reports_to === agent.id).length}</dd></div></dl></Card><Card title="Harness / Runtime" action={<button className="text-button" onClick={() => go('runtime')}>Configure</button>}><dl><div><dt>Adapter</dt><dd>Codex CLI</dd></div><div><dt>Worker</dt><dd><WorkStatus value={runtime.status} /></dd></div><div><dt>Task limit</dt><dd>{agent.config.timeout_seconds} seconds</dd></div><div><dt>Last seen</dt><dd>{workTime(runtime.last_seen)}</dd></div></dl></Card><Card title="Capabilities"><p>{agent.config.capabilities || 'No capability summary has been added.'}</p></Card><Card title="Skills" action={<button className="text-button" onClick={() => go('skills')}>Manage</button>}><div className="native-skill-tags">{agent.config.skill_ids.map(id => <span key={id}>{data.skills.find(skill => skill.id === id)?.config.name ?? 'Unavailable skill'}</span>)}</div>{!agent.config.skill_ids.length && <p className="work-muted">No skills assigned.</p>}</Card></div><Card title="Recent tasks" action={<button className="text-button" onClick={() => go('assign')}>Assign →</button>}>{taskRows(tasks.slice(0, 5))}</Card></>}
     {['identity', 'instructions', 'skills', 'runtime'].includes(view) && <AgentEditor key={`${agent.id}:${view}`} {...props} agent={agent} view={view} />}
     {view === 'assign' && <><AssignTask {...props} canWrite={canExecute} agent={agent} refresh={refresh} /><Card title="Assigned tasks">{taskRows(tasks)}</Card></>}
@@ -107,9 +148,25 @@ function AssignTask(props: Props & { agent: NativeAgent; refresh: () => Promise<
 }
 
 function SkillsPage(props: Props & { recordId?: string }) {
-  const { data, recordId, onNavigate, canWrite } = props;
+  const { data, recordId } = props;
   const skill = data.skills.find(item => item.id === recordId);
-  return <section className="work-page"><div className="work-page-heading"><div><h1>{recordId ? skill?.config.name ?? 'Create skill' : 'Skills'}</h1><p>Grimoire-owned, versioned preparation instructions.</p></div>{!recordId && <button className="button primary" disabled={!canWrite} onClick={() => onNavigate('/skills/new')}>+ Create skill</button>}</div>{recordId ? recordId !== 'new' && !skill ? <Empty>Skill not found in this organization.</Empty> : <SkillEditor key={recordId} {...props} skill={skill ?? null} /> : data.skills.length ? <div className="work-list">{data.skills.map(item => <button className="work-row" key={item.id} onClick={() => onNavigate(`/skills/${item.id}`)}><WorkIcon name="skills" /><span className="work-row-body"><strong>{item.config.name}</strong><small>{item.config.description}</small></span><span className="work-muted">r{item.revision} · {data.agents.filter(agent => agent.config.skill_ids.includes(item.id)).length} agents</span><WorkIcon name="arrow" /></button>)}</div> : <Empty>Create a preparation skill, then assign it to an agent. These are instruction documents, not installed executables.</Empty>}</section>;
+  if (!recordId) return <SkillDirectory {...props} />;
+  return <section className="work-page"><div className="work-page-heading"><div><h1>{skill?.config.name ?? 'Create skill'}</h1><p>Grimoire-owned, versioned preparation instructions.</p></div></div>{recordId !== 'new' && !skill ? <Empty>Skill not found in this organization.</Empty> : <SkillEditor key={recordId} {...props} skill={skill ?? null} />}</section>;
+}
+
+function SkillDirectory({ data, onNavigate, canWrite }: Props) {
+  const [query, setQuery] = useState('');
+  const search = query.trim().toLocaleLowerCase();
+  const skills = data.skills.filter(skill => `${skill.config.name} ${skill.config.description}`.toLocaleLowerCase().includes(search)).sort((left, right) => left.config.name.localeCompare(right.config.name));
+  return <section className="work-page native-directory">
+    <header className="native-directory-heading"><div><h1>Skills <span>{data.skills.length}</span></h1><p>Preparation instructions owned by this organization.</p></div><button className="button primary" disabled={!canWrite} onClick={() => onNavigate('/skills/new')}>+ Create skill</button></header>
+    <div className="native-directory-toolbar"><span className="native-directory-scope">Your skills</span><label className="native-directory-search"><WorkIcon name="search" /><input aria-label="Search skills" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search skills…" /></label></div>
+    {skills.length ? <div className="native-skill-grid">{skills.map(skill => {
+      const assigned = data.agents.filter(agent => agent.config.skill_ids.includes(skill.id)).length;
+      return <button className="native-skill-card" key={skill.id} onClick={() => onNavigate(`/skills/${skill.id}`)}><span className="native-skill-card-top"><span className="native-skill-card-icon"><WorkIcon name="skills" /></span><span>Revision {skill.revision}</span><WorkIcon name="arrow" /></span><strong>{skill.config.name}</strong><span className="native-skill-description">{skill.config.description || 'No description added.'}</span><span className="native-skill-card-footer"><span>{assigned} {assigned === 1 ? 'agent' : 'agents'} assigned</span><span>Organization skill</span></span></button>;
+    })}</div> : <Empty>{data.skills.length ? <><h2>No matching skills</h2><p>Try a different name or description.</p><button className="text-button" type="button" onClick={() => setQuery('')}>Clear search</button></> : <><h2>Add your first skill</h2><p>Create a preparation skill and assign it to an agent. Skills are instruction documents, not executable plugins.</p><button className="button primary" disabled={!canWrite} onClick={() => onNavigate('/skills/new')}>Create your first skill</button></>}</Empty>}
+    <p className="native-directory-count" role="status">{skills.length} of {data.skills.length} skills · Existing tasks keep their assigned skill revision.</p>
+  </section>;
 }
 function SkillEditor({ skill, token, canWrite, onChanged, onNavigate, onDirty }: Props & { skill: NativeSkill | null }) {
   const [config, setConfig] = useState<SkillConfig>(skill?.config ?? { name: '', description: '', instructions: '' }); const [busy, setBusy] = useState(false); const [error, setError] = useState('');

@@ -1,0 +1,194 @@
+[
+  {
+    "form": "login",
+    "mode": "dark",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "documentHeight": 1127,
+    "card": {
+      "top": 136,
+      "bottom": 983.5,
+      "height": 847.5,
+      "width": 421.140625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(231, 237, 247)",
+      "background": "rgb(16, 21, 31)"
+    },
+    "gradient": "radial-gradient(56% 62% at 48% -17%, rgba(68, 107, 167, 0.72), rgba(0, 0, 0, 0) 79%), radial-gradient(38% 48% at -5% -4%, rgba(30, 62, 113, 0.8), rgba(0, 0, 0, 0) 83%), radial-gradient(42% 48% at 106% -5%, rgba(30, 62, 113, 0.82), rgba(0, 0, 0, 0) 84%)",
+    "cardColor": "rgb(231, 237, 247)"
+  },
+  {
+    "form": "signup",
+    "mode": "dark",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "documentHeight": 1142,
+    "card": {
+      "top": 136,
+      "bottom": 999.3125,
+      "height": 863.3125,
+      "width": 421.140625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(231, 237, 247)",
+      "background": "rgb(16, 21, 31)"
+    },
+    "gradient": "radial-gradient(56% 62% at 48% -17%, rgba(68, 107, 167, 0.72), rgba(0, 0, 0, 0) 79%), radial-gradient(38% 48% at -5% -4%, rgba(30, 62, 113, 0.8), rgba(0, 0, 0, 0) 83%), radial-gradient(42% 48% at 106% -5%, rgba(30, 62, 113, 0.82), rgba(0, 0, 0, 0) 84%)",
+    "cardColor": "rgb(231, 237, 247)"
+  },
+  {
+    "form": "login",
+    "mode": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "documentHeight": 1047,
+    "card": {
+      "top": 136,
+      "bottom": 904.3125,
+      "height": 768.3125,
+      "width": 421.140625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(24, 33, 51)",
+      "background": "rgb(247, 248, 251)"
+    },
+    "gradient": "radial-gradient(58% 58% at 48% -14%, rgba(194, 214, 243, 0.64), rgba(0, 0, 0, 0) 78%), radial-gradient(38% 38% at 0% 0%, rgba(212, 227, 248, 0.46), rgba(0, 0, 0, 0) 85%), radial-gradient(38% 42% at 100% 0%, rgba(205, 222, 247, 0.48), rgba(0, 0, 0, 0) 85%)",
+    "cardColor": "rgb(24, 33, 51)"
+  },
+  {
+    "form": "signup",
+    "mode": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "documentHeight": 1142,
+    "card": {
+      "top": 136,
+      "bottom": 999.3125,
+      "height": 863.3125,
+      "width": 421.140625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(24, 33, 51)",
+      "background": "rgb(247, 248, 251)"
+    },
+    "gradient": "radial-gradient(58% 58% at 48% -14%, rgba(194, 214, 243, 0.64), rgba(0, 0, 0, 0) 78%), radial-gradient(38% 38% at 0% 0%, rgba(212, 227, 248, 0.46), rgba(0, 0, 0, 0) 85%), radial-gradient(38% 42% at 100% 0%, rgba(205, 222, 247, 0.48), rgba(0, 0, 0, 0) 85%)",
+    "cardColor": "rgb(24, 33, 51)"
+  },
+  {
+    "form": "login",
+    "mode": "dark",
+    "viewport": {
+      "width": 1760,
+      "height": 900
+    },
+    "documentHeight": 1047,
+    "card": {
+      "top": 136,
+      "bottom": 904.3125,
+      "height": 768.3125,
+      "width": 416.65625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(231, 237, 247)",
+      "background": "rgb(16, 21, 31)"
+    },
+    "gradient": "radial-gradient(56% 62% at 48% -17%, rgba(68, 107, 167, 0.72), rgba(0, 0, 0, 0) 79%), radial-gradient(38% 48% at -5% -4%, rgba(30, 62, 113, 0.8), rgba(0, 0, 0, 0) 83%), radial-gradient(42% 48% at 106% -5%, rgba(30, 62, 113, 0.82), rgba(0, 0, 0, 0) 84%)",
+    "cardColor": "rgb(231, 237, 247)"
+  },
+  {
+    "form": "signup",
+    "mode": "dark",
+    "viewport": {
+      "width": 1760,
+      "height": 900
+    },
+    "documentHeight": 1142,
+    "card": {
+      "top": 136,
+      "bottom": 999.3125,
+      "height": 863.3125,
+      "width": 416.65625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(231, 237, 247)",
+      "background": "rgb(16, 21, 31)"
+    },
+    "gradient": "radial-gradient(56% 62% at 48% -17%, rgba(68, 107, 167, 0.72), rgba(0, 0, 0, 0) 79%), radial-gradient(38% 48% at -5% -4%, rgba(30, 62, 113, 0.8), rgba(0, 0, 0, 0) 83%), radial-gradient(42% 48% at 106% -5%, rgba(30, 62, 113, 0.82), rgba(0, 0, 0, 0) 84%)",
+    "cardColor": "rgb(231, 237, 247)"
+  },
+  {
+    "form": "login",
+    "mode": "light",
+    "viewport": {
+      "width": 1760,
+      "height": 900
+    },
+    "documentHeight": 1047,
+    "card": {
+      "top": 136,
+      "bottom": 904.3125,
+      "height": 768.3125,
+      "width": 416.65625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(24, 33, 51)",
+      "background": "rgb(247, 248, 251)"
+    },
+    "gradient": "radial-gradient(58% 58% at 48% -14%, rgba(194, 214, 243, 0.64), rgba(0, 0, 0, 0) 78%), radial-gradient(38% 38% at 0% 0%, rgba(212, 227, 248, 0.46), rgba(0, 0, 0, 0) 85%), radial-gradient(38% 42% at 100% 0%, rgba(205, 222, 247, 0.48), rgba(0, 0, 0, 0) 85%)",
+    "cardColor": "rgb(24, 33, 51)"
+  },
+  {
+    "form": "signup",
+    "mode": "light",
+    "viewport": {
+      "width": 1760,
+      "height": 900
+    },
+    "documentHeight": 1142,
+    "card": {
+      "top": 136,
+      "bottom": 999.3125,
+      "height": 863.3125,
+      "width": 416.65625
+    },
+    "body": {
+      "font": "InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      "size": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(24, 33, 51)",
+      "background": "rgb(247, 248, 251)"
+    },
+    "gradient": "radial-gradient(58% 58% at 48% -14%, rgba(194, 214, 243, 0.64), rgba(0, 0, 0, 0) 78%), radial-gradient(38% 38% at 0% 0%, rgba(212, 227, 248, 0.46), rgba(0, 0, 0, 0) 85%), radial-gradient(38% 42% at 100% 0%, rgba(205, 222, 247, 0.48), rgba(0, 0, 0, 0) 85%)",
+    "cardColor": "rgb(24, 33, 51)"
+  }
+]

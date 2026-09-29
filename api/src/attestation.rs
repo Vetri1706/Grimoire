@@ -34,6 +34,10 @@ pub const MIGRATIONS: &[(&str, &[u8])] = &[
     migration!("intake", "0042_watchtower_task_sources.sql"),
     migration!("intake", "0043_native_agents.sql"),
     migration!("intake", "0044_organization_onboarding.sql"),
+    migration!("intake", "0045_handler_registration.sql"),
+    migration!("intake", "0046_public_judge_demo.sql"),
+    migration!("intake", "0047_google_identity.sql"),
+    migration!("intake", "0048_handler_profile.sql"),
 ];
 
 #[derive(FromRow)]

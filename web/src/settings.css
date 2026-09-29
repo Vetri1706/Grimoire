@@ -1,0 +1,54 @@
+.settings-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: calc(100svh - 60px); }
+.settings-navigation { border-right: 1px solid var(--border); padding: 24px 12px; display: flex; flex-direction: column; gap: 4px; align-self: stretch; }
+.settings-nav-label { padding: 0 12px 12px; font-size: 12px; font-weight: 500; }
+.settings-navigation button { text-align: left; color: var(--foreground); background: transparent; border: 0; border-radius: var(--radius); min-height: 36px; padding: 8px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+.settings-navigation button:hover { background: var(--muted); }
+.settings-navigation button[aria-current="page"] { background: var(--accent); font-weight: 500; }
+.settings-content { width: 100%; max-width: 1080px; padding: 28px 32px 56px; min-width: 0; }
+.settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
+.settings-heading h1 { font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -.6px; margin: 0 0 8px; }
+.settings-content p { color: var(--foreground); font-size: 14px; line-height: 1.6; margin: 4px 0 0; }
+.settings-heading .button { flex-shrink: 0; white-space: nowrap; }
+.settings-content h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; line-height: 1.5; }
+.settings-section { padding: 24px 0; border-top: 1px solid var(--border); }
+.settings-profile-summary { display: flex; align-items: center; gap: 20px; padding: 24px; margin-bottom: 28px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-background); }
+.settings-profile-summary h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
+.settings-avatar { display: grid; place-items: center; flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; font-size: 20px; font-weight: 500; background: var(--accent); color: var(--foreground); border: 1px solid var(--border); }
+.settings-facts { margin: 8px 0 0; }
+.settings-facts>div { display: grid; grid-template-columns: minmax(120px, 190px) minmax(0, 1fr); gap: 24px; border-bottom: 1px solid var(--border); padding: 15px 0; font-size: 14px; line-height: 1.6; }
+.settings-facts dt { color: var(--foreground); font-weight: 500; }
+.settings-facts dd { margin: 0; overflow-wrap: anywhere; }
+.settings-mono { font-family: var(--font-mono); font-size: 12px; }
+.settings-form { max-width: 540px; }
+.settings-form label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+.settings-form input { width: 100%; }
+.settings-form>p { margin-top: 10px; }
+.settings-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 24px; }
+.settings-notice { color: var(--success) !important; }
+.settings-content .settings-footnote { font-size: 13px; margin-top: 20px; }
+.settings-organization-list { margin-top: 16px; }
+.settings-organization { display: flex; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.settings-organization>div { flex: 1; min-width: 0; }
+.settings-organization strong { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.settings-organization p { font-size: 12px; }
+.settings-org-mark { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted); }
+.settings-status { border: 1px solid var(--border); background: var(--muted); border-radius: 20px; padding: 3px 10px; font-size: 12px; }
+.settings-theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; border: 0; padding: 0; margin: 0; }
+.settings-theme-options legend { font-size: 16px; font-weight: 500; padding: 0 0 16px; }
+.settings-theme-option { position: relative; display: flex; flex-direction: column; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; background: var(--surface-raised); }
+.settings-theme-option[data-selected="true"] { outline: 2px solid var(--ring); outline-offset: 2px; }
+.settings-theme-option:focus-within { outline: 2px solid var(--ring); outline-offset: 4px; }
+.settings-theme-option>input { position: absolute; top: 17px; right: 17px; width: 16px; height: 16px; min-height: 0; padding: 0; accent-color: var(--primary); }
+.settings-theme-option>span:last-child { display: flex; flex-direction: column; gap: 5px; }
+.settings-theme-option strong { font-size: 14px; font-weight: 500; }
+.settings-theme-option>span:last-child>span { font-size: 12px; line-height: 1.5; }
+.settings-theme-preview { border: 1px solid var(--border); border-radius: 5px; height: 90px; margin-top: 20px; padding: 20px 16px 16px 30px; display: flex; flex-direction: column; gap: 8px; background: #f7f8fb; }
+.settings-theme-preview i { height: 6px; border-radius: 2px; background: #34435b; }
+.settings-theme-preview i:nth-child(2) { width: 70%; }.settings-theme-preview i:nth-child(3) { width: 85%; }
+.settings-theme-dark { background: #10151f; }.settings-theme-dark i { background: #e2e8f0; }
+.settings-theme-system { background: linear-gradient(90deg, #f7f8fb 50%, #10151f 50%); }.settings-theme-system i { background: #6e91be; }
+.settings-links { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 16px; }
+.settings-links button { padding: 4px 0; border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.settings-links button:hover { text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 1100px) { .settings-layout { grid-template-columns: 180px minmax(0, 1fr); }.settings-content { padding: 28px; }.settings-heading { flex-wrap: wrap; }.settings-theme-options { grid-template-columns: 1fr; }.settings-theme-option { display: grid; grid-template-columns: 100px 1fr; align-items: center; }.settings-theme-preview { margin: 0; height: 70px; }.settings-theme-option>input { top: 12px; right: 12px; } }
+@media (max-width: 767px) { .settings-layout { display: block; }.settings-navigation { flex-direction: row; flex-wrap: wrap; padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--border); gap: 4px; }.settings-nav-label { display: none; }.settings-navigation button { min-height: 40px; font-size: 13px; }.settings-content { padding: 24px 20px 48px; }.settings-heading { margin-bottom: 24px; gap: 16px; }.settings-facts>div { grid-template-columns: 1fr; gap: 4px; }.settings-profile-summary { padding: 20px 16px; gap: 14px; }.settings-avatar { width: 48px; height: 48px; font-size: 16px; }.settings-actions { flex-wrap: wrap; }.settings-form input { font-size: 16px; } }

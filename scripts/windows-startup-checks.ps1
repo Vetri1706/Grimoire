@@ -99,7 +99,11 @@ $migrationFiles = @(
     'db/intake/0041_watchtower_artifact_guards.sql',
     'db/intake/0042_watchtower_task_sources.sql',
     'db/intake/0043_native_agents.sql',
-    'db/intake/0044_organization_onboarding.sql'
+    'db/intake/0044_organization_onboarding.sql',
+    'db/intake/0045_handler_registration.sql',
+    'db/intake/0046_public_judge_demo.sql',
+    'db/intake/0047_google_identity.sql',
+    'db/intake/0048_handler_profile.sql'
 )
 $attestationSource = Get-Content -LiteralPath (Join-Path $projectRoot 'api/src/attestation.rs') -Raw
 $compiledFiles = @([regex]::Matches($attestationSource, 'migration!\("([^"]+)",\s*"([^"]+)"\)') | ForEach-Object { "db/$($_.Groups[1].Value)/$($_.Groups[2].Value)" })

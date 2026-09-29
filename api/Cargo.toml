@@ -6,8 +6,10 @@ publish = false
 
 [dependencies]
 axum = "0.8"
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 futures-util = "0.3"
+jsonwebtoken = { version = "11.1", default-features = false, features = ["rust_crypto"] }
 object_store = { version = "0.14", default-features = false, features = ["aws-base", "reqwest", "ring"] }
 # Use the existing ring provider instead of introducing a second TLS provider.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
@@ -21,3 +23,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 url = "2"
+
+[dev-dependencies]
+rand = "0.8"
+rsa = "0.9"

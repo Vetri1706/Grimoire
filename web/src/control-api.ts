@@ -1,6 +1,8 @@
 import type { AgentRuntime } from './agents-api';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { request } from './api';
+import { demoRequest } from './demo-api';
+import type { DemoSlug } from './demo-api';
 
 export type CaseNode = {
   id: string;
@@ -12,6 +14,7 @@ export type CaseNode = {
 };
 export type ReviewTask = { id: string; event_id: string; status: string; reason: string; created_at: string };
 export type ControlSurfaceState = {
+  synthetic?: boolean; read_only?: boolean;
   scion_id: string; scion_revision: number; generated_at: string;
   nodes: CaseNode[]; edges: { id: string; source: string; target: string; kind: string }[];
   watchtower: {
@@ -43,7 +46,7 @@ const POLL_MS = 2000;
 
 // Polling observes the persisted server monitor. It never performs or simulates a watch check.
 // A short display lease bounds how long a formerly authorized projection can remain visible.
-export function useControlSurface(token: string, scionId: string) {
+export function useControlSurface(token: string, scionId: string, demoSlug?: DemoSlug) {
   const [data, setData] = useState<ControlSurfaceState | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -67,8 +70,11 @@ export function useControlSurface(token: string, scionId: string) {
     const controller = new AbortController(); pending.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), 2500);
     try {
-      const result = await request<ControlSurfaceState>(token, `/scions/${encodeURIComponent(scionId)}/control-surface`, { signal: controller.signal, cache: 'no-store' });
+      const result = demoSlug
+        ? await demoRequest<ControlSurfaceState>(`/demo/${demoSlug}`, controller.signal)
+        : await request<ControlSurfaceState>(token, `/scions/${encodeURIComponent(scionId)}/control-surface`, { signal: controller.signal, cache: 'no-store' });
       if (sequence !== epoch.current) return;
+      if (demoSlug && (result.synthetic !== true || result.read_only !== true)) throw new Error('The public synthetic case could not be verified.');
       if (result.scion_id !== scionId || !Array.isArray(result.nodes) || !Array.isArray(result.edges)) throw new Error('The case projection could not be verified.');
       if (document.visibilityState !== 'visible' || !navigator.onLine || Date.now() >= started + LEASE_MS) { clear('Access check expired. Case content has been cleared.'); return; }
       const nextFingerprint = JSON.stringify([result.scion_revision, result.nodes.filter(node => node.kind === 'evidence_source').map(node => [node.id, node.status, node.stale, node.provenance])]);
@@ -76,20 +82,20 @@ export function useControlSurface(token: string, scionId: string) {
       fingerprint.current = nextFingerprint;
       setData(result); setError(''); setLoading(false); setReceivedAt(new Date().toISOString());
       window.clearTimeout(lease.current);
-      lease.current = window.setTimeout(() => clear('The authenticated refresh is overdue. Case content is hidden until access is rechecked.'), Math.max(0, started + LEASE_MS - Date.now()));
+      lease.current = window.setTimeout(() => clear(`The ${demoSlug ? 'demo snapshot' : 'authenticated'} refresh is overdue. Case content is hidden until access is rechecked.`), Math.max(0, started + LEASE_MS - Date.now()));
     } catch (failure) {
       if (sequence === epoch.current) clear(failure instanceof Error ? failure.message : 'The control surface is disconnected. Case content has been cleared.');
     } finally {
       window.clearTimeout(timeout);
       if (pending.current === controller) pending.current = null;
     }
-  }, [token, scionId, clear, invalidate]);
+  }, [token, scionId, demoSlug, clear, invalidate]);
   useEffect(() => {
     fingerprint.current = null; setLoading(true); setData(null); setReceivedAt(null);
     void refresh();
     const interval = window.setInterval(() => void refresh(), POLL_MS);
     const visibility = () => { if (document.visibilityState === 'visible') void refresh(); else clear('This tab is hidden. Case content has been cleared; server monitoring is independent of this page.'); };
-    const offline = () => clear('Disconnected. Case content has been cleared until an authenticated refresh succeeds.');
+    const offline = () => clear('Disconnected. Case content has been cleared until a fresh server snapshot is available.');
     const focus = () => void refresh();
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('focus', focus); window.addEventListener('online', focus); window.addEventListener('offline', offline); window.addEventListener('pagehide', offline); window.addEventListener('pageshow', focus);

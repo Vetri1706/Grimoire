@@ -1,0 +1,284 @@
+{
+  "findings": [
+    {
+      "category": "violation",
+      "file": "web/src/AdaptiveScion.tsx",
+      "line": 149,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/AdaptiveScion.tsx",
+      "line": 222,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/App.tsx",
+      "line": 363,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 259,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 290,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 310,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/NativeAgents.tsx",
+      "line": 95,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/NativeAgents.tsx",
+      "line": 117,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/NativeAgents.tsx",
+      "line": 135,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Offers.tsx",
+      "line": 138,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Onboarding.tsx",
+      "line": 55,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Onboarding.tsx",
+      "line": 91,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/PhysicalScope.tsx",
+      "line": 195,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/PhysicalScope.tsx",
+      "line": 241,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/AdaptiveScion.tsx",
+      "line": 224,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/App.tsx",
+      "line": 370,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/App.tsx",
+      "line": 370,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/App.tsx",
+      "line": 371,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/App.tsx",
+      "line": 371,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 262,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 263,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 290,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 290,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/Evidence.tsx",
+      "line": 310,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/NativeAgents.tsx",
+      "line": 96,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/NativeAgents.tsx",
+      "line": 97,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/NativeAgents.tsx",
+      "line": 135,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/PhysicalScope.tsx",
+      "line": 195,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/PhysicalScope.tsx",
+      "line": 240,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "web/src/PhysicalScope.tsx",
+      "line": 247,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    }
+  ],
+  "mode": "strict",
+  "projectRoot": "C:\\proj\\Grimoire\\grim",
+  "schemaVersion": 1,
+  "summary": {
+    "errors": 30,
+    "total": 30,
+    "unresolved": 0,
+    "violations": 30,
+    "warnings": 0
+  }
+}

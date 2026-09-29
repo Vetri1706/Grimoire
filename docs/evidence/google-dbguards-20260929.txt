@@ -1,0 +1,388 @@
+UTC: 2026-09-29T17:25:16.3178024Z
+PRIMARY HEAD: b757562b348c76d36cfb7e8f14ae242e4cb66858
+Sources: current primary working tree, including uncommitted Google integration
+Drive C free bytes: 40235528192
+COMMAND: pwsh scripts/dev.ps1 -Task DbGuards -Mode native (isolated PostgreSQL55434/grimoire_test)
+SET
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config
+--------------------------------------
+ 48b95145-870c-4d46-972d-272d7ee66cd6
+(1 row)
+
+      set_config
+----------------------
+ procurement_preparer
+(1 row)
+
+      set_config
+-----------------------
+ local:database-checks
+(1 row)
+
+          set_config
+-------------------------------
+ Rollback-only security checks
+(1 row)
+
+DO
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/database_guards.sql:67: NOTICE:  PASS: immutable UPDATE/DELETE; sequential revisions; atomic pointer/audit; least privilege; no TEMP/schema creation; disabled principal denial
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/database_guards.sql:75: NOTICE:  PASS: actual runtime CREATE TEMP TABLE rejected
+ROLLBACK
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config
+--------------------------------------
+ e038d687-2264-4593-ab3b-45451ca382b9
+(1 row)
+
+      set_config
+----------------------
+ procurement_preparer
+(1 row)
+
+      set_config
+-----------------------
+ local:database-checks
+(1 row)
+
+                set_config
+-------------------------------------------
+ Rollback-only history author scope checks
+(1 row)
+
+DO
+SET
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/database_guards.sql:141: NOTICE:  PASS: readable history Handler; foreign, mismatched and missing context author denial; no direct principal access
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config
+--------------------------------------
+ 8676831e-1858-42d5-b3a4-65cb878775d1
+(1 row)
+
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/source_guards.sql:114: NOTICE:  PASS: source/claim/revocation/object-reference immutability; reference identity and locator bounds; no runtime externalization; missing rights; revoked content RLS; pointer privileges; foreign hiding. Exact object bytes/quote are verified by the live API harness.
+DO
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000012
+(1 row)
+
+              set_config
+--------------------------------------
+ 863bf21f-c8a5-4cc7-a3e9-af378906d26e
+(1 row)
+
+           set_config
+--------------------------------
+ synthetic_engineering_reviewer
+(1 row)
+
+     set_config
+--------------------
+ local:scope-guards
+(1 row)
+
+                   set_config
+------------------------------------------------
+ Rollback-only synthetic scope invariant checks
+(1 row)
+
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/scope_guards.sql:95: NOTICE:  PASS: existing GG-40 exact chain, criteria hash, immutable proposal/confirmation/component, mismatched governed chain denial, bounded runtime privileges, dual-role queued-origin self-review denial, agent confirmation denial, cross-org chain denial
+DO
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config
+--------------------------------------
+ 83cfb0bc-e1c4-448a-9884-a0bb971a89c9
+(1 row)
+
+      set_config
+----------------------
+ procurement_preparer
+(1 row)
+
+     set_config
+---------------------
+ local:worker-guards
+(1 row)
+
+                   set_config
+-------------------------------------------------
+ Rollback-only synthetic worker invariant checks
+(1 row)
+
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/worker_guards.sql:84: NOTICE:  PASS: explicit Handler dispatch, no agent self-dispatch, no future deadline spoof, one active org task, immutable execution bounds/events/completed results, exact task-result origin, cancellation prevents proposals/restarts, bounded runtime grants
+DO
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000012
+(1 row)
+
+              set_config
+--------------------------------------
+ a5d7d4b7-8424-4c1a-a16e-132f5e946bef
+(1 row)
+
+           set_config
+--------------------------------
+ synthetic_engineering_reviewer
+(1 row)
+
+     set_config
+--------------------
+ local:offer-guards
+(1 row)
+
+                 set_config
+---------------------------------------------
+ Rollback-only exact offer comparison checks
+(1 row)
+
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/offer_guards.sql:56: NOTICE:  PASS: exact governed source-object mapping; no agent source-grant escalation; exact same-basis decimal preservation; supplier/scope revocation artifact invalidation and price-read denial; immutable submission/offer/comparison; invented FX rejection; least privilege; agent review denial; cross-org hiding
+DO
+ROLLBACK
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config
+--------------------------------------
+ b760c176-79f7-4167-8793-ed0b681ea2d7
+(1 row)
+
+       set_config
+-------------------------
+ synthetic_test_preparer
+(1 row)
+
+       set_config
+-------------------------
+ local:offer-0033-guards
+(1 row)
+
+                              set_config
+----------------------------------------------------------------------
+ Rollback-only legal identity and historical author regression checks
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/offer_guards.sql:130: NOTICE:  PASS: equal registration references across distinct jurisdictions accepted; duplicate full legal identity denied; earlier offer author denied normalization review despite different current offer, series and proposal authors
+ROLLBACK
+SET
+BEGIN
+SET
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 10000000-0000-4000-8000-000000000011
+(1 row)
+
+              set_config
+--------------------------------------
+ cd3ad961-c217-474e-83ad-faef2725fdce
+(1 row)
+
+      set_config
+----------------------
+ procurement_preparer
+(1 row)
+
+      set_config
+-----------------------
+ local:adaptive-guards
+(1 row)
+
+                         set_config
+------------------------------------------------------------
+ Rollback-only synthetic adaptive proposal invariant checks
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/adaptive_guards.sql:71: NOTICE:  PASS: immutable adaptive plans/comparisons, no agent review, no Handler impersonation of agent proposal, pinned leased task, required evidence gaps, actual connector IDs, bounded runtime grants
+SET
+              set_config
+--------------------------------------
+ 20000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 20000000-0000-4000-8000-000000000011
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/adaptive_guards.sql:82: NOTICE:  PASS: adaptive plan and comparison history hidden by runtime organization RLS
+ROLLBACK
+SET
+BEGIN
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/control_surface_guards.sql:25: NOTICE:  PASS duplicate direct event deliveries preserve audit/task/state identities; runtime cannot mutate watch records or inject events
+DO
+SET
+              set_config
+--------------------------------------
+ 20000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 20000000-0000-4000-8000-000000000011
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/control_surface_guards.sql:35: NOTICE:  PASS direct runtime RLS hides foreign watch rows, alerts and dependencies
+ROLLBACK
+SET
+BEGIN
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/native_agent_guards.sql:20: NOTICE:  PASS native runtime has no direct mutation grants; revisions, receipts and assignments are immutable
+DO
+SET
+              set_config
+--------------------------------------
+ 20000000-0000-4000-8000-000000000001
+(1 row)
+
+              set_config
+--------------------------------------
+ 20000000-0000-4000-8000-000000000011
+(1 row)
+
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/native_agent_guards.sql:30: NOTICE:  PASS native profile, instruction, assignment and heartbeat RLS hides other organizations
+ROLLBACK
+SET
+BEGIN
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/onboarding_guards.sql:43: NOTICE:  PASS onboarding hashed sessions, cross-session retry idempotency and organization authority separation
+DO
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/onboarding_guards.sql:64: NOTICE:  PASS runtime can configure workspace skill without task authority; foreign organizations and revoked sessions denied
+DO
+RESET
+UPDATE 1
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/onboarding_guards.sql:71: NOTICE:  PASS expired session denied
+DO
+UPDATE 1
+UPDATE 1
+DO
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/onboarding_guards.sql:81: NOTICE:  PASS disabled identity denied session and organization switching
+ROLLBACK
+SET
+BEGIN
+SET
+DO
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/registration_guards.sql:111: NOTICE:  PASS independent signup before and after setup; real login; no inherited ownership or memberships
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/registration_guards.sql:111: NOTICE:  PASS duplicate signup is atomic; NULL arguments and unbounded session expiry denied
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/registration_guards.sql:111: NOTICE:  PASS registered organizations remain isolated and workspace management grants no sourcing, approval or agent authority
+DO
+RESET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/registration_guards.sql:123: NOTICE:  PASS registered passphrase is stored only as a bcrypt hash
+DO
+ROLLBACK
+SET
+BEGIN
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/google_identity_guards.sql:27: NOTICE:  PASS Google identity and challenge tables have no runtime or PUBLIC direct access
+DO
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/google_identity_guards.sql:160: NOTICE:  PASS Google challenge is nonce-bound and one-use; distinct identity has no password, owner or organization
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/google_identity_guards.sql:160: NOTICE:  PASS returning subject reuses one identity; foreign organizations denied; password login retained and no approval authority gained
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/google_identity_guards.sql:160: NOTICE:  PASS NULL inputs, unbounded expiry, replaced challenges and logout revocation denied safely
+DO
+RESET
+DO
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/google_identity_guards.sql:202: NOTICE:  PASS expired challenges and disabled Google identities denied, including existing sessions
+DO
+RESET
+DELETE 0
+INSERT 0 1024
+SET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/google_identity_guards.sql:216: NOTICE:  PASS Google outstanding challenge count is bounded
+DO
+RESET
+psql:C:/proj/Grimoire/grim-integrate-onboarding/api/tests/google_identity_guards.sql:225: NOTICE:  PASS Google authentication creates no installation owner or approval effects
+DO
+ROLLBACK
+PASS isolated Google47 dbguards verification

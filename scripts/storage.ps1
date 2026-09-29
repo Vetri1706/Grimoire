@@ -83,7 +83,7 @@ function Invoke-Mc {
     } finally { $env:MC_HOST_grimoire = $previousHost; $env:MC_CONFIG_DIR = $previousConfig }
 }
 function Assert-Healthy {
-    $response = Invoke-WebRequest -Uri "$endpoint/minio/health/live" -TimeoutSec 3
+    $response = Invoke-WebRequest -Uri "$endpoint/minio/health/live" -UseBasicParsing -TimeoutSec 3
     if ($response.StatusCode -ne 200) { throw 'Object store is unhealthy.' }
 }
 function Write-Policy([string]$Name, [string]$Bucket, [bool]$Faults) {
@@ -98,7 +98,8 @@ function Write-Policy([string]$Name, [string]$Bucket, [bool]$Faults) {
         @{ Effect='Allow'; Action=$objectActions; Resource=@("arn:aws:s3:::$Bucket/*") }
     ) }
     $policyPath = Join-Path $localRoot "$Name.json"
-    $policy | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $policyPath -Encoding utf8
+    $json = $policy | ConvertTo-Json -Depth 10
+    [IO.File]::WriteAllText($policyPath, $json, (New-Object System.Text.UTF8Encoding($false)))
     Invoke-Mc admin policy create grimoire $Name $policyPath | Out-Null
 }
 function Initialize-Buckets {

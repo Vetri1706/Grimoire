@@ -109,7 +109,7 @@ function Initialize-Database([string]$Database) {
     Invoke-Psql -Database $Database -Sql "REVOKE ALL ON DATABASE $Database FROM PUBLIC; GRANT CONNECT ON DATABASE $Database TO grimoire_intake_app;" | Out-Null
     Verify-Sql
     Invoke-Psql -Database $Database -AsMigrator -Sql 'CREATE TABLE IF NOT EXISTS public.grimoire_schema_migrations (name text PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT clock_timestamp());' | Out-Null
-    foreach ($file in @('db/gg40/0022_grimoire_contract.sql','db/gg40/0023_grimoire_review_corrections.sql','db/intake/0024_intake.sql','db/intake/0025_intake_history_authors.sql','db/intake/0026_intake_sources.sql','db/intake/0027_intake_source_objects.sql','db/intake/0028_intake_scope.sql','db/intake/0029_intake_agent_tasks.sql','db/intake/0030_scope_chain_guard.sql','db/intake/0031_worker_controls.sql','db/intake/0032_synthetic_offer_comparison.sql','db/intake/0033_offer_review_identity_guards.sql','db/intake/0034_sourcing_authority_gate.sql','db/intake/0038_windows_adaptive_plans.sql','db/intake/0039_windows_approval_lockdown.sql','db/intake/0040_control_surface.sql','db/intake/0041_watchtower_artifact_guards.sql','db/intake/0042_watchtower_task_sources.sql','db/intake/0043_native_agents.sql','db/intake/0044_organization_onboarding.sql')) {
+    foreach ($file in @('db/gg40/0022_grimoire_contract.sql','db/gg40/0023_grimoire_review_corrections.sql','db/intake/0024_intake.sql','db/intake/0025_intake_history_authors.sql','db/intake/0026_intake_sources.sql','db/intake/0027_intake_source_objects.sql','db/intake/0028_intake_scope.sql','db/intake/0029_intake_agent_tasks.sql','db/intake/0030_scope_chain_guard.sql','db/intake/0031_worker_controls.sql','db/intake/0032_synthetic_offer_comparison.sql','db/intake/0033_offer_review_identity_guards.sql','db/intake/0034_sourcing_authority_gate.sql','db/intake/0038_windows_adaptive_plans.sql','db/intake/0039_windows_approval_lockdown.sql','db/intake/0040_control_surface.sql','db/intake/0041_watchtower_artifact_guards.sql','db/intake/0042_watchtower_task_sources.sql','db/intake/0043_native_agents.sql','db/intake/0044_organization_onboarding.sql','db/intake/0045_handler_registration.sql','db/intake/0046_public_judge_demo.sql','db/intake/0047_google_identity.sql','db/intake/0048_handler_profile.sql')) {
         $name = Split-Path $file -Leaf
         $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
         $previous = (Invoke-Psql -Database $Database -Scalar -Sql "SELECT sha256 FROM public.grimoire_schema_migrations WHERE name='$name';" | Out-String).Trim()
@@ -183,6 +183,11 @@ switch ($Task) {
     }
     'Api' {
         & (Join-Path $PSScriptRoot 'storage.ps1') -Task Environment -TestDatabase:$TestDatabase
+        foreach ($setting in @('GRIMOIRE_GOOGLE_CLIENT_ID','GRIMOIRE_COOKIE_SECURE')) {
+            if (-not [Environment]::GetEnvironmentVariable($setting, 'Process') -and $config.ContainsKey($setting)) {
+                [Environment]::SetEnvironmentVariable($setting, $config[$setting], 'Process')
+            }
+        }
         $dbName = if ($TestDatabase) { 'grimoire_test' } else { 'grimoire_dev' }
         $env:DATABASE_URL = "postgres://grimoire_intake_app:$($config.INTAKE_DB_PASSWORD)@127.0.0.1:$pgPort/$dbName"
         $env:GRIMOIRE_BIND = '127.0.0.1:8080'
@@ -225,6 +230,9 @@ switch ($Task) {
           Invoke-Psql -Database 'grimoire_test' -AsMigrator -File 'api/tests/control_surface_guards.sql'
           Invoke-Psql -Database 'grimoire_test' -AsMigrator -File 'api/tests/native_agent_guards.sql'
           Invoke-Psql -Database 'grimoire_test' -AsMigrator -File 'api/tests/onboarding_guards.sql'
+          Invoke-Psql -Database 'grimoire_test' -AsMigrator -File 'api/tests/profile_guards.sql'
+          Invoke-Psql -Database 'grimoire_test' -AsMigrator -File 'api/tests/registration_guards.sql'
+          Invoke-Psql -Database 'grimoire_test' -AsMigrator -File 'api/tests/google_identity_guards.sql'
     }
     'DbDown' {
         if ($Mode -eq 'docker') { & docker compose stop db; Assert-Exit 'Database stop' }

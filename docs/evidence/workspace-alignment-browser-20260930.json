@@ -1,0 +1,123 @@
+﻿{
+    "recorded_at":  "2026-09-29T18:39:45.5444912Z",
+    "reference":  {
+                      "sidebar_px":  240,
+                      "inset_px":  24,
+                      "source":  "Live read-only Paperclip localhost:3100",
+                      "record_text_px":  14,
+                      "header_px":  60,
+                      "nav_text_px":  13,
+                      "font":  "InterVariable"
+                  },
+    "flows":  {
+                  "errors":  [
+
+                             ],
+                  "completed":  true,
+                  "checks":  [
+                                 "Fresh signup and centered organization creation persist a workspace without engineering, sourcing, agent or approval authority.",
+                                 "Scion Enter/Back/review preserve fields and make no early POST. Blank lists persist null; lost real success response retries with one key and one Scion; digital excludes physical actions.",
+                                 "Explicitly-none lists persist [] and physical Scion retains scope/offer routes.",
+                                 "Agent wizard retains Back values, reports real disconnected worker, saves Codex configuration only after final step, and creates no task/run.",
+                                 "Cancel warns about a dirty agent draft; rejecting keeps it, accepting discards without saving.",
+                                 "Agent/skill searches and disconnected Active filter use real records; skill card shows revision1 and zero actual assignments.",
+                                 "Real profile POST survives reload, retains login/identity/org/permissions, and guards unsaved profile navigation.",
+                                 "Profile name remains consistent after creating and switching organizations; memberships stay isolated."
+                             ]
+              },
+    "visuals":  {
+                    "checks":  [
+                                   "Workspace routes render in both palettes at1440,1920 and390: fixed desktop240px rail/60px header, inner scrolling, no document or main horizontal overflow.",
+                                   "Account menu opens with keyboard Enter, Escape restores focus, outside click closes, and all four account/documentation links resolve.",
+                                   "Account theme shortcut, Settings radios and topbar selector share persisted state; System follows device changes.",
+                                   "Runtime shows disconnected worker from real state; offline invalidates workspace values and reconnect restores API state."
+                               ],
+                    "errors":  [
+
+                               ],
+                    "completed":  true,
+                    "views":  109
+                },
+    "judge":  {
+                  "errors":  [
+
+                             ],
+                  "checks":  [
+                                 "fresh normal signup creates an isolated organization and digital Scion without owner, sourcing or approval authority; session survives reload",
+                                 "logout clears access after reload; login restores the same private organization",
+                                 "signed-in visitors open the public demo without sending cookies or changing their session or organization",
+                                 "second account sees an empty isolated workspace; foreign private Scion, graph and sources return 404, with no foreign alerts",
+                                 "public database projections show completed draft without approval, revised stale plan and persisted review, revoked evidence redaction and blocked dependent tasks",
+                                 "browser inspector withholds revoked content; Operations dock exposes persisted blocked work and auditable events",
+                                 "fresh public browser allocates no identity or cookie, calls no setup/session endpoints, cannot mutate or enumerate private cases, and requests only GET demo snapshots",
+                                 "offline transition clears nodes and events; reconnect reads server state again",
+                                 "mobile demo and normal account entry fit a fresh 390px viewport; no browser JavaScript errors"
+                             ],
+                  "passed":  9
+              },
+    "onboarding":  {
+                       "checks":  [
+                                      "Login and organization dashboard",
+                                      "Digital Scion real case graph retained; physical action absent",
+                                      "Native agent configuration allowed; task assignment and execution remain unauthorized",
+                                      "Organization isolation, switch back and narrow reload",
+                                      "Second tab switch invalidates display; stale organization mutation denied",
+                                      "Failed logout retry; real logout survives reload; sign-in restores membership"
+                                  ],
+                       "errors":  [
+
+                                  ],
+                       "mode":  "existing-login with fresh synthetic normal account",
+                       "passed":  6
+                   },
+    "wizard_appearance":  {
+                              "errors":  [
+
+                                         ],
+                              "completed":  true,
+                              "views":  26,
+                              "mutations":  [
+
+                                            ]
+                          },
+    "primary_readonly":  {
+                             "mutations":  [
+
+                                           ],
+                             "errors":  [
+
+                                        ],
+                             "completed":  true,
+                             "views":  7
+                         },
+    "mobile_action":  {
+                          "checks":  [
+                                         {
+                                             "theme":  "dark",
+                                             "focused":  true,
+                                             "top":  801.0625,
+                                             "bottom":  844.0625,
+                                             "left":  201.65625,
+                                             "right":  364,
+                                             "outline":  "rgb(16, 27, 45) solid 2px",
+                                             "outlineOffset":  "-4px",
+                                             "scroll":  3
+                                         },
+                                         {
+                                             "theme":  "light",
+                                             "focused":  true,
+                                             "top":  801.0625,
+                                             "bottom":  844.0625,
+                                             "left":  201.65625,
+                                             "right":  364,
+                                             "outline":  "rgb(248, 250, 255) solid 2px",
+                                             "outlineOffset":  "-4px",
+                                             "scroll":  3
+                                         }
+                                     ],
+                          "errors":  [
+
+                                     ],
+                          "completed":  true
+                      }
+}

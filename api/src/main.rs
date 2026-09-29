@@ -3,8 +3,10 @@ mod attestation;
 mod byoa;
 mod capabilities;
 mod control_surface;
+mod demo;
 mod domain;
 mod error;
+mod google_identity;
 mod offers;
 mod onboarding;
 mod scope;
@@ -122,6 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = std::env::var("DATABASE_URL")
         .map_err(|_| "DATABASE_URL is required; use the dedicated grimoire_intake_app login.")?;
     storage::initialize()?;
+    onboarding::initialize()?;
+    google_identity::initialize()?;
     let bind: SocketAddr = std::env::var("GRIMOIRE_BIND")
         .unwrap_or_else(|_| "127.0.0.1:8080".into())
         .parse()?;
@@ -188,6 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(byoa::routes())
         .merge(capabilities::routes())
         .merge(control_surface::routes())
+        .merge(demo::routes())
         .merge(workspace::routes())
         .merge(agents::routes())
         .fallback(|| async {

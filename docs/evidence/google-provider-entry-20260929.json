@@ -1,0 +1,28 @@
+{
+  "kind": "real-google-provider-browser-no-account-selection",
+  "base": "http://localhost:5180",
+  "checks": [
+    "localhost UI reads enabled API configuration with the intended public Google client ID",
+    "official Google Identity Services script renders its button",
+    "opened the real Google popup and stopped before account selection or entering credentials",
+    "no Grimoire identity/session was created by opening the provider",
+    "separate fresh public demo loads its real case graph with no Google SDK or Google auth requests"
+  ],
+  "console": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+  ],
+  "failed_requests": [
+    {
+      "url": "http://localhost:5180/api/session/google/config",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "page_errors": [],
+  "popup": {
+    "url": "https://accounts.google.com/v3/signin/identifier",
+    "title": "Sign in - Google Accounts",
+    "text": "Sign in with Google\nSign in\n\nto continue to Grimoire\n\nEmail or phone\n\nForgot email?\n\nNext\nCreate account\nAfrikaans\nazərbaycan\nbosanski\ncatalà\nČeština\nCymraeg\nDansk\nDeutsch\neesti\nEnglish (United Kingdom)\nEnglish (United States)\nEspañol (España)\nEspañol (Latinoamérica)\neuskara\nFilipino\nFrançais (Canada)\nFrançais (France)\nGaeilge\ngalego\nHrvatski\nIndonesia\nisiZulu\níslenska\nItaliano\nKiswahili\nlatviešu\nlietuvių\nmagyar\nMelayu\nNederlands\nnorsk\no‘zbek\npolski\nPortuguês (Brasil)\nPortuguês (Portugal)\nromână\nshqip\nSlovenčina\nslovenščina\nsrpski (latinica)\nSuomi\nSvenska\nTiếng Việt\nTürkçe\nΕλληνικά\nбеларуская\nбългарски\nкыргызча\nқазақ тілі\nмакедонски\nмонгол\nРусский\nсрпски (ћирилица)\nУкраїнська\nქართული\nհայերեն\n‫עברית‬‎\n‫اردو‬‎\n‫العربية‬‎\n‫فارسی‬‎\nአማርኛ\nनेपाली\nमराठी\nहिन्दी\nঅসমীয়া\nবাংলা\nਪੰਜਾਬੀ\nગુજરાતી\nଓଡ଼ିଆ\nதமிழ்\nతెలుగు\nಕನ್ನಡ\nമലയാളം\nසිංහල\nไทย\nລາວ\nမြန်မာ\nខ្មែរ\n한국어\n中文（香港）\n日本語\n简体中文\n繁體中文\nHelpPrivacyTerms"
+  },
+  "demo_google_requests": []
+}

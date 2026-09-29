@@ -14,11 +14,16 @@ records 152 live Go checks, 20 Rust tests and real browser checks.
 
 ## Current local run
 
-The browser now starts with one-time Handler owner setup, then organization
-creation. Later visits use the login page and an HttpOnly session cookie. This
-is local installation setup, not public registration for additional users.
+The browser offers normal Handler signup and sign-in with HttpOnly sessions.
+Each new account creates its own isolated organization. Installation-owner
+setup remains a separate one-time action; signup never claims it.
 Organization administration grants workspace access, not sourcing or approval
-authority. See the [onboarding integration notes](docs/onboarding-integration-2026-09-29.md).
+authority. The public `/demo` entry shows three persisted synthetic cases
+without an account or personal Codex login. See [judge access and setup](docs/judge-access.md).
+
+Optional [Sign in with Google](docs/google-sign-in.md) uses server-verified Google
+tokens and Grimoire-owned sessions. It stays disabled until a Web application
+client ID is configured. Google accounts never inherit existing memberships.
 
 The [Windows adaptive verification report](docs/windows-adaptive-verification.md)
 records the 131-check live regression, real Codex digital demonstration, applied
@@ -28,7 +33,7 @@ migration hashes, startup protections and unavailable Mac work.
 - Rust API: <http://127.0.0.1:8080/api/health>
 - PostgreSQL: `127.0.0.1:55432`, canonical development database `grimoire_dev`.
 - Database runtime: native PostgreSQL **17.11**, stored persistently in `.local/pgdata`, retained from the earlier Docker Desktop startup failure. Docker Engine is now reachable; Layer 2B uses a native source-built MinIO because the attempted official images/binaries were unavailable. No Docker settings, existing volumes, WSL distributions or Paperclip databases were reset.
-- Open the browser and create the installation owner's Handler identity. Existing owners sign in with their login name and passphrase. The generated `.env` bearer credentials remain server-side development-harness inputs; the UI no longer asks for them.
+- Open the browser to create an account, sign in, or explore the judge demo. The operator can separately choose “Set up this installation.” The generated `.env` bearer credentials remain server-side development-harness inputs; the UI does not ask for them.
 
 A clearly labelled `UI smoke test — enclosure intake` draft with four revisions remains in development for inspection. It contains no real product/supplier evidence and is independent of the supplied GG-40 fixture. The supplied fixture is present only in disposable `grimoire_test`.
 
@@ -71,7 +76,7 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 
 ## Migration and fixture handling
 
-`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034 → 0038 → 0039 → 0040 → 0041 → 0042 → 0043 → 0044**. Mac-origin migrations 0035–0037 are unavailable and have not been reconstructed. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
+`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034 → 0038 → 0039 → 0040 → 0041 → 0042 → 0043 → 0044 → 0045 → 0046 → 0047 → 0048**. Mac-origin migrations 0035–0037 are unavailable and have not been reconstructed. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
 
 - `db/gg40/0022_grimoire_contract.sql`, `0023_grimoire_review_corrections.sql`, and `fixture_one_case_two_event.sql` are unchanged supplied bytes.
 - `db/gg40/checksums.json` contains the supplied expected SHA-256 values. `.gitattributes` prevents newline conversion of these SQL files.
@@ -82,6 +87,9 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 - `0028_intake_scope.sql` adds immutable scope proposals and confirmation links to the existing governed tables. `0029_intake_agent_tasks.sql` adds the scoped BYOA preparation queue. `0030_scope_chain_guard.sql` strengthens exact-chain readback and prevents a task requester from confirming work returned by their agent. All three are new application migrations, not part of verified GG-40.
 - `0031_worker_controls.sql` adds explicit dispatch, cancellation, execution bounds and immutable task provenance. `0032_synthetic_offer_comparison.sql` adds synthetic offer staging and reviewed exact comparison through existing GG-40 tables. `0033_offer_review_identity_guards.sql` enforces jurisdiction-scoped supplier identity and review separation across full offer history. `0034_sourcing_authority_gate.sql` rejects every future canonical decision revision unless an immutable, exact-scope review exists from a distinct enabled commercial authority; its positive fixture is synthetic software-behavior evidence only. These are additive application migrations, not verified GG-40 files.
 - `public.grimoire_schema_migrations` records applied file hashes and refuses changed migrations.
+- `0045_handler_registration.sql` adds independent non-owner signup. `0046_public_judge_demo.sql` reserves a separate synthetic organization and a read-only publication registry. The operator seed command in [judge access](docs/judge-access.md) publishes the three cases through real API transitions; ordinary page visits never create fixtures or run agents.
+- `0047_google_identity.sql` adds separate Google identities and single-use browser challenges. Google sign-in creates a normal non-owner account with no inherited organization membership; password accounts are not automatically linked.
+- `0048_handler_profile.sql` permits an authenticated Handler to update their own display name and corresponding membership display labels with an audit record. It does not change login credentials, organization roles, or approval authority; see the [workspace alignment verification](docs/paperclip-workspace-alignment-2026-09-30.md).
 - `0038_windows_adaptive_plans.sql` adds revision-bound capability proposals and reviewable evidence drafts. `0039_windows_approval_lockdown.sql` keeps unverified canonical approval/decision paths disabled. Neither is GG-53/GG-54 or the unavailable Mac 0037 work. Startup verifies compiled migration hashes and a clean PostgreSQL catalog; see the [Windows authority boundary](docs/windows-adaptive-scion.md#windows-authority-protections-and-unavailable-mac-work).
 - `db/local-handlers.sql` creates no governed product, offer, price or approval records.
 - `db/local-scope-actors.sql` enrolls only separate synthetic reviewer and proposal-agent principals. `GRIMOIRE_TOKEN_REVIEWER_A` is a test identity, not a qualified real reviewer. `GRIMOIRE_TOKEN_AGENT_A` cannot confirm scope or edit intake/source history.

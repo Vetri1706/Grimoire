@@ -1,0 +1,12 @@
+{
+  "passed": 3,
+  "checks": [
+    "Primary normal login displays configured Google sign-in entry without starting authentication",
+    "Primary login and persisted synthetic demo render the same Midnight Blue and Pearl palettes",
+    "Fresh primary browser has no cookies, API mutations or JavaScript errors; appearance survives reload"
+  ],
+  "errors": [],
+  "mutations": [],
+  "database": "grimoire_dev",
+  "readonly": true
+}

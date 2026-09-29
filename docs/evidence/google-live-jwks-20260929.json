@@ -1,0 +1,5 @@
+{
+  "passed": true,
+  "check": "Production verifier fetched and parsed public Google JWKS, rejected deliberately unknown signing key, and issued no session.",
+  "realGoogleLoginPerformed": false
+}

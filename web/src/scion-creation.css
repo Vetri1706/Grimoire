@@ -1,0 +1,46 @@
+.scion-creation { width: min(540px, calc(100% - 48px)); margin: 0 auto; padding: 64px 0 48px; min-height: calc(100svh - 60px); display: flex; flex-direction: column; justify-content: center; }
+.scion-create-card { padding: 0; }
+.scion-create-steps { display: flex; align-items: center; justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 0 0 32px; }
+.scion-create-steps button { display: flex; align-items: center; gap: 7px; padding: 4px 0; border: none; background: none; color: var(--foreground); font-size: 12px; line-height: 1.5; }
+.scion-create-steps button:disabled { cursor: default; }
+.scion-create-steps button>span { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--input); border-radius: 50%; font-size: 12px; }
+.scion-create-steps button[aria-current="step"] { font-weight: 600; }
+.scion-create-steps button[aria-current="step"]>span, .scion-create-steps li[data-complete] button>span { background: var(--foreground); border-color: var(--foreground); color: var(--background); }
+.scion-create-heading { text-align: center; margin-bottom: 30px; }
+.scion-creation .scion-create-heading h1 { font-size: clamp(30px, 3vw, 45px); font-weight: 600; line-height: 1.15; letter-spacing: -1.3px; margin: 12px 0; }
+.scion-create-heading p:last-child { font-size: 14px; line-height: 1.6; }
+.scion-create-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
+.scion-create-step { animation: surface-enter var(--motion-duration-base) var(--motion-ease-expo); }
+.scion-create-field+.scion-create-field { margin-top: 20px; }
+.scion-create-field>label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 8px; font-size: 14px; font-weight: 500; }
+.scion-create-field>label>span, .scion-create-advanced summary>span { font-size: 12px; font-weight: 400; }
+.scion-create-field input:not([type=checkbox]), .scion-create-field select { min-height: 48px; background: var(--card); font-size: 16px; }
+.scion-create-field textarea { min-height: 76px; resize: vertical; }
+.scion-create-help { font-size: 12px; line-height: 1.6; margin: 8px 0 0; }
+.scion-create-advanced { margin-top: 24px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 16px 0; }
+.scion-create-advanced summary { cursor: pointer; font-size: 14px; font-weight: 500; }
+.scion-create-advanced summary>span { margin-left: 8px; }
+.scion-create-advanced>p { font-size: 12px; line-height: 1.6; margin: 14px 0 20px; }
+.scion-create-field>.scion-create-check { justify-content: flex-start; align-items: flex-start; margin: 10px 0 0; gap: 8px; }
+.scion-create-check input { margin: 3px 0 0; flex: 0 0 auto; min-height: 0; width: auto; }
+.scion-create-field>.scion-create-check>span { font-size: 12px; line-height: 1.5; }
+.scion-create-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 30px; }
+.scion-creation .scion-create-actions .button { min-height: 44px; border-radius: 999px; padding: 10px 20px; font-size: 14px; }
+.scion-create-review { margin: 0; display: grid; gap: 0; }
+.scion-create-review>div { display: grid; grid-template-columns: 130px minmax(0,1fr); gap: 18px; border-bottom: 1px solid var(--border); padding: 12px 0; font-size: 14px; }
+.scion-create-review>div:first-child { padding-top: 0; }
+.scion-create-review dt { font-weight: 500; }
+.scion-create-review dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.scion-create-review ul { margin: 0; padding-left: 18px; }
+.scion-create-review li+li { margin-top: 6px; }
+.scion-create-unknown { font-style: italic; }
+.scion-create-boundary { font-size: 12px; line-height: 1.6; margin-top: 18px; }
+.scion-create-footnote { text-align: center; font-size: 12px; line-height: 1.6; margin: 18px 12px 0; }
+@media (max-width: 767px) {
+  .scion-creation { width: calc(100% - 32px); margin: 0 auto; padding: 32px 0; justify-content: flex-start; }
+  .scion-create-card { padding: 0; }
+  .scion-creation .scion-create-heading h1 { font-size: 1.75rem; }
+  .scion-create-steps { gap: 12px; margin-bottom: 28px; }
+  .scion-creation .scion-create-field input:not([type=checkbox]), .scion-creation .scion-create-field select, .scion-creation .scion-create-field textarea { font-size: 16px; }
+  .scion-create-review>div { grid-template-columns: 1fr; gap: 5px; }
+}

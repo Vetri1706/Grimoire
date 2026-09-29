@@ -1,8 +1,40 @@
 # UI appearance
 
-Grimoire uses the local Paperclip UI as its visual reference. `web/src/styles.css`
-implements the reference tokens in plain CSS; Paperclip is not a runtime or UI
-package dependency. The Scion workflow and Grimoire branding remain its own.
+The current global theme is **Midnight Blue / Pearl**, based on the user's supplied
+account-screen references. [DESIGN.md](../DESIGN.md) owns the accepted visual
+intent and documents the canonical runtime tokens in `web/src/styles.css`.
+The follow-up in `../paperclip/see.md` adds clear foreground lettering, minimum
+12px metadata, shared layered surfaces, backdrop transitions, and compact account
+forms. The exact Paperclip Inter font binary is bundled locally. Account entry
+retains the stronger blue fade; work screens use legible, nearly opaque surfaces.
+`web/src/theme.tsx` shares appearance controls across account, workspace and demo.
+
+The workspace alignment follow-up uses live Paperclip measurements: 240px rail,
+60px fixed header, 24px content inset, 13px navigation and 14px record titles.
+Lists use the available width. Creation uses focused steps in a centered 540px
+frame; full Scion revision editing remains available. Native Settings and the
+account menu expose profile, organizations, appearance, runtime health and a
+built-in guide. Display-name changes use authenticated self-service session
+authority; source visibility, task authority and review gates stay unchanged.
+
+The sections below retain historical design and verification notes. Older neutral
+palette and typography values are superseded by DESIGN.md. Paperclip remains a
+historical layout/font reference and is not a runtime or UI package dependency.
+
+## Current canonical UI owners
+
+| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
+| --- | --- | --- | --- | --- |
+| Select/Listbox | Native select, shared ThemePicker for appearance | DESIGN.md and styles.css | Theme and existing data selectors; OS-owned popup | Keyboard and narrow-screen browser checks |
+| Form | Existing domain forms, shared field/button CSS | Existing API contracts; appearance from DESIGN.md | Account, Scion, source, agent, skill | Existing form and session browser checks |
+| Scrollbar | styles.css global rule | DESIGN.md | Graph viewport keeps horizontal scrolling | Computed style and responsive checks |
+| CRUD | Existing React routes and Rust API | Onboarding, native-agent and Scion contracts | Existing create/edit/read behavior | Existing browser and API verification |
+
+Native browser field validation and server validation remain in force. Textareas
+remain vertically resizable. These are deliberate existing domain conventions,
+including in the short creation flows. Future behavior changes
+must be reviewed under their owning domain contract rather than inferred from a
+theme choice.
 
 ## Reference files
 

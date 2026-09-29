@@ -1,0 +1,74 @@
+{
+  "findings": [
+    {
+      "severity": "warning",
+      "path": "colors.midnightBackground",
+      "message": "'midnightBackground' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.midnightForeground",
+      "message": "'midnightForeground' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.midnightCard",
+      "message": "'midnightCard' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.midnightPrimary",
+      "message": "'midnightPrimary' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.midnightFocus",
+      "message": "'midnightFocus' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.pearlBackground",
+      "message": "'pearlBackground' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.pearlForeground",
+      "message": "'pearlForeground' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.pearlCard",
+      "message": "'pearlCard' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.pearlPrimary",
+      "message": "'pearlPrimary' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "warning",
+      "path": "colors.pearlFocus",
+      "message": "'pearlFocus' is defined but never referenced by any component.",
+      "rule": "orphaned-tokens"
+    },
+    {
+      "severity": "info",
+      "message": "Design system defines 11 colors, 2 typography scales, 2 rounding levels, 3 spacing tokens, 2 components.",
+      "rule": "token-summary"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 10,
+    "infos": 1
+  }
+}

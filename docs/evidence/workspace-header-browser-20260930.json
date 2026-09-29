@@ -1,0 +1,56 @@
+{
+  "scope": "Title-only Paperclip-style header and relocated navigation controls",
+  "date": "2026-09-30",
+  "environment": "Isolated grimoire_test with real Chrome and Rust API; no primary workspace writes",
+  "view_count": 36,
+  "widths": [
+    1440,
+    1920,
+    390
+  ],
+  "themes": [
+    "Midnight Blue",
+    "Pearl"
+  ],
+  "checks": [
+    "Title-only60px header and contained organization/account popovers pass at1440,1920 and390 in both palettes; no body/main overflow. Organization Enter/Escape/outside click and current-item focus pass.",
+    "Organization menu performs real session switches; other organization is empty and receives404 for the first organization Scion; switching back and reload restore the correct workspace.",
+    "Organization creation starts from the brand menu and Cancel returns without a write or organization change.",
+    "Organization settings, account Appearance, persisted quick theme toggle and truthful disconnected Runtime remain accessible.",
+    "Account Judge demo opens the real public case graph in a separate tab without changing the selected organization."
+  ],
+  "javascript_errors": [],
+  "dirty_switch": {
+    "checks": [
+      "Mobile organization-menu switch dismisses confirmation without a write, preserving current organization and unsaved Scion name; acceptance switches and discards the draft, then restores the original organization."
+    ],
+    "mutations": [
+      {
+        "path": "/api/session/active-organization",
+        "method": "POST"
+      },
+      {
+        "path": "/api/session/active-organization",
+        "method": "POST"
+      }
+    ],
+    "errors": [],
+    "completed": true
+  },
+  "frontend_build": "passed",
+  "frontend_tests": {
+    "passed": 10
+  },
+  "completed": true,
+  "final_mobile_breadcrumbs": {
+    "views": 4,
+    "result": "passed",
+    "final_labels_visible": true,
+    "horizontal_overflow": false,
+    "javascript_errors": []
+  },
+  "cleanup": {
+    "isolated_test_services": "stopped; data retained",
+    "primary_services_and_paperclip": "still running"
+  }
+}

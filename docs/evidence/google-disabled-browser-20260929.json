@@ -1,0 +1,11 @@
+{
+  "kind": "real-local-browser-google-disabled",
+  "database": "grimoire_test",
+  "checks": [
+    "Login and signup show configuration absence accurately while passphrase entry remains available",
+    "No Google SDK, nonce challenge, or Google authentication requests on account forms or public demo",
+    "Fresh mobile context fits 390px viewport and has no JavaScript errors"
+  ],
+  "google_requests": [],
+  "page_errors": []
+}
