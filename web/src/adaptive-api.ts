@@ -1,6 +1,6 @@
 export type Capability = { key: string; title: string; reason: string; evidence_needed: string[]; connector_ids: string[] };
 export type CapabilityPlanInput = { synthetic: true; summary: string; capabilities: Capability[]; unresolved_gaps: string[]; change_summary: string };
-export type CapabilityPlan = { id: string; scion_revision: number; agent_task_id: string; status: 'current' | 'stale'; input: CapabilityPlanInput | null; created_at: string; created_by: string };
+export type CapabilityPlan = { id: string; scion_revision: number; agent_task_id: string; status: 'current' | 'stale' | 'blocked'; blocked_reason?: string; input: CapabilityPlanInput | null; created_at: string; created_by: string };
 export type DataConnector = { id: string; name: string; kind: string; enabled: true; status: string; description: string };
 export type EvidenceComparisonInput = {
   synthetic: true; plan_id: string;

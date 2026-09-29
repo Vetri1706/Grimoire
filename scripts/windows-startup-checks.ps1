@@ -1,12 +1,14 @@
 param(
     [ValidateSet('PrepareCatalog','Check')]
     [string]$Task = 'Check',
-    [string]$ApiBinary
+    [string]$ApiBinary,
+    [ValidatePattern('^grimoire_startup_[a-z0-9_]+_test$')]
+    [string]$CleanDatabase = 'grimoire_startup_agents_v1_test'
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $localRoot = Join-Path $projectRoot '.local'
-$cleanDatabase = 'grimoire_startup_clean_test'
+$cleanDatabase = $CleanDatabase
 $upgradeDatabase = 'grimoire_test'
 $psql = Join-Path $projectRoot '.tools/pgsql/bin/psql.exe'
 if (-not $ApiBinary) { $ApiBinary = Join-Path $projectRoot 'api/target/debug/grimoire-api.exe' }
@@ -92,7 +94,11 @@ $migrationFiles = @(
     'db/intake/0033_offer_review_identity_guards.sql',
     'db/intake/0034_sourcing_authority_gate.sql',
     'db/intake/0038_windows_adaptive_plans.sql',
-    'db/intake/0039_windows_approval_lockdown.sql'
+    'db/intake/0039_windows_approval_lockdown.sql',
+    'db/intake/0040_control_surface.sql',
+    'db/intake/0041_watchtower_artifact_guards.sql',
+    'db/intake/0042_watchtower_task_sources.sql',
+    'db/intake/0043_native_agents.sql'
 )
 $attestationSource = Get-Content -LiteralPath (Join-Path $projectRoot 'api/src/attestation.rs') -Raw
 $compiledFiles = @([regex]::Matches($attestationSource, 'migration!\("([^"]+)",\s*"([^"]+)"\)') | ForEach-Object { "db/$($_.Groups[1].Value)/$($_.Groups[2].Value)" })

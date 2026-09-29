@@ -335,6 +335,33 @@ async fn load_claims(
         .bind(source).bind(number).fetch_all(&mut **tx).await?.into_iter().map(ClaimRow::into_json).collect())
 }
 
+pub(super) async fn control_snapshot(
+    tx: &mut Tx,
+    scion: Uuid,
+) -> Result<Vec<serde_json::Value>, ApiError> {
+    let rows = summaries(tx, scion).await?;
+    let mut result = Vec::new();
+    for summary in rows {
+        let state = source_read_state(tx, scion, summary.id).await?;
+        if state.revoked {
+            result.push(json!({"id":summary.id,"scion_revision":summary.scion_revision,"current_revision":state.current_revision,"title":"Revoked source","status":"revoked","details":null,"blockers":["Source permission revoked; content and claims are hidden."]}));
+            continue;
+        }
+        match load_revision(tx, summary.id, state.current_revision).await {
+            Ok(revision) => {
+                let claims = load_claims(tx, summary.id, Some(state.current_revision)).await?;
+                // Object storage keys are not part of the public graph.
+                result.push(json!({"id":summary.id,"scion_revision":summary.scion_revision,"current_revision":state.current_revision,"title":revision.title,"status":"available","details":{"source_text":revision.source_text,"origin":revision.origin,"owner":revision.owner,"permission_basis":revision.permission_basis,"content_sha256":revision.content_sha256,"content_hash_verified":true,"claims":claims},"blockers":[]}));
+            }
+            Err(error) if error.0 == StatusCode::SERVICE_UNAVAILABLE => {
+                result.push(json!({"id":summary.id,"scion_revision":summary.scion_revision,"current_revision":state.current_revision,"title":"Source temporarily unavailable","status":"unavailable","details":null,"blockers":[error.1]}));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(result)
+}
+
 async fn list(State(pool): State<PgPool>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
     let (mut tx, _) = authenticate(&pool, &headers).await?;
     let id = parse_id(&id)?;

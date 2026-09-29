@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiError, request } from './api';
+import { useCaseInvalidation } from './control-api';
 import type { Scion } from './api';
 import type { SourceDetail, SourceList, SourceSummary } from './evidence-api';
 import { scopeKinds } from './scope-api';
@@ -67,6 +68,7 @@ export default function PhysicalScope({ token, scion, principalId, canWrite, onD
     setScope(null); setSources([]); setTasks(null); setComposing(false); setAccessReady(false); setLoading(false);
     markDirty(false); setError(reason);
   }, [markDirty]);
+  useCaseInvalidation(scion.id, clear);
   const refresh = useCallback(async (force = false) => {
     if (document.visibilityState !== 'visible' || !navigator.onLine) {
       clear('Scope access is paused while this tab is hidden or offline. Scope content and unsaved forms have been cleared.'); return;

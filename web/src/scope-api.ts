@@ -60,6 +60,8 @@ export type ScopeList = {
 };
 export type AgentTask = {
   id: string;
+  agent_id: string | null;
+  agent_revision: number | null;
   scion_id: string;
   scion_revision: number;
   task_kind: 'prepare_physical_scope' | 'prepare_offer_normalization' | 'prepare_capability_plan';

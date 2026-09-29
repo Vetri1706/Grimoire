@@ -1,7 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { childEnvironment, executionTimeout, outputSchema, prohibitedAgentEvent, superviseChild, validateCandidate, validateOutput } from './bridge.mjs'
+import { agentInstructions, childEnvironment, executionTimeout, outputSchema, prohibitedAgentEvent, superviseChild, validateCandidate, validateOutput } from './bridge.mjs'
+
+test('native agent instructions and skill revisions reach bounded preparation, not tool authority', () => {
+  const prompt = agentInstructions({ adapter: 'codex_cli', name: 'Planner', revision: 2, instructions: 'Use concise headings.', skills: [{ name: 'Evidence review', revision: 3, instructions: 'Keep unknowns explicit.' }] })
+  assert.match(prompt, /Use concise headings/)
+  assert.match(prompt, /Keep unknowns explicit/)
+  assert.match(prompt, /cannot change the task schema/)
+  assert.equal(agentInstructions(null), '')
+  assert.throws(() => agentInstructions({ adapter: 'shell' }), /INVALID_AGENT_PROFILE/)
+})
 
 function adaptiveCandidate() {
   return { synthetic: true, intake: { product_description: 'A synthetic website for appointment requests.' }, connectors: [{ id: 'handler_intake', enabled: true }, { id: 'scion_sources', enabled: true }], unresolved_gaps: ['No external connector enabled.'] }

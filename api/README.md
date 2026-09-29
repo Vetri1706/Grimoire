@@ -202,3 +202,28 @@ immutability checks in the disposable `_test` database, and
 `tests/source_guards.sql` extends those checks to synthetic sources, claims,
 rights and revocations. The separate Go harness is the live HTTP/PostgreSQL
 acceptance suite, including process restart.
+
+## OS control surface
+
+`GET /api/workspace` returns organization-scoped Scions, content-free proposal
+summaries, existing Rust task state, watch reviews, events and monitoring health.
+It uses the authenticated PostgreSQL RLS transaction, not client-side filtering.
+Proposal/task/review/event collections each contain at most the newest 300 rows.
+No source text, derivative inputs, task leases or credentials are included.
+There is no workspace mutation endpoint. See [company navigation and API
+boundaries](../docs/company-workspace.md).
+
+`GET /api/scions/{id}/control-surface` returns the authenticated, read-only case
+graph (`nodes[]`, `edges[]`), persisted internal Watchtower health, required human
+reviews and existing Rust task state. PostgreSQL records revision, permission
+and outcome changes transactionally; a Rust background check advances durable
+watch heartbeats independently of browser polling. Restricted/stale derivative
+content is withheld, and agent completion cannot approve a case.
+
+Agent profiles, skills and task assignments are native Rust/PostgreSQL records.
+`/api/agents` and `/api/skills` provide authenticated, Handler-managed revisioned
+configuration; native task assignment pins exact instruction and skill snapshots.
+The existing worker reports authenticated presence and consumes those snapshots.
+No Paperclip process, credentials or company mapping are used.
+See [native API fields and constraints](../docs/native-agents.md) and
+[control-surface architecture](../docs/control-surface.md).

@@ -5,7 +5,8 @@ ChatGPT login. It runs a real noninteractive agent task and submits the resultin
 structured proposal through the Rust API. It is not a Paperclip connector, a
 generic command runner, a source extraction service, or a human approval path.
 
-Supported tasks are `prepare_physical_scope` and `prepare_offer_normalization`.
+Supported tasks are `prepare_physical_scope`, `prepare_offer_normalization`
+and `prepare_capability_plan`.
 A Handler enters explicit synthetic values and exact revision references, creates
 a queued task, then separately dispatches it. No values are filled from empty fields.
 The local bridge claims a dispatched task, gives Codex the explicit synthetic input,
@@ -14,6 +15,11 @@ as completed with its proposal ID. Human confirmation remains a separate API
 action requiring the appropriate enrolled reviewer. The agent cannot perform it.
 
 ## Run the user's agent
+
+Native Grimoire profiles now manage identity, instructions, skills and task
+assignment. See [native agents](native-agents.md). Protocol-2 workers consume
+the pinned profile and skill revisions, enforce pause/cancellation, and report
+actual server-side presence. Paperclip is not a backend dependency.
 
 From `C:\proj\Grimoire\grim`:
 

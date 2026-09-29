@@ -1,12 +1,15 @@
+mod agents;
 mod attestation;
 mod byoa;
 mod capabilities;
+mod control_surface;
 mod domain;
 mod error;
 mod offers;
 mod scope;
 mod sources;
 mod storage;
+mod workspace;
 
 use axum::{
     Json, Router,
@@ -156,6 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("WINDOWS_STARTUP_ATTESTATION_PASS approvals_disabled=true");
         return Ok(());
     }
+    let monitor = tokio::spawn(control_surface::monitor(pool.clone()));
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/me", get(me))
@@ -177,6 +181,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(offers::routes())
         .merge(byoa::routes())
         .merge(capabilities::routes())
+        .merge(control_surface::routes())
+        .merge(workspace::routes())
+        .merge(agents::routes())
         .fallback(|| async {
             ApiError(
                 StatusCode::NOT_FOUND,
@@ -200,6 +207,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown())
         .await?;
+    monitor.abort();
     Ok(())
 }
 

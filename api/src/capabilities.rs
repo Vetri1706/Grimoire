@@ -305,8 +305,17 @@ async fn comparison_json(
     let input: ComparisonInput = serde_json::from_value(row.input.0.clone())?;
     let mut evidence = Vec::new();
     let mut blocked = None;
+    let dependency: Option<(bool, bool)> = sqlx::query_as("SELECT stale,blocked FROM grimoire.intake_watch_node_states WHERE node_kind='comparison' AND node_id=$1")
+        .bind(row.id).fetch_optional(&mut **tx).await?;
+    if let Some((stale, denied)) = dependency {
+        if denied {
+            blocked = Some("SOURCE_RIGHTS_DENIED".to_string());
+        } else if stale {
+            blocked = Some("STALE_DEPENDENCY".to_string());
+        }
+    }
     if row.scion_revision != revision {
-        blocked = Some("STALE_REVISION".to_string());
+        blocked.get_or_insert_with(|| "STALE_REVISION".to_string());
     }
     // Use a savepoint for a permission failure: an expected PostgreSQL denial
     // must not abort the remaining list response or leak old quoted content.
@@ -367,16 +376,50 @@ async fn list(State(pool): State<PgPool>, headers: HeaderMap, Path(id): Path<Str
     let (mut tx, _) = authenticate(&pool, &headers).await?;
     let id = parse_id(&id)?;
     let revision = current(&mut tx, id).await?;
-    let candidate = task_candidate(&mut tx, id, revision).await?;
-    let plans: Vec<PlanRow> = sqlx::query_as(&format!("SELECT {PLAN_COLUMNS} FROM grimoire.intake_capability_plans WHERE scion_id=$1 ORDER BY created_at DESC,id LIMIT 100")).bind(id).fetch_all(&mut *tx).await?;
-    let rows: Vec<ComparisonRow> = sqlx::query_as(&format!("SELECT {COMPARISON_COLUMNS} FROM grimoire.intake_evidence_comparisons WHERE scion_id=$1 ORDER BY created_at DESC,id LIMIT 100")).bind(id).fetch_all(&mut *tx).await?;
-    let mut comparisons = Vec::new();
-    for row in rows {
-        comparisons.push(comparison_json(&mut tx, &row, revision).await?);
-    }
-    let body = json!({"scion_revision":revision,"connectors":candidate["connectors"],"external_connectors_available":false,"unresolved_gaps":candidate["unresolved_gaps"],"plans":plans.iter().map(|v|plan_json(v,revision)).collect::<Vec<_>>(),"comparisons":comparisons,"approval_available":false});
+    let body = snapshot(&mut tx, id, revision).await?;
     tx.commit().await?;
     Ok(Json(body).into_response())
+}
+
+pub(super) async fn snapshot(tx: &mut Tx, id: Uuid, revision: i32) -> Result<Value, ApiError> {
+    let candidate = task_candidate(tx, id, revision).await?;
+    // Lock the current source set before checking derivative state. A revocation
+    // committed while these locks were pending is visible to the next statement.
+    let source_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM grimoire.intake_sources WHERE scion_id=$1 ORDER BY id")
+            .bind(id)
+            .fetch_all(&mut **tx)
+            .await?;
+    for source in source_ids {
+        sqlx::query("SELECT app.intake_source_read_lock($1,$2)")
+            .bind(id)
+            .bind(source)
+            .execute(&mut **tx)
+            .await?;
+    }
+    let plans: Vec<PlanRow> = sqlx::query_as(&format!("SELECT {PLAN_COLUMNS} FROM grimoire.intake_capability_plans WHERE scion_id=$1 ORDER BY created_at DESC,id LIMIT 100")).bind(id).fetch_all(&mut **tx).await?;
+    let rows: Vec<ComparisonRow> = sqlx::query_as(&format!("SELECT {COMPARISON_COLUMNS} FROM grimoire.intake_evidence_comparisons WHERE scion_id=$1 ORDER BY created_at DESC,id LIMIT 100")).bind(id).fetch_all(&mut **tx).await?;
+    let mut plan_values = Vec::new();
+    for plan in plans {
+        let mut value = plan_json(&plan, revision);
+        let state: Option<(bool,bool,Option<String>)> = sqlx::query_as("SELECT stale,blocked,reason FROM grimoire.intake_watch_node_states WHERE node_kind='capability_proposal' AND node_id=$1")
+            .bind(plan.id).fetch_optional(&mut **tx).await?;
+        if let Some((stale, blocked, reason)) = state
+            && (stale || blocked)
+        {
+            value["status"] = json!(if blocked { "blocked" } else { "stale" });
+            value["input"] = Value::Null;
+            value["blocked_reason"] = json!(reason);
+        }
+        plan_values.push(value);
+    }
+    let mut comparisons = Vec::new();
+    for row in rows {
+        comparisons.push(comparison_json(tx, &row, revision).await?);
+    }
+    Ok(
+        json!({"scion_revision":revision,"connectors":candidate["connectors"],"external_connectors_available":false,"unresolved_gaps":candidate["unresolved_gaps"],"plans":plan_values,"comparisons":comparisons,"approval_available":false}),
+    )
 }
 fn request_hash<T: Serialize>(
     scion: Uuid,

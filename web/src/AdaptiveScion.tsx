@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, request } from './api';
+import { useCaseInvalidation } from './control-api';
 import type { Scion } from './api';
 import type { AdaptiveState, CapabilityPlan, EvidenceComparison, EvidenceComparisonInput } from './adaptive-api';
 import type { SourceDetail, SourceList, SourceSummary } from './evidence-api';
 import type { AgentTask, AgentTaskList, ScopeReference } from './scope-api';
 import AgentTasks from './AgentTasks';
+import type { NativeAgent } from './agents-api';
+import { WorkStatus } from './Workbench';
 import { ClaimSelector, useScopeWrite } from './PhysicalScope';
 import './adaptive.css';
 
@@ -15,6 +18,7 @@ const lostAccess = (value: unknown) => value instanceof ApiError && ([0, 401, 40
 function blockedExplanation(reason: string | null) {
   const explanations: Record<string, string> = {
     SOURCE_RIGHTS_DENIED: 'Permission to use a linked source is absent or has been revoked. The comparison and its quoted claims are withheld.',
+    STALE_DEPENDENCY: 'Watchtower detected a changed dependency. Review current inputs and prepare a new evidence comparison.',
     STALE_REVISION: 'The Scion has a newer intake revision. This comparison remains in history; prepare a new plan and comparison for the current revision.',
     CAPABILITY_INPUT_STALE: 'The capability plan or a linked source revision has changed. Review the current inputs and prepare a new comparison with exact current claims.',
     SOURCE_OBJECT_MISSING: 'The exact stored version of a linked source cannot be found. Its comparison and claims are withheld until that version can be verified.',
@@ -30,9 +34,10 @@ function blockedExplanation(reason: string | null) {
 }
 function Gaps({ items }: { items: string[] }) { return items.length ? <ul className="adaptive-gaps">{items.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="field-help">No additional gaps recorded. Evidence and agent proposals remain unverified.</p>; }
 
-export default function AdaptiveScion({ token, scion, canWrite, preferredPlanId, onDirty, onSources, onScopeProposal, onOfferProposal }: {
-  token: string; scion: Scion; canWrite: boolean; preferredPlanId: string | null; onDirty: (dirty: boolean) => void; onSources: () => void;
+export default function AdaptiveScion({ nativeAgents, token, scion, canWrite, preferredPlanId, preferredComparisonId, view = 'plans', onView, onDirty, onSources, onScopeProposal, onOfferProposal }: {
+  nativeAgents: NativeAgent[]; token: string; scion: Scion; canWrite: boolean; preferredPlanId: string | null; onDirty: (dirty: boolean) => void; onSources: () => void;
   onScopeProposal: (id: string) => void; onOfferProposal: (id: string) => void;
+  view?: 'plans' | 'comparisons' | 'agent-work'; preferredComparisonId?: string | null; onView: (view: string, id?: string) => void;
 }) {
   const [data, setData] = useState<AdaptiveState | null>(null);
   const [sources, setSources] = useState<SourceSummary[]>([]);
@@ -41,10 +46,14 @@ export default function AdaptiveScion({ token, scion, canWrite, preferredPlanId,
   const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [ready, setReady] = useState(false); const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(preferredPlanId);
+  const [comparisonId, setComparisonId] = useState<string | null>(preferredComparisonId ?? null);
   const [composing, setComposing] = useState(false);
   const [synthetic, setSynthetic] = useState(false); const [timeoutSeconds, setTimeoutSeconds] = useState(240);
+  const [assignedAgent, setAssignedAgent] = useState('');
   const [queueBusy, setQueueBusy] = useState(false);
   const selectedRef = useRef(preferredPlanId); const dirty = useRef(false);
+  useEffect(() => { if (preferredPlanId) { selectedRef.current = preferredPlanId; setSelectedId(preferredPlanId); } }, [preferredPlanId]);
+  useEffect(() => { setComparisonId(preferredComparisonId ?? null); }, [preferredComparisonId]);
   const pending = useRef(new Set<AbortController>()); const generation = useRef(0);
   const leaseTimer = useRef<number | undefined>(undefined); const leaseEnd = useRef(0);
   const write = useScopeWrite(token); const base = `/scions/${scion.id}`;
@@ -55,6 +64,7 @@ export default function AdaptiveScion({ token, scion, canWrite, preferredPlanId,
     setData(null); setSources([]); setTasks(null); setReady(false); setLoading(false); setComposing(false); setNotice('');
     markDirty(false); setError(reason);
   }, [markDirty]);
+  useCaseInvalidation(scion.id, clear);
   const refresh = useCallback(async (force = false) => {
     if (document.visibilityState !== 'visible' || !navigator.onLine) { clear('Capability and comparison content is paused while this tab is hidden or offline. Unsaved comparison content has been cleared.'); return; }
     if (pending.current.size && !force) return;
@@ -107,7 +117,7 @@ export default function AdaptiveScion({ token, scion, canWrite, preferredPlanId,
     event.preventDefault(); if (!current || !synthetic || queueBusy || !scion.revision.product_description?.trim()) return;
     setQueueBusy(true); setError('');
     try {
-      await write<AgentTask>(`${base}/agent-tasks`, { task_kind: 'prepare_capability_plan', candidate_proposal: { synthetic: true }, timeout_seconds: timeoutSeconds }, scion.current_revision);
+      await write<AgentTask>(`${base}/agent-tasks`, { task_kind: 'prepare_capability_plan', candidate_proposal: { synthetic: true }, timeout_seconds: timeoutSeconds, ...(assignedAgent ? { agent_id: assignedAgent } : {}) }, scion.current_revision);
       if (epoch !== generation.current || Date.now() >= leaseEnd.current) return;
       setNotice('Capability planning task queued. Dispatch it below to let your local Codex CLI prepare a proposal for this exact intake revision.');
       await refresh(true);
@@ -118,34 +128,34 @@ export default function AdaptiveScion({ token, scion, canWrite, preferredPlanId,
     if (epoch !== generation.current || Date.now() >= leaseEnd.current || document.visibilityState !== 'visible') return;
     markDirty(false); setComposing(false); setNotice('Evidence comparison draft saved. Its alternatives, claims and gaps remain unverified; no approval or ranking was created.'); await refresh(true);
   }
-  return <section className="scope-workspace" aria-label="Adaptive Scion capability planning">
-    <div className="scope-toolbar"><div><p className="eyebrow">FROM HANDLER INTENT TO REVIEWABLE EVIDENCE</p><h2>Capability plan</h2><p>Start from your product description. Your coding agent can propose what the product needs and which evidence is still missing.</p></div><span className="badge">Synthetic proposals · no approval</span></div>
-    <div className="scope-boundary"><strong>Plans and comparisons stay bound to one Scion revision.</strong><p>Agent output is a proposal. Authorized source claims remain unverified. This flow creates no vendor listings, prices, physical scope confirmation, or sourcing approval.</p></div>
+  const selectedComparison = data?.comparisons.find(item => item.id === comparisonId) ?? data?.comparisons[0];
+  return <section className="proposal-workspace" aria-label="Scion proposals">
     {error && <div className="error-message" role="alert"><div>{error}<button type="button" className="text-button" onClick={() => void refresh(true)}>Recheck access</button></div></div>}
-    {notice && <div className="info-notice" role="status">{notice}</div>}
-    {loading && <p role="status">Reading enabled connectors and revision-bound proposals…</p>}
+    {notice && <div className="work-notice" role="status">{notice}</div>}
+    {loading && <p role="status">Checking current proposal access…</p>}
     {ready && data && <>
-      {!current && <div className="info-notice"><p>The intake is now at revision {data.scion_revision}. Reopen the case before preparing new work.</p><button className="button secondary" onClick={() => window.location.reload()}>Reopen current case</button></div>}
-      <section className="scope-card adaptive-intake"><p className="eyebrow">HANDLER-PROVIDED STARTING POINT · REVISION {scion.current_revision}</p><h3>Product description</h3>{scion.revision.product_description ? <blockquote>{scion.revision.product_description}</blockquote> : <p className="scope-gap">Product description missing. Edit the intake and describe the product in your own words before queuing a plan.</p>}<p className="field-help">Unspecified requirements stay missing. The agent receives this saved intake revision and the actual local connector registry.</p>
-        <form onSubmit={queue}><label className="scope-attestation"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} disabled={!current || !canWrite || queueBusy} /><span>This Scion describes a synthetic test product. Prepare a capability proposal without treating assumptions as facts.</span></label><div className="adaptive-queue-controls"><label htmlFor="capability-timeout">Runtime limit · seconds<input id="capability-timeout" type="number" min={30} max={300} step={1} value={timeoutSeconds} onChange={event => setTimeoutSeconds(Number(event.target.value))} disabled={queueBusy} /></label><button className="button primary" disabled={!current || !canWrite || !synthetic || !scion.revision.product_description?.trim() || tasks === null || queueBusy}>{queueBusy ? 'Queuing…' : 'Queue capability plan with Codex CLI'}</button></div></form>
-      </section>
-      <section className="scope-card"><div className="section-heading"><h3>Enabled data connectors</h3><span className="badge">Reported by the Rust API</span></div><p className="section-description">These are local data capabilities available to this organization. A coding agent adapter is separate from a data connector.</p><div className="adaptive-connectors">{data.connectors.map(connector => <article key={connector.id}><h4>{connector.name}</h4><span className="badge">{connector.enabled ? 'Enabled' : 'Disabled'} · {connector.status}</span><p>{connector.description}</p><p className="field-help">Connector ID <code>{connector.id}</code></p></article>)}</div><p className="scope-gap">External data connectors are unavailable. No provider catalog, supplier search or external website evidence has been fetched.</p><Gaps items={data.unresolved_gaps} /></section>
-      <section className="scope-card"><div className="section-heading"><h3>Immutable capability proposals</h3><span className="badge">{data.plans.length} recorded</span></div>{data.plans.length === 0 ? <p className="scope-empty">No capability proposal yet. Queue and dispatch a task below; completed agent output appears here for review.</p> : <><label htmlFor="capability-plan-choice">Recorded proposal</label><select id="capability-plan-choice" value={selectedId ?? ''} onChange={event => openPlan(event.target.value)}>{data.plans.map(item => <option key={item.id} value={item.id}>Scion revision {item.scion_revision} · {item.status === 'stale' ? 'Stale' : 'Current proposal'} · {when(item.created_at)}</option>)}</select>{plan && <PlanRecord plan={plan} />}</>}</section>
-      <section className="adaptive-comparisons"><div className="section-heading"><div><h3>Evidence comparison drafts</h3><p className="section-description">Compare Handler-named alternatives against proposed capabilities using exact source claims. Missing support stays visible.</p></div><button type="button" className="button secondary" disabled={!canWrite || !usablePlan || composing} onClick={() => { if (discard()) setComposing(true); }}>Prepare evidence comparison</button></div><p className="field-help">This is a review worksheet. It does not compare vendors, choose a winner, verify claims or approve an implementation.</p>
-        {composing && plan?.input && usablePlan && <ComparisonForm key={plan.id} token={token} scion={scion} plan={plan} sources={sources} onDirty={markDirty} onSources={onSources} onAccessLost={accessLost} onCancel={() => { if (discard()) setComposing(false); }} onSaved={saved} />}
-        {data.comparisons.length === 0 && <p className="scope-empty">No evidence comparison recorded. Alternative labels and evidence are never generated to fill this space.</p>}
-        {data.comparisons.map(comparison => <ComparisonRecord key={comparison.id} comparison={comparison} plan={data.plans.find(item => item.id === comparison.plan_id)} />)}
-      </section>
+      {!current && <div className="work-notice" role="alert">The intake changed to revision {data.scion_revision}. Reopen the current Scion before preparing work.</div>}
+      {view === 'plans' && <>
+        <div className="proposal-toolbar"><div><h2>Proposals</h2><span className="work-muted">{data.plans.length} capability plans</span></div><button className="button secondary" onClick={() => onView('agent-work')}>Prepare proposal</button></div>
+        {data.plans.length ? <><label className="proposal-picker" htmlFor="capability-plan-choice"><span>Recorded proposal</span><select id="capability-plan-choice" value={selectedId ?? ''} onChange={event => openPlan(event.target.value)}>{data.plans.map(item => <option key={item.id} value={item.id}>Revision {item.scion_revision} · {item.status} · {when(item.created_at)}</option>)}</select></label>{plan && <div className="proposal-detail"><article className="proposal-thread"><div className="proposal-author"><span className="company-avatar">C</span><div><strong>Proposal agent</strong><small>Capability proposal · {when(plan.created_at)}</small></div><WorkStatus value={plan.status === 'current' ? 'proposed' : plan.status} /></div><PlanRecord plan={plan} /></article><aside className="scion-properties"><h2>Properties</h2><dl><div><dt>Scion</dt><dd>{scion.revision.name}</dd></div><div><dt>Revision</dt><dd>{plan.scion_revision}</dd></div><div><dt>Task adapter</dt><dd>{tasks?.find(task => task.id === plan.agent_task_id)?.adapter === 'codex_cli' ? 'Codex CLI' : 'Not reported'}</dd></div><div><dt>Authority</dt><dd>Agent proposal</dd></div><div><dt>Decision</dt><dd>{scion.revision.decision?.trim() ? 'Handler-provided' : 'Missing Handler decision'}</dd></div><div><dt>Review</dt><dd>Human required</dd></div></dl><button className="work-property-link" onClick={onSources}>Inspect evidence →</button><button className="work-property-link" onClick={() => onView('comparisons')}>Evidence comparisons →</button><button className="work-property-link" onClick={() => onView('agent-work')}>View preparing task →</button><p className="work-muted">Completion is not approval.</p><details className="work-disclosure"><summary>Preparation gaps · {data.unresolved_gaps.length}</summary><Gaps items={data.unresolved_gaps} /></details></aside></div>}</> : <div className="work-empty"><h3>No capability proposal yet</h3><p>Use the saved Scion brief to prepare one bounded Codex task.</p><button className="button primary" disabled={!canWrite} onClick={() => onView('agent-work')}>Prepare proposal</button></div>}
+      </>}
+      {view === 'comparisons' && <section className="proposal-comparisons"><div className="proposal-toolbar"><div><h2>Evidence comparisons</h2><p className="work-muted">Exact source claims, named alternatives, and unresolved gaps.</p></div><button type="button" className="button secondary" disabled={!canWrite || !usablePlan || composing} onClick={() => { if (discard()) setComposing(true); }}>New comparison</button></div>
+        {composing && plan?.input && usablePlan ? <ComparisonForm key={plan.id} token={token} scion={scion} plan={plan} sources={sources} onDirty={markDirty} onSources={onSources} onAccessLost={accessLost} onCancel={() => { if (discard()) setComposing(false); }} onSaved={saved} />
+        : <>{data.comparisons.length > 0 && <label className="proposal-picker" htmlFor="comparison-choice"><span>Recorded comparison</span><select id="comparison-choice" value={selectedComparison?.id ?? ''} onChange={event => setComparisonId(event.target.value)}>{data.comparisons.map(item => <option key={item.id} value={item.id}>Revision {item.scion_revision} · {item.status} · {when(item.created_at)}</option>)}</select></label>}{selectedComparison ? <ComparisonRecord comparison={selectedComparison} plan={data.plans.find(item => item.id === selectedComparison.plan_id)} /> : <div className="work-empty">No comparison yet. Start with a current capability proposal and authorized evidence.</div>}</>}
+        <p className="work-muted work-endnote">Comparisons are review worksheets. They do not rank vendors, select a winner, or grant approval.</p>
+      </section>}
+      {view === 'agent-work' && <>
+        <div className="proposal-toolbar"><div><h2>Agent work</h2><p className="work-muted">Queue a bounded proposal, then explicitly dispatch it.</p></div><WorkStatus value="preparation only" /></div>
+        <details className="work-disclosure proposal-prepare" open={tasks?.length === 0}><summary>Prepare a new capability proposal</summary><div className="proposal-prepare-body"><p>{scion.revision.product_description || 'Edit the Scion brief and describe the product first.'}</p><form onSubmit={queue}><label>Assigned agent<select aria-label="Assigned agent" value={assignedAgent} onChange={event => { setAssignedAgent(event.target.value); const chosen = nativeAgents.find(agent => agent.id === event.target.value); if (chosen) setTimeoutSeconds(chosen.config.timeout_seconds); }}><option value="">Unassigned legacy task</option>{nativeAgents.filter(agent => !agent.config.paused).map(agent => <option key={agent.id} value={agent.id}>{agent.config.name}</option>)}</select></label><label className="scope-attestation"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} disabled={!current || !canWrite || queueBusy} /><span>This is a synthetic test product. Prepare a proposal; do not treat assumptions as facts.</span></label><div className="adaptive-queue-controls"><label htmlFor="capability-timeout">Runtime limit · seconds<input id="capability-timeout" type="number" min={30} max={300} step={1} value={timeoutSeconds} onChange={event => setTimeoutSeconds(Number(event.target.value))} disabled={queueBusy} /></label><button className="button primary" disabled={!current || !canWrite || !synthetic || !scion.revision.product_description?.trim() || tasks === null || queueBusy}>{queueBusy ? 'Queuing…' : 'Queue Codex proposal'}</button></div></form></div></details>
+        <AgentTasks compact token={token} scionId={scion.id} currentRevision={data.scion_revision} canWrite={canWrite && current} tasks={tasks} error={taskError} onOpen={(id, kind) => kind === 'prepare_capability_plan' ? onView('proposals', id) : kind === 'prepare_physical_scope' ? onScopeProposal(id) : onOfferProposal(id)} onChanged={() => refresh(true)} />
+      </>}
     </>}
-    <AgentTasks token={token} scionId={scion.id} currentRevision={data?.scion_revision ?? scion.current_revision} canWrite={canWrite && current && !composing} tasks={tasks} error={taskError} onOpen={(id, kind) => kind === 'prepare_capability_plan' ? openPlan(id) : kind === 'prepare_physical_scope' ? onScopeProposal(id) : onOfferProposal(id)} onChanged={() => refresh(true)} />
-    <p className="scope-footnote">Access is rechecked every 2 seconds while visible. Hidden, offline or expired access clears source-dependent content and unsaved comparisons; the permission lease is at most 5 seconds from the start of a successful check.</p>
   </section>;
 }
 
 function PlanRecord({ plan }: { plan: CapabilityPlan }) {
-  return <div><div className="section-heading"><p className="section-description">Scion revision {plan.scion_revision} · {when(plan.created_at)}</p><span className={`badge ${plan.status === 'stale' ? 'scope-status-blocked' : ''}`}>{plan.status === 'stale' ? 'Stale · content withheld' : 'Agent proposal · unverified'}</span></div>{plan.status !== 'current' || !plan.input ? <p className="scope-gap">The intake changed. This proposal is retained as an immutable audit record; prepare a new plan for the current revision.</p> : <><p>{plan.input.summary}</p><ol className="adaptive-plan-list">{plan.input.capabilities.map(capability => <li key={capability.key}><h4>{capability.title}</h4><p>{capability.reason}</p><strong>Evidence needed</strong><Gaps items={capability.evidence_needed} /><p className="field-help">Proposed connectors: {capability.connector_ids.length ? capability.connector_ids.join(', ') : 'None · data access missing'}</p></li>)}</ol><h4>Unresolved plan gaps</h4><Gaps items={plan.input.unresolved_gaps} /><p className="field-help">Preparation note: {plan.input.change_summary}</p></>}<details className="revision-details"><summary>Proposal provenance</summary><dl><dt>Plan ID</dt><dd><code>{plan.id}</code></dd><dt>Agent task ID</dt><dd><code>{plan.agent_task_id}</code></dd><dt>Recorded by principal</dt><dd><code>{plan.created_by}</code></dd></dl></details></div>;
+  return <div className="proposal-record">{plan.status !== 'current' || !plan.input ? <div className="work-empty"><WorkStatus value={plan.status} /><p>{plan.status === 'blocked' ? 'A dependent source is no longer permitted. Source-derived content is hidden.' : 'Pinned inputs changed. This proposal is retained as history, not current work.'}</p><p>Review current inputs and prepare a replacement proposal.</p></div> : <><h2>Capability plan</h2><p className="proposal-summary">{plan.input.summary}</p><h3 className="work-group-heading">Proposed capabilities <span>{plan.input.capabilities.length}</span></h3><div className="proposal-capabilities">{plan.input.capabilities.map((capability, index) => <details key={capability.key}><summary><span>{String(index + 1).padStart(2, '0')}</span><strong>{capability.title}</strong><small>{capability.evidence_needed.length} evidence needs</small></summary><div><p>{capability.reason}</p><h4>Evidence needed</h4><Gaps items={capability.evidence_needed} /><p className="work-muted">Data paths: {capability.connector_ids.length ? capability.connector_ids.join(', ') : 'None configured'}</p></div></details>)}</div><details className="work-disclosure"><summary>Unresolved gaps · {plan.input.unresolved_gaps.length}</summary><Gaps items={plan.input.unresolved_gaps} /></details><details className="work-disclosure"><summary>Preparation note</summary><p>{plan.input.change_summary}</p></details></>}<details className="work-disclosure"><summary>Provenance</summary><dl><dt>Proposal ID</dt><dd><code>{plan.id}</code></dd><dt>Agent task ID</dt><dd><code>{plan.agent_task_id}</code></dd><dt>Recorded by</dt><dd><code>{plan.created_by}</code></dd></dl></details></div>;
 }
-
 type Alternative = { label: string; claims: Record<string, ScopeReference[]> };
 function ComparisonForm({ token, scion, plan, sources, onDirty, onSources, onAccessLost, onCancel, onSaved }: {
   token: string; scion: Scion; plan: CapabilityPlan; sources: SourceSummary[]; onDirty: (dirty: boolean) => void; onSources: () => void; onAccessLost: () => void; onCancel: () => void; onSaved: () => Promise<void>;

@@ -29,6 +29,10 @@ pub const MIGRATIONS: &[(&str, &[u8])] = &[
     // 0035-0037 are absent Mac work, not silently recreated here.
     migration!("intake", "0038_windows_adaptive_plans.sql"),
     migration!("intake", "0039_windows_approval_lockdown.sql"),
+    migration!("intake", "0040_control_surface.sql"),
+    migration!("intake", "0041_watchtower_artifact_guards.sql"),
+    migration!("intake", "0042_watchtower_task_sources.sql"),
+    migration!("intake", "0043_native_agents.sql"),
 ];
 
 #[derive(FromRow)]

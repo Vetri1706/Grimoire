@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiError, request } from './api';
+import { useCaseInvalidation } from './control-api';
 import type { Scion } from './api';
 import { MAX_QUOTE_MATCHES, quoteLocators } from './evidence-api';
 import type { SourceClaim, SourceDetail, SourceInput, SourceList, SourceRevision, SourceSummary } from './evidence-api';
@@ -78,6 +79,7 @@ export default function Evidence({ token, scion, canWrite, onDirty }: { token: s
     setAccessNotice(reason);
   }, [markDirty]);
 
+  useCaseInvalidation(scion.id, clearAccess);
   const renewLease = useCallback((startedAt: number) => {
     if (document.visibilityState !== 'visible' || !navigator.onLine || Date.now() >= startedAt + ACCESS_LEASE_MS) return false;
     accessExpiresAt.current = startedAt + ACCESS_LEASE_MS;

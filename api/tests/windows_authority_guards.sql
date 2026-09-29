@@ -2,7 +2,7 @@
 -- All probes roll back. The fixed caller uses only the isolated clean database.
 BEGIN;
 DO $$ BEGIN
- IF current_database() <> 'grimoire_startup_clean_test' THEN
+ IF current_database() !~ '^grimoire_startup_[a-z0-9_]+_test$' THEN
   RAISE EXCEPTION 'Windows startup authority guards require isolated clean database';
  END IF;
 END $$;

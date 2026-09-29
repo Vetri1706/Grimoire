@@ -32,6 +32,8 @@ pub fn routes() -> Router<PgPool> {
 #[derive(FromRow, Serialize)]
 struct Task {
     id: Uuid,
+    agent_id: Option<Uuid>,
+    agent_revision: Option<i32>,
     scion_id: Uuid,
     scion_revision: i32,
     task_kind: String,
@@ -59,12 +61,14 @@ struct Task {
     #[serde(skip_serializing)]
     request_sha256: String,
 }
-const COLUMNS: &str = "id,scion_id,scion_revision,task_kind,adapter,status,attempt,created_at,claimed_at,completed_at,proposal_id,failure_code,input,claimed_by,lease_token,lease_until,request_sha256,timeout_seconds,dispatched_at,cancelled_at,provider_run_id,output_sha256,(claimed_at+make_interval(secs=>timeout_seconds)) AS execution_deadline";
+const COLUMNS: &str = "id,(SELECT agent_id FROM grimoire.intake_task_agent_bindings WHERE task_id=intake_agent_tasks.id) AS agent_id,(SELECT agent_revision FROM grimoire.intake_task_agent_bindings WHERE task_id=intake_agent_tasks.id) AS agent_revision,scion_id,scion_revision,task_kind,adapter,status,attempt,created_at,claimed_at,completed_at,proposal_id,failure_code,input,claimed_by,lease_token,lease_until,request_sha256,timeout_seconds,dispatched_at,cancelled_at,provider_run_id,output_sha256,(claimed_at+make_interval(secs=>timeout_seconds)) AS execution_deadline";
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Create {
     task_kind: String,
     candidate_proposal: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    agent_id: Option<Uuid>,
     #[serde(
         default = "default_timeout",
         skip_serializing_if = "is_default_timeout"
@@ -127,6 +131,10 @@ async fn load(tx: &mut Tx, id: Uuid, lock: bool) -> Result<Task, ApiError> {
     .ok_or_else(ApiError::not_found)
 }
 async fn eligible(tx: &mut Tx, task: &Task) -> Result<(), ApiError> {
+    sqlx::query("SELECT app.intake_assert_managed_task($1)")
+        .bind(task.id)
+        .execute(&mut **tx)
+        .await?;
     sqlx::query("SELECT app.intake_task_assert_input($1,$2,$3,$4)")
         .bind(task.scion_id)
         .bind(task.scion_revision)
@@ -134,6 +142,21 @@ async fn eligible(tx: &mut Tx, task: &Task) -> Result<(), ApiError> {
         .bind(sqlx::types::Json(&task.input.0["candidate_proposal"]))
         .execute(&mut **tx)
         .await?;
+    let dependency: Option<(bool, bool)> = sqlx::query_as("SELECT stale,blocked FROM grimoire.intake_watch_node_states WHERE node_kind='agent_task' AND node_id=$1")
+        .bind(task.id).fetch_optional(&mut **tx).await?;
+    if let Some((stale, blocked)) = dependency {
+        if blocked {
+            return Err(ApiError(StatusCode::FORBIDDEN, "SOURCE_RIGHTS_DENIED", "Dependent source permission was revoked. Stop preparation and request human review.".into()));
+        }
+        if stale {
+            return Err(ApiError(
+                StatusCode::CONFLICT,
+                "CAPABILITY_INPUT_STALE",
+                "A watched task input changed. Prepare new work from current authorized inputs."
+                    .into(),
+            ));
+        }
+    }
     Ok(())
 }
 fn lease(headers: &HeaderMap, task: &Task, actor: &Actor) -> Result<(), ApiError> {
@@ -165,6 +188,7 @@ pub(super) async fn submission(
         return Ok(());
     }
     agent(actor)?;
+    crate::agents::lock_org(tx, actor).await?;
     let task = headers
         .get("X-Grimoire-Task-Id")
         .and_then(|h| h.to_str().ok())
@@ -208,6 +232,7 @@ async fn dispatch(
     Path((scion, id)): Path<(String, String)>,
 ) -> ApiResult {
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
+    crate::agents::lock_org(&mut tx, &actor).await?;
     let scion = parse_id(&scion)?;
     visible(&mut tx, scion).await?;
     let task = load(&mut tx, parse_id(&id)?, true).await?;
@@ -279,6 +304,7 @@ async fn control(
 ) -> ApiResult {
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     agent(&actor)?;
+    crate::agents::worker_seen(&mut tx, &headers).await?;
     let task = load(&mut tx, parse_id(&id)?, false).await?;
     lease(&headers, &task, &actor)?;
     let expired = task.execution_deadline.is_none_or(|v| v <= Utc::now());
@@ -330,9 +356,17 @@ async fn list(State(pool): State<PgPool>, headers: HeaderMap, Path(id): Path<Str
     let (mut tx, _) = authenticate(&pool, &headers).await?;
     let id = parse_id(&id)?;
     visible(&mut tx, id).await?;
-    let tasks=sqlx::query_as::<_,Task>(&format!("SELECT {COLUMNS} FROM grimoire.intake_agent_tasks WHERE scion_id=$1 ORDER BY created_at DESC,id LIMIT 50")).bind(id).fetch_all(&mut *tx).await?;
+    let tasks = control_snapshot(&mut tx, id).await?;
     tx.commit().await?;
     Ok(Json(json!({"tasks":tasks})).into_response())
+}
+pub(super) async fn control_snapshot(tx: &mut Tx, id: Uuid) -> Result<Vec<Value>, ApiError> {
+    let tasks = sqlx::query_as::<_, Task>(&format!("SELECT {COLUMNS} FROM grimoire.intake_agent_tasks WHERE scion_id=$1 ORDER BY created_at DESC,id LIMIT 100"))
+        .bind(id).fetch_all(&mut **tx).await?;
+    tasks
+        .into_iter()
+        .map(|task| serde_json::to_value(task).map_err(ApiError::from))
+        .collect()
 }
 async fn create(
     State(pool): State<PgPool>,
@@ -346,6 +380,7 @@ async fn create(
     if !actor.can_write || actor.is_agent {
         return Err(ApiError::forbidden());
     }
+    crate::agents::lock_org(&mut tx, &actor).await?;
     let mut input = json_input(input)?;
     let base = precondition(&headers)?;
     let key = key(&headers)?;
@@ -425,6 +460,13 @@ async fn create(
     }
     let task_id = Uuid::new_v4();
     sqlx::query("INSERT INTO grimoire.intake_agent_tasks(id,org_id,scion_id,scion_revision,task_kind,input,created_by,request_key,request_sha256,timeout_seconds) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)").bind(task_id).bind(actor.org_id).bind(id).bind(base).bind(&input.task_kind).bind(sqlx::types::Json(json!({"candidate_proposal":input.candidate_proposal}))).bind(actor.principal_id).bind(key).bind(hash).bind(input.timeout_seconds).execute(&mut *tx).await?;
+    if let Some(agent_id) = input.agent_id {
+        sqlx::query("SELECT app.intake_bind_agent_task($1,$2)")
+            .bind(task_id)
+            .bind(agent_id)
+            .execute(&mut *tx)
+            .await?;
+    }
     let task = load(&mut tx, task_id, false).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(task)).into_response())
@@ -434,7 +476,8 @@ async fn next(State(pool): State<PgPool>, headers: HeaderMap) -> ApiResult {
     agent(&actor)?;
     // No task input is returned until claim validates current Scion/source permissions.
     expire(&mut tx, &actor).await?;
-    let id:Option<Uuid>=sqlx::query_scalar("SELECT id FROM grimoire.intake_agent_tasks WHERE status='dispatched' AND NOT EXISTS(SELECT 1 FROM grimoire.intake_agent_tasks WHERE status IN ('running','cancel_requested')) ORDER BY dispatched_at,id LIMIT 1").fetch_optional(&mut *tx).await?;
+    crate::agents::worker_seen(&mut tx, &headers).await?;
+    let id:Option<Uuid>=sqlx::query_scalar("SELECT task.id FROM grimoire.intake_agent_tasks task LEFT JOIN grimoire.intake_task_agent_bindings binding ON (binding.org_id,binding.task_id)=(task.org_id,task.id) LEFT JOIN grimoire.intake_managed_entities entity ON (entity.org_id,entity.id)=(binding.org_id,binding.agent_id) LEFT JOIN grimoire.intake_managed_revisions revision ON (revision.org_id,revision.entity_id,revision.number)=(entity.org_id,entity.id,entity.current_revision) WHERE task.status='dispatched' AND (binding.task_id IS NULL OR ($1 AND NOT (revision.config->>'paused')::boolean)) AND NOT EXISTS(SELECT 1 FROM grimoire.intake_agent_tasks WHERE status IN ('running','cancel_requested')) ORDER BY task.dispatched_at,task.id LIMIT 1").bind(crate::agents::protocol(&headers)).fetch_optional(&mut *tx).await?;
     tx.commit().await?;
     Ok(Json(json!({"task":id.map(|id|json!({"id":id}))})).into_response())
 }
@@ -451,6 +494,19 @@ async fn claim(
     if task.status != "dispatched" {
         return Err(conflict());
     }
+    let profile: Option<Value> = sqlx::query_scalar(
+        "SELECT snapshot FROM grimoire.intake_task_agent_bindings WHERE task_id=$1",
+    )
+    .bind(task.id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if profile.is_some() && !crate::agents::protocol(&headers) {
+        return Err(ApiError(
+            StatusCode::CONFLICT,
+            "WORKER_UPGRADE_REQUIRED",
+            "Native agent tasks require Grimoire worker protocol 2.".into(),
+        ));
+    }
     if let Err(error) = eligible(&mut tx, &task).await {
         tx.rollback().await?;
         // A SQL permission error aborts its transaction. Preserve a content-free
@@ -465,6 +521,7 @@ async fn claim(
     let mut result = serde_json::to_value(&task)?;
     result["input"] = task.input.0;
     result["lease_token"] = json!(task.lease_token);
+    result["agent_profile"] = json!(profile);
     tx.commit().await?;
     Ok(Json(result).into_response())
 }
@@ -476,6 +533,7 @@ async fn result(
 ) -> ApiResult {
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     agent(&actor)?;
+    crate::agents::lock_org(&mut tx, &actor).await?;
     let id = parse_id(&id)?;
     let task = load(&mut tx, id, true).await?;
     lease(&headers, &task, &actor)?;

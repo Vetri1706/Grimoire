@@ -2,7 +2,15 @@
 
 Working local Scion intake, synthetic evidence, adaptive capability proposals, physical-scope review and two-offer exact comparison. React/TypeScript calls a Rust HTTP API backed by PostgreSQL 17 and private versioned MinIO source storage. Exact configuration, BOM occurrence, component, requirement, supplier, source and commercial terms remain pinned. Separate synthetic engineering review creates the identity chain and confirms normalization in existing GG-40 tables. The Go harness exercises the real API, database and object store, including process restarts, conflicts, revocation and organization isolation.
 
-Draft and source history stay immutable. No physical values are generated from missing fields. Synthetic scope confirmation records exact identity only; claims remain unverified and sourcing approval is disabled. Digital Scions support revision-bound capability proposals and Handler-authored evidence comparison drafts; digital vendor comparison remains unavailable. Supplier discovery, real supplier offers, RFQs, production qualification and the Paperclip connector remain deferred. A local BYOA bridge executes bounded preparation tasks using the user's installed **Codex CLI and existing login**, returning proposals without human confirmation authority. See [Windows adaptive Scions, authority boundaries and commands](docs/windows-adaptive-scion.md), [BYOA setup](docs/byoa-local.md), [Layer 4 results](docs/layer-4-verification-2026-09-26.md), and [remaining storage work](docs/storage-recovery-backlog.md).
+Draft and source history stay immutable. No physical values are generated from missing fields. Synthetic scope confirmation records exact identity only; claims remain unverified and sourcing approval is disabled. Digital Scions support revision-bound capability proposals and Handler-authored evidence comparison drafts; digital vendor comparison remains unavailable. Supplier discovery, real supplier offers, RFQs and production qualification remain deferred. Agent profiles, instructions, skills and assignments belong to Grimoire's native Rust/PostgreSQL backend; Paperclip is a design/source reference only. A local BYOA bridge executes bounded preparation tasks using the user's installed **Codex CLI and existing login**, returning proposals without human confirmation authority. See [Windows adaptive Scions, authority boundaries and commands](docs/windows-adaptive-scion.md), [BYOA setup](docs/byoa-local.md), [Layer 4 results](docs/layer-4-verification-2026-09-26.md), and [remaining storage work](docs/storage-recovery-backlog.md).
+
+## Company workspace
+
+The [company-first workspace](docs/company-workspace.md) separates Dashboard,
+Inbox, Proposals, Scions, Agent work, Watchtower, Agents, Skills, Connectors and
+Activity. Scions open a focused overview, and proposals open one selected record
+instead of a stacked case board. [Current verification](docs/verification-2026-09-27-native-agents.md)
+records 152 live Go checks, 20 Rust tests and real browser checks.
 
 ## Current local run
 
@@ -284,4 +292,4 @@ npm.cmd --prefix web run build
 | `docs/verification-2026-09-25.md` | Actual execution evidence and remaining limitations |
 | `docs/reference/GG40_page_capture.txt` | Supplied reference capture; not a canonical document-body hash |
 
-See `api/README.md` for request/response shapes and limits, and `harness/README.md` for direct harness invocation. There is no Paperclip connector or agent approval path. The sibling Paperclip clone is unchanged.
+See `api/README.md` for request/response shapes and limits, and `harness/README.md` for direct harness invocation. The [Grimoire OS control surface](docs/control-surface.md) projects the case graph, persistent internal Watchtower, and existing Rust tasks. [Native Grimoire agents](docs/native-agents.md) own versioned profiles, skills, assignments, pause/resume and real Codex task history; no Paperclip backend or management redirect is used. Completion never grants approval. The sibling Paperclip clone is unchanged.

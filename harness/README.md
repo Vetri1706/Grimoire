@@ -168,3 +168,18 @@ boundary; it does not accelerate the database clock.
 For focused development runs use `dev.ps1 -Task Harness -HarnessSlice offers`
 or `-HarnessSlice scope`. Only the default full run establishes regression results.
 An actual Codex CLI run and browser checks are separate from this Go protocol client.
+
+`-HarnessSlice control-surface` runs thirteen OS and eight native-agent checks: revision-only staleness,
+authorized graph edges, foreign-organization hiding, completion without approval,
+source revisions, revocation/redaction, blocked dispatch and running-worker
+control, replay idempotency, browser-independent checks and actual API restart.
+The full harness also runs these checks and preserves physical-workflow coverage.
+`api/tests/control_surface_guards.sql` separately redelivers the same watch event
+under rollback and checks unchanged audit/review/task effects and direct RLS.
+See [control-surface verification and boundaries](../docs/control-surface.md) for
+the separate browser protocol fixture. [Native agent verification](../docs/native-agents.md)
+covers persistent profiles/skills, exact assignment snapshots, compatible worker
+protocol, pause/cancellation, idempotent retries, foreign organization isolation,
+reporting-cycle rejection, proposal-only completion and actual Rust restart.
+`api/tests/native_agent_guards.sql` checks immutable native history and direct RLS.
+Paperclip is a source reference only; the suite uses no Paperclip backend.

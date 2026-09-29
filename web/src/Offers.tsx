@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiError, request } from './api';
+import { useCaseInvalidation } from './control-api';
 import type { Scion } from './api';
 import AgentTasks from './AgentTasks';
 import { ClaimSelector, useScopeWrite } from './PhysicalScope';
@@ -35,6 +36,7 @@ export default function Offers({ token, scion, canWrite, preferredProposalId, on
     generation.current++; pending.current.forEach(controller => controller.abort()); pending.current.clear(); window.clearTimeout(leaseTimer.current); leaseEnd.current = 0;
     setOffers([]); setComparisons(null); setScope(null); setSources([]); setTasks(null); setForm(null); setReady(false); setLoading(false); markDirty(false); setError(reason);
   }, [markDirty]);
+  useCaseInvalidation(scion.id, clear);
   const refresh = useCallback(async (force = false) => {
     if (document.visibilityState !== 'visible' || !navigator.onLine) { clear('This tab is hidden or offline. Offer and comparison content and unsaved forms have been cleared.'); return; }
     if (pending.current.size && !force) return;
