@@ -1,0 +1,35 @@
+/* Local-installation onboarding. */
+.onboarding-page { min-height: 100vh; display: flex; flex-direction: column; padding: 32px max(6vw,24px) 24px; }
+.onboarding-brand { display: flex; align-items: center; gap: 12px; font-size: var(--text-section); font-weight: 600; letter-spacing: -.4px; }
+.onboarding-brand .theme-picker { margin-left: auto; }
+.onboarding-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius); background: var(--primary); color: var(--primary-foreground); font-family: Georgia, serif; }
+.onboarding-layout { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(360px,.75fr); gap: clamp(48px,8vw,120px); width: 100%; max-width: 1120px; margin: auto; padding: 64px 0 80px; align-items: center; }
+.onboarding-intro h1 { max-width: 650px; margin-top: 16px; font-size: var(--text-hero); line-height: 1.18; letter-spacing: -1.2px; }
+.onboarding-intro>p:not(.eyebrow) { max-width: 560px; margin-top: 20px; color: var(--muted-foreground); }
+.onboarding-steps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; list-style: none; padding: 0; margin: 40px 0 0; max-width: 560px; counter-reset: step; }
+.onboarding-steps li { border-top: 2px solid var(--border); padding-top: 10px; color: var(--muted-foreground); font-size: var(--text-small); }
+.onboarding-steps li[data-current="true"] { border-color: var(--foreground); color: var(--foreground); font-weight: 600; }
+.onboarding-card { padding: 32px; border: 1px solid var(--border); background: var(--card); border-radius: var(--radius); box-shadow: 0 12px 40px rgb(0 0 0 / 4%); }
+.onboarding-card h2 { margin: 6px 0 24px; font-size: var(--text-heading); }
+.onboarding-card label { margin-top: 18px; }
+.onboarding-card .error-message { margin: 18px 0 0; }
+.onboarding-card>.button.full { margin-top: 22px; }
+.onboarding-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+.onboarding-boundary { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: var(--text-small); }
+
+
+@media (max-width: 767px) {
+  .onboarding-page { padding: 20px 16px 16px; }
+  .onboarding-layout { grid-template-columns: 1fr; gap: 28px; padding: 40px 0; max-width: 520px; }
+  .onboarding-intro h1 { font-size: 2.2rem; }
+  .onboarding-intro>p:not(.eyebrow) { margin-top: 12px; }
+  .onboarding-steps { margin-top: 24px; }
+  .onboarding-card { padding: 24px 20px; }
+  .onboarding-card h2 { margin-bottom: 18px; }
+}
+@media (max-width: 430px) {
+  .onboarding-brand .theme-picker select { min-width: 92px; }
+  .onboarding-steps li { font-size: .75rem; }
+  .onboarding-actions { flex-direction: column-reverse; }
+  .onboarding-actions .button { width: 100%; }
+}

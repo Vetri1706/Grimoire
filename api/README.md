@@ -19,15 +19,27 @@ explicit administrator operation, never performed automatically by the API.
 
 ## HTTP contract
 
-All endpoints except health require `Authorization: Bearer <local token>`.
-Tokens are stored as SHA-256 digests, never plaintext, and resolved against the
-current enabled principal and role membership. Browser organization headers are
-ignored. These local credentials are not a production identity integration.
+Ordinary browser requests use an opaque HttpOnly `grimoire_session` cookie.
+PostgreSQL stores only its SHA-256 digest and accepts an active organization only
+through a live Handler membership joined to an enabled organization-scoped
+principal. Session writes require the same-origin `X-Grimoire-CSRF: 1` marker.
+The legacy `Authorization: Bearer <local token>` path remains available for
+the development harness and local adapters. Cookie-authenticated workspace
+requests must include `X-Grimoire-Organization` matching the session's active
+organization. A mismatch returns `409 ACTIVE_ORGANIZATION_CHANGED`; this header
+checks displayed context and never selects or grants access to an organization.
+This local identity/session mechanism is not a production identity integration.
 
 | Method | Path | Success |
 |---|---|---|
 | GET | `/api/health` | Actual database name, PostgreSQL version and runtime role |
-| GET | `/api/me` | Current principal, organization, display names and `can_write` |
+| GET | `/api/setup/status` | Whether the one-time local installation owner is still unconfigured |
+| POST | `/api/setup/owner` | `201 SessionState` + HttpOnly cookie; unauthenticated first-use only |
+| POST | `/api/session/login` | `200 SessionState` + HttpOnly cookie |
+| GET / DELETE | `/api/session` | Read the Handler/membership state or revoke the current session |
+| POST | `/api/organizations` | `201 SessionState`; atomic creation; requires `Idempotency-Key` |
+| POST | `/api/session/active-organization` | Checked membership switch; returns `SessionState` |
+| GET | `/api/me` | Current principal, organization, display names, sourcing `can_write` and separate `can_manage_workspace` |
 | GET | `/api/scions` | `{ "scions": [Scion] }`, current organization only |
 | POST | `/api/scions` | `201 Scion`, requires `Idempotency-Key` |
 | GET | `/api/scions/{id}` | `200 Scion`, `ETag: "N"` |
@@ -75,7 +87,10 @@ Errors use `{ "error": { "code": "...", "message": "..." } }`. Invalid
 credentials return 401; insufficient same-organization write role 403; hidden or
 unknown Scions 404 (including history and writes); invalid intake 422; missing
 `If-Match` 428; stale edits 412; and conflicting idempotency-key reuse 409.
-Authorized mutations require `procurement_preparer` or `org_admin`.
+Scion intake creation/revision permits workspace managers (`org_admin`) and
+`procurement_preparer`. Source, scope, offer, engineering, commercial, and
+approval operations do not inherit authority from `org_admin`; they continue to
+require their explicit role/enrollment boundaries.
 
 ## Persistence and concurrency
 

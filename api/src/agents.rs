@@ -159,7 +159,7 @@ async fn save(
     input: Result<Json<Value>, JsonRejection>,
 ) -> ApiResult {
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
-    if !actor.can_write || actor.is_agent {
+    if !actor.can_manage_workspace || actor.is_agent {
         return Err(ApiError::forbidden());
     }
     let value = input

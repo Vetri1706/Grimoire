@@ -6,6 +6,7 @@ mod control_surface;
 mod domain;
 mod error;
 mod offers;
+mod onboarding;
 mod scope;
 mod sources;
 mod storage;
@@ -13,8 +14,10 @@ mod workspace;
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{DefaultBodyLimit, Path, State, rejection::JsonRejection},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header},
+    middleware::Next,
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -32,12 +35,14 @@ type Tx = Transaction<'static, Postgres>;
 type ApiResult = Result<Response, ApiError>;
 
 #[derive(FromRow, Serialize)]
-struct Actor {
+pub(crate) struct Actor {
     principal_id: Uuid,
     org_id: Uuid,
     display_name: String,
     organization_name: String,
     can_write: bool,
+    #[sqlx(default)]
+    can_manage_workspace: bool,
     #[sqlx(default)]
     can_confirm_scope: bool,
     #[sqlx(default)]
@@ -148,11 +153,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("The API runtime must not own Grimoire tables.".into());
     }
     let migrated: bool =
-        sqlx::query_scalar("SELECT to_regclass('grimoire.intake_revisions') IS NOT NULL AND to_regprocedure('app.intake_history_authors(uuid)') IS NOT NULL AND to_regclass('grimoire.intake_source_objects') IS NOT NULL AND to_regprocedure('app.intake_source_read_lock(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_agent_tasks') IS NOT NULL AND to_regprocedure('app.intake_scope_has_preparer_conflict(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_offer_submissions') IS NOT NULL AND to_regclass('grimoire.sourcing_authority_reviews') IS NOT NULL")
+        sqlx::query_scalar("SELECT to_regclass('grimoire.intake_revisions') IS NOT NULL AND to_regprocedure('app.intake_history_authors(uuid)') IS NOT NULL AND to_regclass('grimoire.intake_source_objects') IS NOT NULL AND to_regprocedure('app.intake_source_read_lock(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_agent_tasks') IS NOT NULL AND to_regprocedure('app.intake_scope_has_preparer_conflict(uuid,uuid)') IS NOT NULL AND to_regclass('grimoire.intake_offer_submissions') IS NOT NULL AND to_regclass('grimoire.sourcing_authority_reviews') IS NOT NULL AND to_regclass('grimoire.handler_sessions') IS NOT NULL AND to_regprocedure('app.intake_create_organization(text,text,text,text)') IS NOT NULL")
             .fetch_one(&pool)
             .await?;
     if !migrated {
-        return Err("Apply unchanged migrations 0022 through 0030, then additive migrations 0031 through 0034 before starting the API.".into());
+        return Err("Apply the unchanged contract and all additive migrations through 0044 before starting the API.".into());
     }
     attestation::verify(&pool).await?;
     if std::env::args().nth(1).as_deref() == Some("check-startup") {
@@ -176,6 +181,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             get(history).post(create_revision),
         )
         .route("/api/scions/{id}/revisions/{number}", get(get_revision))
+        .merge(onboarding::routes())
         .merge(sources::routes())
         .merge(scope::routes())
         .merge(offers::routes())
@@ -200,6 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .layer(DefaultBodyLimit::max(256 * 1024))
         .layer(axum::middleware::from_fn(audit_request))
+        .layer(axum::middleware::from_fn(session_csrf))
         .layer(axum::middleware::map_response(security_headers))
         .with_state(pool);
     let listener = tokio::net::TcpListener::bind(bind).await?;
@@ -257,7 +264,30 @@ async fn audit_request(request: axum::extract::Request, next: axum::middleware::
     .await
 }
 
+async fn session_csrf(request: Request<Body>, next: Next) -> Response {
+    let session_write = !matches!(
+        request.method(),
+        &Method::GET | &Method::HEAD | &Method::OPTIONS
+    ) && onboarding::has_session_cookie(request.headers())
+        && !request.headers().contains_key(header::AUTHORIZATION);
+    if session_write
+        && request
+            .headers()
+            .get("X-Grimoire-CSRF")
+            .and_then(|value| value.to_str().ok())
+            != Some("1")
+    {
+        return ApiError::csrf().into_response();
+    }
+    next.run(request).await
+}
+
 async fn authenticate(pool: &PgPool, headers: &HeaderMap) -> Result<(Tx, Actor), ApiError> {
+    if !headers.contains_key(header::AUTHORIZATION) && onboarding::has_session_cookie(headers) {
+        let (mut tx, actor) = onboarding::authenticate_session(pool, headers).await?;
+        set_audit_context(&mut tx, headers, &actor).await?;
+        return Ok((tx, actor));
+    }
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
@@ -274,22 +304,33 @@ async fn authenticate(pool: &PgPool, headers: &HeaderMap) -> Result<(Tx, Actor),
     // true means transaction-local; commit and rollback both discard these values.
     sqlx::query("SELECT set_config('app.current_org_id',$1,true),set_config('app.current_principal_id',$2,true),set_config('app.request_id',$3,true),set_config('statement_timeout','10000',true),set_config('lock_timeout','5000',true)")
         .bind(actor.org_id.to_string()).bind(actor.principal_id.to_string()).bind(Uuid::new_v4().to_string()).execute(&mut *tx).await?;
-    let capabilities: (bool, bool, bool) = sqlx::query_as("SELECT app.intake_scope_can_confirm(),app.intake_scope_can_propose(),app.intake_scope_is_agent()")
+    let capabilities: (bool, bool, bool, bool, bool) = sqlx::query_as("SELECT app.intake_scope_can_confirm(),app.intake_scope_can_propose(),app.intake_scope_is_agent(),app.intake_can_write(),app.intake_can_manage_workspace()")
         .fetch_one(&mut *tx).await?;
     actor.can_confirm_scope = capabilities.0;
     actor.can_propose_scope = capabilities.1;
     actor.is_agent = capabilities.2;
+    actor.can_write = capabilities.3;
     // A proposal agent cannot inherit Handler write authority from an accidental
     // additional role. Its only write surface is explicitly scoped proposals.
     if actor.is_agent {
         actor.can_write = false;
     }
+    actor.can_manage_workspace = capabilities.4 && !actor.is_agent;
+    set_audit_context(&mut tx, headers, &actor).await?;
+    Ok((tx, actor))
+}
+
+async fn set_audit_context(
+    tx: &mut Tx,
+    headers: &HeaderMap,
+    actor: &Actor,
+) -> Result<(), ApiError> {
     sqlx::query("SELECT set_config('app.endpoint_scope',$1,true),set_config('app.input_hash',$2,true),set_config('app.effective_role',$3,true),set_config('app.action_reason','Authenticated local HTTP request',true),set_config('app.action_outcome','committed',true)")
         .bind(headers.get("x-grimoire-internal-endpoint").and_then(|v|v.to_str().ok()).unwrap_or("internal:unspecified"))
         .bind(headers.get("x-grimoire-internal-input-sha256").and_then(|v|v.to_str().ok()).unwrap_or(""))
-        .bind(if actor.is_agent { "agent" } else if actor.can_confirm_scope { "engineering_reviewer" } else { "procurement_preparer" })
-        .execute(&mut *tx).await?;
-    Ok((tx, actor))
+        .bind(if actor.is_agent { "agent" } else if actor.can_confirm_scope { "engineering_reviewer" } else if actor.can_write { "procurement_preparer" } else if actor.can_manage_workspace { "org_admin" } else { "read_only" })
+        .execute(&mut **tx).await?;
+    Ok(())
 }
 
 async fn health(State(pool): State<PgPool>) -> ApiResult {
@@ -581,7 +622,7 @@ async fn create_scion(
     input: Result<Json<Intake>, JsonRejection>,
 ) -> ApiResult {
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
-    if !actor.can_write {
+    if !actor.can_manage_workspace {
         return Err(ApiError::forbidden());
     }
     let intake = parse_intake(input)?;
@@ -618,7 +659,7 @@ async fn create_revision(
     // Resolve visibility before validation, role checks, and idempotency lookup so
     // foreign and nonexistent IDs share one response even on write/history paths.
     visible_revision(&mut tx, id, false).await?;
-    if !actor.can_write {
+    if !actor.can_manage_workspace {
         return Err(ApiError::forbidden());
     }
     let intake = parse_intake(input)?;

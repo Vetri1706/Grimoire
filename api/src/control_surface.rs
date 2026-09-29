@@ -147,7 +147,11 @@ async fn read(State(pool): State<PgPool>, headers: HeaderMap, Path(id): Path<Str
             .map(|gap| &gap.message)
             .collect::<Vec<_>>()
     );
-    root["safe_next_action"] = action("edit_intake", &record.next_safe_action, actor.can_write);
+    root["safe_next_action"] = action(
+        "edit_intake",
+        &record.next_safe_action,
+        actor.can_manage_workspace,
+    );
     nodes.push(root);
     for connector in adaptive["connectors"].as_array().into_iter().flatten() {
         let connector_id = format!("connector:{}", text(&connector["id"]));
@@ -375,7 +379,7 @@ async fn read(State(pool): State<PgPool>, headers: HeaderMap, Path(id): Path<Str
         action(
             "edit_intake",
             "Record the missing Handler decision before proceeding.",
-            actor.can_write,
+            actor.can_manage_workspace,
         )
     } else {
         action(

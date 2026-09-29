@@ -19,7 +19,14 @@ impl ApiError {
         Self(
             StatusCode::UNAUTHORIZED,
             "UNAUTHENTICATED",
-            "A valid Grimoire bearer credential is required.".into(),
+            "A valid Handler session or Grimoire bearer credential is required.".into(),
+        )
+    }
+    pub fn csrf() -> Self {
+        Self(
+            StatusCode::FORBIDDEN,
+            "SESSION_REQUEST_DENIED",
+            "This session write is missing the required same-origin request marker.".into(),
         )
     }
     pub fn not_found() -> Self {
@@ -82,6 +89,8 @@ impl From<sqlx::Error> for ApiError {
             Some("G3802") => Self(StatusCode::CONFLICT,"CAPABILITY_INPUT_STALE","Plan or evidence inputs changed. Prepare a new revision-bound proposal.".into()),
             Some("G3804") => Self::not_found(),
             Some("G3901") => Self(StatusCode::FORBIDDEN,"APPROVAL_UNAVAILABLE","Sourcing approval is disabled on this Windows implementation.".into()),
+            Some("G3501") => Self(StatusCode::CONFLICT,"INSTALLATION_ALREADY_CONFIGURED","This installation already has an owner. Sign in instead.".into()),
+            Some("G3502") => Self(StatusCode::CONFLICT,"IDEMPOTENCY_CONFLICT","This idempotency key has already been used for a different organization request.".into()),
             Some("23505") => Self(StatusCode::CONFLICT,"IDENTITY_CONFLICT","This identity or operation already exists. Use a new explicit identity or replay the original request.".into()),
             Some("23514") => Self::invalid("An intake value violates its bounds."),
             _ => Self(StatusCode::SERVICE_UNAVAILABLE,"DATABASE_UNAVAILABLE","The database could not complete this request. Retry with the same idempotency key.".into()),

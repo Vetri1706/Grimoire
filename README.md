@@ -14,6 +14,12 @@ records 152 live Go checks, 20 Rust tests and real browser checks.
 
 ## Current local run
 
+The browser now starts with one-time Handler owner setup, then organization
+creation. Later visits use the login page and an HttpOnly session cookie. This
+is local installation setup, not public registration for additional users.
+Organization administration grants workspace access, not sourcing or approval
+authority. See the [onboarding integration notes](docs/onboarding-integration-2026-09-29.md).
+
 The [Windows adaptive verification report](docs/windows-adaptive-verification.md)
 records the 131-check live regression, real Codex digital demonstration, applied
 migration hashes, startup protections and unavailable Mac work.
@@ -22,7 +28,7 @@ migration hashes, startup protections and unavailable Mac work.
 - Rust API: <http://127.0.0.1:8080/api/health>
 - PostgreSQL: `127.0.0.1:55432`, canonical development database `grimoire_dev`.
 - Database runtime: native PostgreSQL **17.11**, stored persistently in `.local/pgdata`, retained from the earlier Docker Desktop startup failure. Docker Engine is now reachable; Layer 2B uses a native source-built MinIO because the attempted official images/binaries were unavailable. No Docker settings, existing volumes, WSL distributions or Paperclip databases were reset.
-- Open the ignored `.env` and use `GRIMOIRE_TOKEN_A` in the UI. Token B belongs to a different local organization. The browser keeps the token only in its tab session. These are generated local development credentials, not production sign-in.
+- Open the browser and create the installation owner's Handler identity. Existing owners sign in with their login name and passphrase. The generated `.env` bearer credentials remain server-side development-harness inputs; the UI no longer asks for them.
 
 A clearly labelled `UI smoke test — enclosure intake` draft with four revisions remains in development for inspection. It contains no real product/supplier evidence and is independent of the supplied GG-40 fixture. The supplied fixture is present only in disposable `grimoire_test`.
 
@@ -65,7 +71,7 @@ Choose one runtime. Changing `GRIMOIRE_DB_MODE` does not migrate data between a 
 
 ## Migration and fixture handling
 
-`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034 → 0038 → 0039**. Mac-origin migrations 0035–0037 are unavailable and have not been reconstructed. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
+`Migrate` creates a fresh `grimoire_dev` if necessary, verifies every supplied SQL hash, and applies **0022 → 0023 → 0024 → 0025 → 0026 → 0027 → 0028 → 0029 → 0030 → 0031 → 0032 → 0033 → 0034 → 0038 → 0039 → 0040 → 0041 → 0042 → 0043 → 0044**. Mac-origin migrations 0035–0037 are unavailable and have not been reconstructed. It seeds local Handler identities, a separate synthetic engineering reviewer and a proposal-only Codex agent. Missing new credentials are appended after backing up `.env`; existing values are preserved. Use `-TestDatabase` to migrate the disposable test database without resetting it. The API login has no database CREATE/TEMP, schema CREATE, ownership, superuser or RLS bypass. Bounded database functions create the governed identity chain only after the Rust authority, revision and source-byte checks.
 
 - `db/gg40/0022_grimoire_contract.sql`, `0023_grimoire_review_corrections.sql`, and `fixture_one_case_two_event.sql` are unchanged supplied bytes.
 - `db/gg40/checksums.json` contains the supplied expected SHA-256 values. `.gitattributes` prevents newline conversion of these SQL files.
@@ -104,7 +110,7 @@ npm.cmd --prefix web ci
 npm.cmd --prefix web run dev -- --host 127.0.0.1 --port 5180
 ```
 
-Open <http://127.0.0.1:5180> and enter the local Handler A token from `.env`. Create a Scion with just a name; the missing fields stay visible. Field-entry counts and unresolved questions are displayed separately from evidence readiness, which remains unassessed. Revision history selects the current snapshot immediately and shows the Handler's readable directory name, with the principal ID in details. A stale form must load the latest record and explicitly reapply intended changes; it never silently overwrites another save.
+Open <http://127.0.0.1:5180>, complete one-time Handler setup or sign in, then create or select an organization. Create a Scion with just a name; the missing fields stay visible. Field-entry counts and unresolved questions are displayed separately from evidence readiness, which remains unassessed. Revision history selects the current snapshot immediately and shows the Handler's readable directory name, with the principal ID in details. A stale form must load the latest record and explicitly reapply intended changes; it never silently overwrites another save.
 
 Vite proxies `/api` to Rust at `127.0.0.1:8080`. Rust rejects non-loopback binds, non-PostgreSQL-17 databases and privileged/owning runtime roles. No database credential is sent to the browser. No deployment or paid service is required.
 

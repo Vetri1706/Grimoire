@@ -171,8 +171,13 @@ impl Scion {
             }
             _ => None,
         };
-        let next_safe_action = missing_information.first().map(|m| m.next_action.clone()).unwrap_or_else(||
-            "Review this Handler-provided draft and gather supporting evidence. Exact scope review and qualification require separate actions; saving intake does not authorize sourcing.".into());
+        let next_safe_action = missing_information
+            .first()
+            .map(|m| m.next_action.clone())
+            .unwrap_or_else(|| match revision.intake.product_category {
+                Category::Digital => "Review this Handler-provided digital draft and gather supporting evidence. Physical scope and offer comparison are unavailable; saving intake does not authorize sourcing.".into(),
+                _ => "Review this Handler-provided draft and gather supporting evidence. Exact scope review and qualification require separate actions; saving intake does not authorize sourcing.".into(),
+            });
         Self {
             id,
             current_revision: revision.number,
@@ -238,8 +243,15 @@ mod tests {
 
     #[test]
     fn digital_draft_does_not_claim_vendor_comparison() {
-        let intake: Intake =
-            serde_json::from_value(json!({"name":"App","product_category":"digital"})).unwrap();
+        let intake: Intake = serde_json::from_value(json!({
+            "name":"App",
+            "product_description":"Synthetic digital fixture",
+            "product_category":"digital",
+            "decision":"Review the draft",
+            "requirements":[],
+            "questions":[]
+        }))
+        .unwrap();
         let scion = Scion::from_revision(
             Uuid::new_v4(),
             Revision {
@@ -255,6 +267,12 @@ mod tests {
                 "Capability and evidence drafts only — digital vendor comparison and sourcing approval unavailable."
             )
         );
+        assert!(
+            scion
+                .next_safe_action
+                .contains("Physical scope and offer comparison are unavailable")
+        );
+        assert!(!scion.next_safe_action.contains("Exact scope review"));
     }
 
     #[test]

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { ApiError, request } from './api';
+import { ApiError, SESSION_AUTH, announceSessionChange, organizationSession, request, sessionChangedStorageKey, sessionInvalidatedEvent } from './api';
+import { IdentityAccess, OrganizationOnboarding } from './Onboarding';
 import Evidence from './Evidence';
 import PhysicalScope from './PhysicalScope';
 import Offers from './Offers';
@@ -12,7 +13,7 @@ import { useControlSurface } from './control-api';
 import type { CaseNode } from './control-api';
 import { CompanyNavigation, WorkspacePage, ScionOverview, ScionActivity, pageNames } from './Workbench';
 import { useWorkspace } from './workspace-api';
-import type { Category, Intake, Principal, Revision, RevisionHistory, Scion } from './api';
+import type { Category, Intake, Revision, RevisionHistory, Scion, SessionState } from './api';
 
 type IconName = 'book' | 'plus' | 'arrow' | 'history' | 'file' | 'check' | 'search' | 'lock' | 'edit' | 'alert' | 'logout' | 'sun' | 'moon' | 'monitor' | 'layers' | 'columns';
 function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
@@ -36,7 +37,6 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
-const storageKey = 'grimoire.local-handler-token';
 const date = (value: string) => new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const category = (value: Category) => value === 'unspecified' ? 'Category missing' : value === 'digital' ? 'Digital product' : 'Physical product';
 const errorText = (error: unknown) => error instanceof Error ? error.message : 'The request failed. Please retry.';
@@ -50,30 +50,19 @@ function ThemePicker({ theme, onChangeTheme }: ThemeControl) {
   return <label className="theme-picker"><Icon name={theme === 'system' ? 'monitor' : theme === 'dark' ? 'moon' : 'sun'} size={18} /><select aria-label="Appearance" value={theme} onChange={event => onChangeTheme(parseTheme(event.target.value))}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>;
 }
 
-function Connection({ onConnect, theme, onChangeTheme }: ThemeControl & { onConnect: (token: string, principal: Principal) => void }) {
-  const [token, setToken] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  async function connect(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError('');
-    try {
-      const principal = await request<Principal>(token.trim(), '/me');
-      onConnect(token.trim(), principal);
-    } catch (failure) { setError(errorText(failure)); } finally { setBusy(false); }
-  }
-  return <main className="connection-page">
-    <div className="connection-brand"><span className="brand-icon"><Icon name="book" size={27} /></span><span>GRIMOIRE</span><span className="local-tag">LOCAL WORKSPACE</span><ThemePicker theme={theme} onChangeTheme={onChangeTheme} /></div>
-    <div className="connection-layout">
-      <section className="connection-intro"><p className="eyebrow">A considered beginning</p><h1>Every decision starts<br />with what you know.</h1><p>Create a Scion. Capture the product, make the gaps visible, and keep a record of how the understanding changes.</p><div className="intro-note"><Icon name="history" /><span>One case record.<br /><strong>Every revision preserved.</strong></span></div></section>
-      <form className="connection-card" onSubmit={connect}><span className="subtle-icon"><Icon name="lock" size={24} /></span><h2>Open your workspace</h2><p>Use your local Handler token to access your organization’s Scions.</p><label htmlFor="token">Handler access token</label><input id="token" type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" required autoFocus placeholder="Paste your local token" />{error && <ErrorMessage>{error}</ErrorMessage>}<button className="button primary full" disabled={!token.trim() || busy}>{busy ? 'Connecting…' : 'Open workspace'}<Icon name="arrow" size={18} /></button><p className="connection-footnote">Your token stays in this browser tab’s session. The API checks your organization access.</p></form>
-    </div><footer className="connection-footer">SCION INTAKE <span>Local development · Layer 1</span></footer>
-  </main>;
-}
-
 export default function App() {
   const [theme, setTheme] = useState<ThemePreference>(() => parseTheme(document.documentElement.dataset.themePreference));
-  const [token, setToken] = useState(() => sessionStorage.getItem(storageKey) ?? '');
-  const [principal, setPrincipal] = useState<Principal | null>(null);
+  const [setupRequired, setSetupRequired] = useState<boolean | null>(null);
+  const [session, setSession] = useState<SessionState | null>(null);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [accessError, setAccessError] = useState('');
+  const [sessionRefresh, setSessionRefresh] = useState(0);
+  const [creatingOrganization, setCreatingOrganization] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const authPending = useRef(false);
+  const principal = session?.active_organization ?? null;
+  const token = principal ? organizationSession(principal.org_id) : '';
+  const activeToken = useRef(token); activeToken.current = token;
   const [route, setRoute] = useState(routeFromHash);
   const [selected, setSelected] = useState<Scion | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,7 +77,8 @@ export default function App() {
   const page = route === '/' ? 'dashboard' : parts[1];
   const view = parts[3] || 'overview';
   const focusedId = parts[4] || null;
-  const canWrite = principal?.can_write !== false;
+  const canWrite = principal?.can_write === true;
+  const canManage = principal?.can_manage_workspace === true;
   const workspace = useWorkspace(token, principal?.org_id);
 
   useEffect(() => {
@@ -126,13 +116,39 @@ export default function App() {
     window.addEventListener('beforeunload', unload); return () => window.removeEventListener('beforeunload', unload);
   }, []);
   useEffect(() => {
-    if (!token) return;
     let active = true;
-    request<Principal>(token, '/me').then(value => { if (active) setPrincipal(value); }).catch(failure => {
-      if (active) { setError(errorText(failure)); sessionStorage.removeItem(storageKey); setToken(''); }
-    });
+    setAccessLoading(true); setAccessError('');
+    async function bootstrap() {
+      try {
+        const status = await request<{ setup_required: boolean }>(SESSION_AUTH, '/setup/status');
+        if (!active) return;
+        setSetupRequired(status.setup_required);
+        if (status.setup_required) { setSession(null); return; }
+        try {
+          const state = await request<SessionState>(SESSION_AUTH, '/session', { cache: 'no-store' });
+          if (active) setSession(state);
+        } catch (failure) {
+          if (failure instanceof ApiError && failure.status === 401) { if (active) setSession(null); }
+          else throw failure;
+        }
+      } catch (failure) { if (active) setAccessError(errorText(failure)); }
+      finally { if (active) setAccessLoading(false); }
+    }
+    void bootstrap();
     return () => { active = false; };
-  }, [token]);
+  }, [sessionRefresh]);
+  useEffect(() => {
+    function recheck() {
+      setSession(null); setSelected(null); setEdit(false); setCreatingOrganization(false);
+      dirty.current = false; setAccessLoading(true); setSessionRefresh(value => value + 1);
+    }
+    const invalidated = (event: Event) => {
+      if ((event as CustomEvent<{ token: string }>).detail?.token === activeToken.current) recheck();
+    };
+    const changed = (event: StorageEvent) => { if (event.key === sessionChangedStorageKey) recheck(); };
+    window.addEventListener(sessionInvalidatedEvent, invalidated); window.addEventListener('storage', changed);
+    return () => { window.removeEventListener(sessionInvalidatedEvent, invalidated); window.removeEventListener('storage', changed); };
+  }, []);
   useEffect(() => {
     setError(''); setSelected(null);
     if (!id || !token || !principal) { setLoading(false); return; }
@@ -142,36 +158,63 @@ export default function App() {
   }, [id, token, principal, refresh]);
   const setDirty = useCallback((value: boolean) => { dirty.current = value; }, []);
   function navigate(next: string) { window.location.hash = next; }
-  function disconnect() {
-    if (dirty.current && !window.confirm('Disconnect and discard this unsaved edit?')) return;
-    dirty.current = false; sessionStorage.removeItem(storageKey); setToken(''); setPrincipal(null); setSelected(null); setEdit(false); setError('');
+  function acceptSession(state: SessionState) {
+    dirty.current = false; setSession(state); setSetupRequired(false); setAccessError(''); setError('');
+    setCreatingOrganization(false); setSelected(null); setEdit(false); setNotice('');
+    setRefresh(value => value + 1); routeRef.current = '/';
+    window.history.replaceState(null, '', '#/'); setRoute('/'); announceSessionChange();
+  }
+  async function disconnect() {
+    if (authPending.current || (dirty.current && !window.confirm('Sign out and discard this unsaved edit?'))) return;
+    authPending.current = true; setAuthBusy(true); setError('');
+    try {
+      await request<void>(SESSION_AUTH, '/session', { method: 'DELETE' });
+      dirty.current = false; setSession(null); setSelected(null); setEdit(false); setCreatingOrganization(false); announceSessionChange();
+    } catch (failure) { setError('Sign out could not be confirmed. ' + errorText(failure)); }
+    finally { authPending.current = false; setAuthBusy(false); }
+  }
+  async function switchOrganization(organizationId: string) {
+    if (authPending.current || organizationId === principal?.org_id || (dirty.current && !window.confirm('Switch organizations and discard this unsaved edit?'))) return;
+    authPending.current = true; setAuthBusy(true); setError('');
+    try {
+      const state = await request<SessionState>(SESSION_AUTH, '/session/active-organization', { method: 'POST', body: JSON.stringify({ organization_id: organizationId }) });
+      acceptSession(state);
+    } catch (failure) { setError(errorText(failure)); }
+    finally { authPending.current = false; setAuthBusy(false); }
+  }
+  function createOrganization() {
+    if (authPending.current || (dirty.current && !window.confirm('Create another organization and discard this unsaved edit?'))) return;
+    dirty.current = false; setEdit(false); setCreatingOrganization(true);
   }
   function saved(scion: Scion) {
     dirty.current = false; setEdit(false); setSelected(scion); setRefresh(value => value + 1);
     void workspace.refresh(); navigate(`/scions/${scion.id}`);
     setNotice(`Revision ${scion.current_revision} saved.`);
   }
-  if (!token) return <Connection theme={theme} onChangeTheme={changeTheme} onConnect={(value, identity) => { sessionStorage.setItem(storageKey, value); setToken(value); setPrincipal(identity); setError(''); }} />;
-  if (!principal) return <div className="boot-state" role="status"><Icon name="book" size={28} /><p>Opening your workspace…</p></div>;
+  const appearance = <ThemePicker theme={theme} onChangeTheme={changeTheme} />;
+  if (accessLoading) return <div className="boot-state" role="status"><Icon name="book" size={28} /><p>Opening Grimoire...</p></div>;
+  if (accessError || setupRequired === null) return <main className="boot-state"><Icon name="alert" /><p>{accessError || 'Installation state could not be checked.'}</p><button className="button primary" onClick={() => setSessionRefresh(value => value + 1)}>Retry</button></main>;
+  if (!session) return <IdentityAccess setupRequired={setupRequired} appearance={appearance} onReady={acceptSession} />;
+  if (!principal || creatingOrganization) return <OrganizationOnboarding session={session} appearance={appearance} allowCancel={Boolean(principal)} onReady={acceptSession} onCancel={() => setCreatingOrganization(false)} />;
   const record = selected?.id === id ? selected : null;
   return <div className="company-app">
     <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to content</a>
-    <CompanyNavigation principal={principal} data={workspace.data} route={route} onNavigate={navigate} onDisconnect={disconnect} canWrite={canWrite} />
-<div className="company-main"><header className="company-topbar"><nav aria-label="Breadcrumb"><button onClick={() => navigate(id ? '/scions' : '/dashboard')}>{id ? 'Scions' : 'Workspace'}</button><span>›</span><strong>{route === '/new' ? 'New Scion' : id ? record?.revision.name ?? 'Scion' : pageNames[page] ?? 'Workspace'}</strong>{(page === 'agents' || page === 'skills') && parts[2] && <><span>›</span><span>{parts[2] === 'new' ? 'Create' : (page === 'agents' ? workspace.data?.agents : workspace.data?.skills)?.find(item => item.id === parts[2])?.config.name ?? 'Record'}</span></>}{id && view !== 'overview' && <><span>›</span><span>{scionViewNames[view] ?? 'Record'}</span></>}</nav><div className="company-topbar-tools"><span className="company-connection" title={workspace.error || 'Authenticated organization state'}><i className={workspace.data ? 'connected' : ''} />{workspace.data ? 'Local' : workspace.loading ? 'Checking' : 'Disconnected'}</span><ThemePicker theme={theme} onChangeTheme={changeTheme} /></div></header>
+    <CompanyNavigation principal={principal} data={workspace.data} route={route} onNavigate={navigate} onDisconnect={() => void disconnect()} disconnectBusy={authBusy} canWrite={canManage} />
+<div className="company-main"><header className="company-topbar"><nav aria-label="Breadcrumb"><button onClick={() => navigate(id ? '/scions' : '/dashboard')}>{id ? 'Scions' : 'Workspace'}</button><span>›</span><strong>{route === '/new' ? 'New Scion' : id ? record?.revision.name ?? 'Scion' : pageNames[page] ?? 'Workspace'}</strong>{(page === 'agents' || page === 'skills') && parts[2] && <><span>›</span><span>{parts[2] === 'new' ? 'Create' : (page === 'agents' ? workspace.data?.agents : workspace.data?.skills)?.find(item => item.id === parts[2])?.config.name ?? 'Record'}</span></>}{id && view !== 'overview' && <><span>›</span><span>{scionViewNames[view] ?? 'Record'}</span></>}</nav><div className="company-topbar-tools"><label className="company-organization-switch"><span className="sr-only">Active organization</span><select aria-label="Active organization" value={principal.org_id} disabled={authBusy} onChange={event => void switchOrganization(event.target.value)}>{session.organizations.map(organization => <option key={organization.org_id} value={organization.org_id}>{organization.organization_name}</option>)}</select></label><button type="button" className="icon-button" disabled={authBusy} onClick={createOrganization} aria-label="Create another organization" title="Create another organization"><Icon name="plus" size={17} /></button><span className="company-connection" title={workspace.error || 'Authenticated organization state'}><i className={workspace.data ? 'connected' : ''} />{workspace.data ? 'Local' : workspace.loading ? 'Checking' : 'Disconnected'}</span><ThemePicker theme={theme} onChangeTheme={changeTheme} /></div></header>
     <main id="main-content" tabIndex={-1}>
       {notice && <div className="work-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}
       {error && <ErrorMessage>{error}<button className="text-button" onClick={() => setRefresh(value => value + 1)}>Retry</button></ErrorMessage>}
-      {id ? loading ? <div className="loading-panel" role="status">Loading Scion…</div> : record ? edit ? <div className="work-form-page"><IntakeForm key={`${record.id}-edit`} token={token} scion={record} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /></div> : <CaseRecord nativeAgents={workspace.data?.agents ?? []} key={record.id} token={token} scion={record} view={view} focusedId={focusedId} onNavigate={navigate} principalId={principal.principal_id} canWrite={canWrite} onDirty={setDirty} onEdit={current => { setSelected(current); setEdit(true); }} /> : null
-      : route === '/new' ? !canWrite ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <div className="work-form-page"><IntakeForm token={token} onSaved={saved} onCancel={() => navigate('/scions')} onDirty={setDirty} /></div>
-      : (page === 'agents' || page === 'skills') && workspace.data ? <NativeAgents token={token} page={page} route={route} data={workspace.data} canWrite={canWrite} onNavigate={navigate} onChanged={workspace.refresh} onDirty={setDirty} />
-      : <WorkspacePage key={page} page={pageNames[page] ? page : 'dashboard'} connection={workspace} onNavigate={navigate} canWrite={canWrite} />}
+      {id ? loading ? <div className="loading-panel" role="status">Loading Scion…</div> : record ? edit ? <div className="work-form-page"><IntakeForm key={`${record.id}-edit`} token={token} scion={record} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /></div> : <CaseRecord nativeAgents={workspace.data?.agents ?? []} key={record.id} token={token} scion={record} view={view} focusedId={focusedId} onNavigate={navigate} principalId={principal.principal_id} canManage={canManage} canWrite={canWrite} onDirty={setDirty} onEdit={current => { setSelected(current); setEdit(true); }} /> : null
+      : route === '/new' ? !canManage ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <div className="work-form-page"><IntakeForm token={token} onSaved={saved} onCancel={() => navigate('/scions')} onDirty={setDirty} /></div>
+      : (page === 'agents' || page === 'skills') && workspace.data ? <NativeAgents token={token} page={page} route={route} data={workspace.data} canWrite={canManage} canExecute={canWrite} onNavigate={navigate} onChanged={workspace.refresh} onDirty={setDirty} />
+      : <WorkspacePage key={page} page={pageNames[page] ? page : 'dashboard'} connection={workspace} onNavigate={navigate} canWrite={canManage} />}
     </main></div>
   </div>;
 }
 function ErrorMessage({ children }: { children: ReactNode }) { return <div className="error-message" role="alert"><Icon name="alert" size={19} /><div>{children}</div></div>; }
 const scionViewNames: Record<string, string> = { overview: 'Overview', proposals: 'Proposals', comparisons: 'Comparisons', sources: 'Evidence', 'agent-work': 'Agent work', graph: 'Dependency graph', activity: 'Activity', record: 'Brief', history: 'Revisions', scope: 'Physical scope', offers: 'Supplier offers' };
 
-function CaseRecord({ nativeAgents, token, scion: initialScion, view: requestedView, focusedId, onNavigate, principalId, onEdit, canWrite, onDirty }: { nativeAgents: NativeAgent[]; token: string; scion: Scion; view: string; focusedId: string | null; onNavigate: (route: string) => void; principalId: string; canWrite: boolean; onEdit: (current: Scion) => void; onDirty: (value: boolean) => void }) {
+function CaseRecord({ nativeAgents, token, scion: initialScion, view: requestedView, focusedId, onNavigate, principalId, onEdit, canManage, canWrite, onDirty }: { nativeAgents: NativeAgent[]; token: string; scion: Scion; view: string; focusedId: string | null; onNavigate: (route: string) => void; principalId: string; canManage: boolean; canWrite: boolean; onEdit: (current: Scion) => void; onDirty: (value: boolean) => void }) {
   const [scion, setScion] = useState(initialScion);
   const connection = useControlSurface(token, initialScion.id);
   const physical = scion.revision.product_category !== 'digital';
@@ -206,10 +249,10 @@ function CaseRecord({ nativeAgents, token, scion: initialScion, view: requestedV
   }
   const primaryViews = ['overview', 'proposals', 'sources', 'agent-work', 'activity'];
   return <div className="work-scion">
-    <div className="work-scion-heading"><span className="work-muted">{category(scion.revision.product_category)} · Revision {scion.current_revision}</span><div><h1>{scion.revision.name}</h1><button className="button secondary" onClick={editIntake} disabled={!canWrite}><Icon name="edit" size={15} />Edit brief</button></div></div>
+    <div className="work-scion-heading"><span className="work-muted">{category(scion.revision.product_category)} · Revision {scion.current_revision}</span><div><h1>{scion.revision.name}</h1><button className="button secondary" onClick={editIntake} disabled={!canManage}><Icon name="edit" size={15} />Edit brief</button></div></div>
     <nav className="work-scion-tabs" aria-label="Scion views">{primaryViews.map(item => <button key={item} aria-current={view === item ? 'page' : undefined} className={view === item ? 'selected' : ''} onClick={() => openView(item)}>{scionViewNames[item]}</button>)}<label className="work-more"><select aria-label="More Scion views" value={primaryViews.includes(view) ? '' : view} onChange={event => { if (event.target.value) openView(event.target.value); }}><option value="">More…</option><option value="comparisons">Evidence comparisons</option><option value="graph">Dependency graph</option><option value="record">Full brief</option><option value="history">Revision history</option>{physical && <><option value="scope">Physical scope</option><option value="offers">Supplier offers</option></>}</select></label></nav>
     <div className="work-scion-body">
-    {view === 'overview' ? <ScionOverview scion={scion} connection={connection} onOpen={openView} onEdit={editIntake} canWrite={canWrite} />
+    {view === 'overview' ? <ScionOverview scion={scion} connection={connection} onOpen={openView} onEdit={editIntake} canWrite={canManage} />
     : view === 'graph' ? <ControlSurface graphOnly connection={connection} onAction={nodeAction} />
     : view === 'activity' ? <ScionActivity connection={connection} />
     : view === 'record' ? <section className="work-brief-page"><div className="work-section-title"><h2>Brief</h2><span className="work-muted">Handler-provided · unverified</span></div><RecordFacts revision={scion.revision} /></section>

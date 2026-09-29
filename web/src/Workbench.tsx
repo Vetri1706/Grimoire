@@ -39,7 +39,7 @@ export function WorkStatus({ value }: { value: string }) {
   return <span className={`work-status ${tone}`}><i />{label[value] ?? humanize(value)}</span>;
 }
 
-export function CompanyNavigation({ principal, data, route, onNavigate, onDisconnect, canWrite }: { principal: Principal; data: WorkspaceState | null; route: string; onNavigate: (route: string) => void; onDisconnect: () => void; canWrite: boolean }) {
+export function CompanyNavigation({ principal, data, route, onNavigate, onDisconnect, disconnectBusy, canWrite }: { principal: Principal; data: WorkspaceState | null; route: string; onNavigate: (route: string) => void; onDisconnect: () => void; disconnectBusy: boolean; canWrite: boolean }) {
   const page = route === '/' ? 'dashboard' : route.split('/')[1];
   const inboxCount = data ? data.reviews.length + data.scions.filter(scion => !scion.revision.decision?.trim()).length : null;
   function item(name: string, count?: number | null) { return <button key={name} title={pageNames[name]} aria-label={pageNames[name]} aria-current={page === name ? 'page' : undefined} className={`company-nav-item ${page === name ? 'active' : ''}`} onClick={() => onNavigate(`/${name}`)}><WorkIcon name={name} /><span>{pageNames[name]}</span>{typeof count === 'number' && count > 0 && <small>{count}</small>}</button>; }
@@ -48,7 +48,7 @@ export function CompanyNavigation({ principal, data, route, onNavigate, onDiscon
       <div className="company-nav-group"><h2>Work</h2>{item('proposals')}{item('scions')}{item('tasks')}{item('watchtower')}</div>
       <div className="company-nav-group"><h2>Organization</h2>{item('agents')}{item('skills')}{item('connectors')}{item('audit')}</div>
       {data && data.scions.length > 0 && <div className="company-nav-group company-recents"><h2>Recent Scions</h2>{data.scions.slice(0, 3).map(scion => <button className="company-nav-item" key={scion.id} title={scion.revision.name} onClick={() => onNavigate(`/scions/${scion.id}`)}><span className="work-record-dot" /><span>{scion.revision.name}</span></button>)}</div>}
-    </nav><div className="company-user"><span className="company-avatar">{principal.display_name.charAt(0)}</span><span>{principal.display_name}<small>Handler workspace</small></span><button title="Disconnect workspace" aria-label="Disconnect workspace" onClick={onDisconnect}><WorkIcon name="exit" /></button></div></aside>;
+    </nav><div className="company-user"><span className="company-avatar">{principal.display_name.charAt(0)}</span><span>{principal.display_name}<small>Handler workspace</small></span><button title="Sign out" aria-label="Sign out" disabled={disconnectBusy} onClick={onDisconnect}><WorkIcon name="exit" /></button></div></aside>;
 }
 
 function Empty({ children }: { children: ReactNode }) { return <div className="work-empty">{children}</div>; }

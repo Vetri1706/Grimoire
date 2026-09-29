@@ -98,7 +98,8 @@ $migrationFiles = @(
     'db/intake/0040_control_surface.sql',
     'db/intake/0041_watchtower_artifact_guards.sql',
     'db/intake/0042_watchtower_task_sources.sql',
-    'db/intake/0043_native_agents.sql'
+    'db/intake/0043_native_agents.sql',
+    'db/intake/0044_organization_onboarding.sql'
 )
 $attestationSource = Get-Content -LiteralPath (Join-Path $projectRoot 'api/src/attestation.rs') -Raw
 $compiledFiles = @([regex]::Matches($attestationSource, 'migration!\("([^"]+)",\s*"([^"]+)"\)') | ForEach-Object { "db/$($_.Groups[1].Value)/$($_.Groups[2].Value)" })
