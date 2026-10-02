@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-02",
+  "host": "https://grimoire-52-71-93-70.sslip.io",
+  "source_commit": "9124c628ed334abd6751e1cd5ff9b70c1ca04a76",
+  "application_change": "Replace the empty data favicon with the supplied Grimoire PNG",
+  "web_image": "grimoire-web:sha-9124c628ed334abd6751e1cd5ff9b70c1ca04a76",
+  "web_image_id": "sha256:321654c0ae4587a850548eaabf9ace4265b686c6156ec4348db78ffc1fca641f",
+  "image_archive_sha256": "51027f146cfe15c26ddd887abb3bccfdca40d81e788e26dee53d1c294afed972",
+  "image_source": "Built off-host on Docker Desktop Linux amd64 and transferred over pinned-key SSH",
+  "previous_web_configuration_retained_for_rollback": true,
+  "other_services_recreated": false,
+  "checks": {
+    "production_frontend_build": "passed",
+    "nginx_configuration": "passed",
+    "fresh_chrome_routes": ["/", "/demo"],
+    "favicon_href": "/grimoire-logo.png?v=1",
+    "automatic_browser_favicon_statuses": [200, 200],
+    "favicon_mime": "image/png",
+    "favicon_bytes_match_original_supplied_asset": true,
+    "browser_page_errors": 0
+  }
+}
