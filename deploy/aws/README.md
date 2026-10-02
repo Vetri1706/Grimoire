@@ -1,21 +1,22 @@
 # Grimoire: AWS judging deployment, USD 10–15/month target
 
-Use one **Lightsail Linux IPv4 2 GB / 2 vCPU / 60 GB instance: USD 12/month**. Keep React's compiled files, Rust API, PostgreSQL 17 and private versioned object storage on that host. Codex stays on the operator's computer and connects over HTTPS. This is a small judging deployment with one failure domain, not a highly available production service. Two-GB capacity has not been load-tested.
+The current judging deployment uses an explicitly approved **Lightsail Linux IPv4 1 GB / 2 vCPU / 40 GB instance: USD 7/month**, with the `small` memory profile and a **2 GiB swap file on its included disk**. Keep React's compiled files, Rust API, PostgreSQL 17 and private versioned object storage on that host. Codex stays on the operator's computer and connects over HTTPS. This has one failure domain; the 1 GB capacity check remains a release gate.
 
-No AWS resources are created by these files or by the verification performed so far.
+The instance is running in `us-east-1`. All five application images have been built and published; HTTPS and hosted capacity checks are still pending. This is not yet a verified public judging deployment. The original 2 GB / 60 GB / USD 12 profile remains the scripts' default, but the account blocked that instance size during provisioning. Selecting `small` is explicit; the scripts do not silently downgrade a host.
 
 ## Cost and limits
 
 | Item | Monthly estimate |
 |---|---:|
-| Lightsail 2 GB IPv4 bundle | $12.00 |
+| Lightsail 1 GB IPv4 bundle, selected `small` profile | $7.00 |
+| 2 GiB swap within the included 40 GB disk | $0 additional storage charge |
 | One small snapshot, 10–20 GB stored | $0.50–1.00 |
 | Existing domain, DNS and ACME TLS | $0 additional hosting cost |
-| Expected infrastructure subtotal | **$12.50–13.00** |
+| Expected infrastructure subtotal | **$7.50–8.00** |
 
-Allow **$13–15 before applicable tax**. A new domain, transfer overages and model/provider usage are additional. Credits are not a reason to increase the server size, and their service eligibility/expiry must be checked in Billing. AWS promotional credits normally exclude domain registration. If $15 must include tax, check the account's tax treatment before applying the plan. Do not purchase a domain or add a paid service silently.
+Keep total spending within the user's **USD 10–15/month ceiling**, allowing room for applicable tax and small backups. A new domain, transfer overages and model/provider usage are additional. Credits are not a reason to increase the server size, and their service eligibility/expiry must be checked in Billing. AWS promotional credits normally exclude domain registration. Check actual account tax and usage before promising a total bill. Do not purchase a domain or add a paid service silently.
 
-This setup has no managed database, load balancer, NAT gateway, paid container registry, or cloud-hosted model. Compile all images off the 2 GB instance. Keep one small current snapshot, inspect its billed size, and deliberately remove superseded snapshots after verifying recovery. PostgreSQL dumps alone do not back up pinned object versions: retain the storage volume in the same instance snapshot.
+This setup has no managed database, load balancer, NAT gateway, paid container registry, or cloud-hosted model. Compile all images off the deployment instance. Swap is a pressure buffer, not additional RAM or proof of adequate performance. Keep one small current snapshot, inspect its billed size, and deliberately remove superseded snapshots after verifying recovery. PostgreSQL dumps alone do not back up pinned object versions: retain the storage volume in the same instance snapshot.
 
 `budget.json` alerts at a $15 **account-wide** monthly budget, including tax and excluding credits/refunds so credits do not hide spending. `budget-notifications.example.json` contains placeholder email recipients: replace privately before applying. Alerts do not enforce a spending cap. Existing unrelated AWS usage also counts.
 
@@ -46,10 +47,11 @@ The locally configured AWS profile is `default` in `us-east-1`; confirm that is 
 
 ```powershell
 .\deploy\aws\lightsail.ps1 -Profile default -Region us-east-1 `
-  -SshCidr YOUR_PUBLIC_IP/32 -KeyPairName YOUR_EXISTING_KEY
+  -SshCidr YOUR_PUBLIC_IP/32 -KeyPairName YOUR_EXISTING_KEY `
+  -MemoryGb 1 -MaxBundleMonthlyUsd 7
 ```
 
-This is read-only. It discovers the Ubuntu 24.04 image and 2 GB IPv4 bundle, rejects a bundle above **$12/month**, and checks for existing resource names. It creates no key and downloads no private key.
+This explicit small-host plan is read-only. It discovers the Ubuntu 24.04 image and 1 GB IPv4 bundle, rejects a bundle above **$7/month**, and checks for existing resource names. Without those two flags the defaults remain 2 GB and a $12 ceiling. It creates no key and downloads no private key. The judging instance already exists: inspect it rather than rerunning this create-only provisioner against the same name.
 
 After confirming the exact account, region, price and key, repeat with `-ExpectedAccountId YOUR_12_DIGIT_ACCOUNT -Apply`. `-WhatIf` previews the mutation. The script creates only a new host/static IP/firewall; it does not replace resources or install the app. If creation is interrupted, inspect the named resources before retrying: resources left behind can bill.
 
@@ -65,7 +67,11 @@ aws budgets create-budget --profile default --region us-east-1 --account-id YOUR
 
 ## 2. Build outside the small AWS instance
 
-The manually triggered `.github/workflows/aws-images.yml` builds Linux amd64 images; its `publish` input defaults to false. Select `publish: true` explicitly to publish checked SHA-tagged packages to GHCR. It runs only when explicitly dispatched; creating this file does not build or deploy anything. Use one successful run's exact commit for **all five images** and for the host checkout: `ghcr.io/vetri1706/grimoire-{api,web,ops,storage,mc}:sha-FULL_COMMIT_SHA`. Confirm the packages are publicly pullable (the application repo is public), or authenticate the host using a narrowly scoped read-only package credential. Never publish an image containing `.env` or user data.
+The manually triggered `.github/workflows/aws-images.yml` builds Linux amd64 images; its `publish` input defaults to false. [Successful release run 36968370011](https://github.com/Vetri1706/Grimoire/actions/runs/36968370011) built and published all five images from **`899a9fbcc8ca753f07349940a0f70f14788da607`**. The packages are publicly pullable as `ghcr.io/vetri1706/grimoire-{api,web,ops,storage,mc}:sha-899a9fbcc8ca753f07349940a0f70f14788da607`. Never publish an image containing `.env` or user data.
+
+Resolve each published image's registry digest and put its immutable `ghcr.io/vetri1706/grimoire-COMPONENT@sha256:DIGEST` reference in the corresponding `.env` image field. Use all five images from the same successful run. Keep the tested source SHA for the host checkout, or use a later configuration-only commit only after confirming that `api`, `db`, `web`, `scripts/seed-judge-demo.mjs`, all five `deploy/aws/Dockerfile.*` files, and `deploy/aws/api-entrypoint.sh` are unchanged from the image source. That comparison passed for the current configuration changes; repeat it for any subsequent release. Preserve the exact migration bytes embedded by the API build.
+
+Future builds run only when explicitly dispatched. Select `publish: true` to publish checked SHA-tagged packages; workflow success checks packaging, not the hosted application's readiness.
 
 Alternatively, on a sufficiently provisioned Linux Docker build machine:
 
@@ -82,20 +88,22 @@ docker pull caddy:2.10.2-alpine
 docker save grimoire-api:local grimoire-web:local grimoire-ops:local grimoire-storage:local grimoire-mc:local postgres:17-bookworm caddy:2.10.2-alpine | gzip > grimoire-images.tar.gz
 ```
 
-Copy this release archive privately to the host and run `docker load < grimoire-images.tar.gz`. Do not build Rust/Go on the 2 GB host.
+Copy this release archive privately to the host and run `docker load < grimoire-images.tar.gz`. Do not build Rust/Go on either small deployment host profile.
 
 Upstream MinIO's old Docker Hub/Quay images were unavailable during verification. The storage Dockerfiles build pinned upstream source instead, including the October 2025 security release and licensing files. [Upstream build instructions](https://github.com/minio/minio/releases/tag/RELEASE.2025-10-15T17-29-55Z). The community repository is archived; this preserves the current bounded judging stack, not a long-term storage maintenance strategy. A future AWS S3 adapter requires an explicit supported cloud-storage path and tests; the current app intentionally accepts only local object storage.
 
 ## 3. Start a fresh deployment
 
-SSH as `ubuntu`, clone this repository at the exact tested release SHA, and use Docker via `sudo` (or a deliberately configured operator Docker group). Run:
+SSH as `ubuntu`, clone this repository at the tested release SHA or a verified configuration-only successor described above, and use Docker via `sudo` (or a deliberately configured operator Docker group). For the selected **1 GB** host, run both scripts with the explicit `small` argument:
 
 ```bash
-sudo bash deploy/aws/bootstrap.sh
-sudo bash deploy/aws/configure.sh app.YOUR_DOMAIN operator@YOUR_DOMAIN
+sudo bash deploy/aws/bootstrap.sh small
+sudo bash deploy/aws/configure.sh HOST EMAIL small
 ```
 
-If using GHCR, edit the root-only `deploy/aws/.env` image fields to the five exact image tags from the successful workflow. Pull them before startup:
+Replace `HOST` with the verified DNS hostname and `EMAIL` with the private certificate contact. `bootstrap.sh small` creates or validates a private 2 GiB swap file and preserves existing unrelated swap; it refuses to overwrite an unknown file. `configure.sh HOST EMAIL small` writes the full memory overrides: 816 MiB combined long-running container RAM limits, lower PostgreSQL allocations and bounded swap allowances. Setting only `AWS_MEMORY_PROFILE=small` does not apply those overrides. Existing `.env` files are preserved rather than regenerated. The standard 2 GB profile is still available by omitting `small` from both commands.
+
+If using GHCR, edit the root-only `deploy/aws/.env` image fields to the five verified digest references from the successful workflow. Pull them before startup:
 
 ```bash
 sudo docker compose --env-file deploy/aws/.env -f deploy/aws/compose.yaml --profile tools pull
@@ -126,8 +134,9 @@ Approve the normal organization pairing in the app. Your computer and worker mus
 - A separate organization cannot read the first organization's task; revoked evidence disappears from replies/artifacts.
 - A real paired worker completes one intended task if live execution is part of the judging demo.
 - Desktop/mobile layouts, refresh, logout and network failures work on the actual HTTPS URL.
+- On the selected 1 GB host, check free disk, active 2 GiB swap, container RSS/restarts/OOM state and response times during seed, sign-in, demo browsing and one intended worker task. Inspect memory pressure and swap activity; a running instance alone does not establish usable capacity.
 
-Locally verified: production nginx image build; isolated proxy tests for SPA routes, blocked diagnostics/setup/dotfiles and authentication throttling; Caddy configuration validation without certificate issuance; deployment scripts/Compose validation; provisioner no-write/price/account/firewall tests; fresh and repeated **Linux PostgreSQL 17** migrations; exact catalog attestation using the existing Windows API against that Linux database; changed migration history rejected. The isolated proxy test had no API backend and confirms proxy behavior only. This is **not** a completed Linux API/storage image build, AWS deployment, end-to-end HTTPS check, or 2 GB load test. The release workflow and hosted checks above still need to pass before submission.
+Verified locally: isolated proxy tests for SPA routes, blocked diagnostics/setup/dotfiles and authentication throttling; Caddy configuration validation without certificate issuance; deployment scripts/Compose validation; provisioner no-write/price/account/firewall tests; fresh and repeated **Linux PostgreSQL 17** migrations; exact catalog attestation using the existing Windows API against that Linux database; changed migration history rejected. The isolated proxy test had no API backend and confirms proxy behavior only. Release run 36968370011 subsequently built, checked and published all five Linux amd64 images, including the API and storage images. The selected 1 GB AWS instance is now running in `us-east-1`. End-to-end HTTPS, the fresh hosted judge journey and capacity under the small profile remain pending and must pass before submission.
 
 ## Backups and end of judging
 

@@ -20,7 +20,7 @@ param(
     [ValidateNotNullOrEmpty()][string]$Profile = 'default',
     [string]$KeyPairName,
     [ValidatePattern('^(?:\d{12})?$')][string]$ExpectedAccountId = '',
-    [ValidateSet(2)][int]$MemoryGb = 2,
+    [ValidateSet(1, 2)][int]$MemoryGb = 2,
     [ValidateRange(1, 12)][decimal]$MaxBundleMonthlyUsd = 12,
     [string]$AvailabilityZone,
     [switch]$Apply
@@ -49,16 +49,39 @@ function Invoke-AwsJson([string[]]$Arguments) {
 }
 
 function Wait-AwsOperations($Response) {
-    foreach ($operation in $Response.operations) {
+    # Lightsail returns `operation` for some commands (including firewall
+    # updates), and `operations` for others. Avoid missing-property access under
+    # StrictMode, but never treat an absent/empty receipt as successful work.
+    if ($null -eq $Response) { throw 'Lightsail returned no operation receipt. Inspect AWS before continuing.' }
+    $operations = @(
+        foreach ($name in @('operations', 'operation')) {
+            $property = $Response.PSObject.Properties[$name]
+            if ($null -ne $property) {
+                foreach ($item in @($property.Value)) {
+                    if ($null -ne $item) { $item }
+                }
+            }
+        }
+    )
+    if ($operations.Count -eq 0) { throw 'Lightsail returned no operation receipt. Inspect AWS before continuing.' }
+    $operationIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($operation in $operations) {
+        $idProperty = $operation.PSObject.Properties['id']
+        if ($null -eq $idProperty -or [string]::IsNullOrWhiteSpace([string]$idProperty.Value)) {
+            throw 'Lightsail returned an operation without an ID. Inspect AWS before continuing.'
+        }
+        [void]$operationIds.Add([string]$idProperty.Value)
+    }
+    foreach ($operationId in $operationIds) {
         $deadline = [DateTimeOffset]::UtcNow.AddMinutes(5)
         do {
-            $current = (Invoke-AwsJson @('lightsail', 'get-operation', '--operation-id', $operation.id)).operation
+            $current = (Invoke-AwsJson @('lightsail', 'get-operation', '--operation-id', $operationId)).operation
             if ($current.status -in @('Failed', 'NotStarted') -and $current.isTerminal) {
-                throw "Lightsail operation $($operation.id) failed. Inspect the operation in AWS before continuing."
+                throw "Lightsail operation $operationId failed. Inspect the operation in AWS before continuing."
             }
             if ($current.status -in @('Succeeded', 'Completed')) { break }
             if ([DateTimeOffset]::UtcNow -ge $deadline) {
-                throw "Timed out waiting for operation $($operation.id). The resource may still be provisioning; inspect AWS before retrying."
+                throw "Timed out waiting for operation $operationId. The resource may still be provisioning; inspect AWS before retrying."
             }
             Start-Sleep -Seconds 5
         } while ($true)
