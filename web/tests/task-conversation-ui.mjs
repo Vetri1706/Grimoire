@@ -144,6 +144,19 @@ try {
   check('Pearl/Midnight desktop and narrow mobile layouts fit; short viewports put the composer in normal flow.');
 
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await editor().fill(`Discard on actual sign out ${stamp}`);
+  await page.getByRole('button', { name: 'Account menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  const loginForm = page.getByRole('form', { name: 'Sign in to Grimoire', exact: true });
+  await loginForm.waitFor();
+  await loginForm.getByLabel('Login name', { exact: true }).fill(login.login_name);
+  await loginForm.getByLabel('Passphrase', { exact: true }).fill(login.passphrase);
+  await loginForm.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.locator('.company-app').waitFor();
+  await navigate(route(tasks[0]));
+  assert.equal(await editor().inputValue(), '');
+  await page.locator('.task-thread-message').filter({ hasText: note }).waitFor();
+  check('Actual UI sign-out and same-Handler sign-in discard unsent drafts while retaining saved notes.');
   await editor().fill(`Clear this draft on session end ${stamp}`);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('grimoire:session-invalidated', { detail: { token: '__grimoire_cookie_session__:previous-organization' } })));
   assert.match(await editor().inputValue(), /Clear this draft on session end/);

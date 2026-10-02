@@ -54,9 +54,13 @@ export type SessionState = {
 
 export const SESSION_AUTH = '__grimoire_cookie_session__';
 export const sessionInvalidatedEvent = 'grimoire:session-invalidated';
+export const sessionChangedEvent = 'grimoire:session-changed';
 export const sessionChangedStorageKey = 'grimoire:session-changed';
 export const organizationSession = (organizationId: string) => `${SESSION_AUTH}:${organizationId}`;
 export function announceSessionChange() {
+  // Storage events reach other tabs only. Clear this tab's private ephemeral
+  // state too when a Handler signs out, signs in, or changes organizations.
+  window.dispatchEvent(new Event(sessionChangedEvent));
   try { localStorage.setItem(sessionChangedStorageKey, crypto.randomUUID()); } catch { /* Request binding still rejects stale tabs. */ }
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, request, sessionChangedStorageKey, sessionInvalidatedEvent } from './api';
+import { ApiError, request, sessionChangedEvent, sessionChangedStorageKey, sessionInvalidatedEvent } from './api';
 import type { AgentTask } from './scope-api';
 
 export type TaskMessage = { id: string; body: string; intent: 'note' | 'follow_up'; author_principal_id: string; author_name: string; created_at: string; task_id: string | null };
@@ -44,8 +44,8 @@ export function useTaskConversation(token: string, scionId: string, taskId: stri
     };
     const sessionChanged = (event: StorageEvent) => { if (event.key === sessionChangedStorageKey) signedOut(); };
     document.addEventListener('visibilitychange', changed); window.addEventListener('online', changed); window.addEventListener('offline', changed); window.addEventListener('pagehide', changed); window.addEventListener('pageshow', changed); window.addEventListener('grimoire:case-invalidated', invalidated);
-    window.addEventListener(sessionInvalidatedEvent, signedOut); window.addEventListener('storage', sessionChanged);
-    return () => { epoch.current++; pending.current?.abort(); pending.current = null; window.clearInterval(timer); window.clearTimeout(lease.current); document.removeEventListener('visibilitychange', changed); window.removeEventListener('online', changed); window.removeEventListener('offline', changed); window.removeEventListener('pagehide', changed); window.removeEventListener('pageshow', changed); window.removeEventListener('grimoire:case-invalidated', invalidated); window.removeEventListener(sessionInvalidatedEvent, signedOut); window.removeEventListener('storage', sessionChanged); };
+    window.addEventListener(sessionInvalidatedEvent, signedOut); window.addEventListener(sessionChangedEvent, signedOut); window.addEventListener('storage', sessionChanged);
+    return () => { epoch.current++; pending.current?.abort(); pending.current = null; window.clearInterval(timer); window.clearTimeout(lease.current); document.removeEventListener('visibilitychange', changed); window.removeEventListener('online', changed); window.removeEventListener('offline', changed); window.removeEventListener('pagehide', changed); window.removeEventListener('pageshow', changed); window.removeEventListener('grimoire:case-invalidated', invalidated); window.removeEventListener(sessionInvalidatedEvent, signedOut); window.removeEventListener(sessionChangedEvent, signedOut); window.removeEventListener('storage', sessionChanged); };
   }, [refresh, clear, scionId]);
   return { data, error, unsupported, refresh };
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { ApiError, request, sessionChangedStorageKey, sessionInvalidatedEvent } from './api';
+import { ApiError, request, sessionChangedEvent, sessionChangedStorageKey, sessionInvalidatedEvent } from './api';
 import type { Scion } from './api';
 import type { AgentTask } from './scope-api';
 import type { NativeAgent } from './agents-api';
@@ -27,9 +27,10 @@ if (typeof window !== 'undefined') {
   const invalidated = (event: Event) => { const token = (event as CustomEvent<{ token?: string }>).detail?.token; if (!token || draftScope.endsWith(`:${token}`)) clearDrafts(); };
   const changed = (event: StorageEvent) => { if (event.key === sessionChangedStorageKey) clearDrafts(); };
   window.addEventListener(sessionInvalidatedEvent, invalidated);
+  window.addEventListener(sessionChangedEvent, clearDrafts);
   window.addEventListener('storage', changed);
   const hot = (import.meta as ImportMeta & { hot?: { dispose: (callback: () => void) => void } }).hot;
-  hot?.dispose(() => { window.removeEventListener(sessionInvalidatedEvent, invalidated); window.removeEventListener('storage', changed); });
+  hot?.dispose(() => { window.removeEventListener(sessionInvalidatedEvent, invalidated); window.removeEventListener(sessionChangedEvent, clearDrafts); window.removeEventListener('storage', changed); });
 }
 const when = (value: string) => new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const taskPath = (scionId: string, id: string, kind: AgentTask['task_kind']) => `/scions/${scionId}/${kind === 'research_public_web' ? 'research' : kind === 'prepare_capability_plan' ? 'tasks' : 'agent-work'}/${id}`;
@@ -96,8 +97,8 @@ function ConversationBody({ token, scion, task, nativeAgents, canPrepare, onNavi
       sessionActive.current = false; setAuthEnded(true); clearDrafts(); pending.current?.abort(); setDraft(old => ({ ...old, body: '', retry: null, consent: false })); dirtyHandler.current?.(false);
     };
     const changed = (event: StorageEvent) => { if (event.key === sessionChangedStorageKey) ended(); };
-    window.addEventListener(sessionInvalidatedEvent, ended); window.addEventListener('storage', changed);
-    return () => { window.removeEventListener(sessionInvalidatedEvent, ended); window.removeEventListener('storage', changed); };
+    window.addEventListener(sessionInvalidatedEvent, ended); window.addEventListener(sessionChangedEvent, ended); window.addEventListener('storage', changed);
+    return () => { window.removeEventListener(sessionInvalidatedEvent, ended); window.removeEventListener(sessionChangedEvent, ended); window.removeEventListener('storage', changed); };
   }, []);
   const update = (patch: Partial<Draft>) => setDraft(old => ({ ...old, ...patch }));
   const research = task.task_kind === 'research_public_web' && draft.intent === 'follow_up';
