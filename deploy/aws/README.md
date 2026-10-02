@@ -1,8 +1,8 @@
 # Grimoire: AWS judging deployment, USD 10–15/month target
 
-The current judging deployment uses an explicitly approved **Lightsail Linux IPv4 1 GB / 2 vCPU / 40 GB instance: USD 7/month**, with the `small` memory profile and a **2 GiB swap file on its included disk**. Keep React's compiled files, Rust API, PostgreSQL 17 and private versioned object storage on that host. Codex stays on the operator's computer and connects over HTTPS. This has one failure domain; the 1 GB capacity check remains a release gate.
+The judging deployment is live at **[Grimoire](https://grimoire-52-71-93-70.sslip.io)**, with a public **[synthetic judge demo](https://grimoire-52-71-93-70.sslip.io/demo)**. It uses an explicitly approved **Lightsail Linux IPv4 1 GB / 2 vCPU / 40 GB instance: USD 7/month**, with the `small` memory profile and a **2 GiB swap file on its included disk**. React's compiled files, Rust API, PostgreSQL 17 and private versioned object storage run on that host. A real Codex worker must run on the operator's computer and connect over HTTPS; no real worker or model task was run during deployment verification.
 
-The instance is running in `us-east-1`. All five application images have been built and published; HTTPS and hosted capacity checks are still pending. This is not yet a verified public judging deployment. The original 2 GB / 60 GB / USD 12 profile remains the scripts' default, but the account blocked that instance size during provisioning. Selecting `small` is explicit; the scripts do not silently downgrade a host.
+HTTPS, password sign-in, the three public demo cases and a bounded host-local capacity check passed on 2026-10-02. The instance runs in `us-east-1` with deployment configuration **`c0eadfd39e607c22658b009da523237c0f5afb34`** and the five digest-pinned images built from **`899a9fbcc8ca753f07349940a0f70f14788da607`**. See [sanitized deployment evidence](../../docs/evidence/aws-judging-20261002.json) and the verification scope below. This is a single-host judging deployment, not a high-availability service. The original 2 GB / 60 GB / USD 12 profile remains the scripts' default, but the account blocked that instance size during provisioning. Selecting `small` is explicit; the scripts do not silently downgrade a host.
 
 ## Cost and limits
 
@@ -11,7 +11,7 @@ The instance is running in `us-east-1`. All five application images have been bu
 | Lightsail 1 GB IPv4 bundle, selected `small` profile | $7.00 |
 | 2 GiB swap within the included 40 GB disk | $0 additional storage charge |
 | One small snapshot, 10–20 GB stored | $0.50–1.00 |
-| Existing domain, DNS and ACME TLS | $0 additional hosting cost |
+| Shared sslip.io hostname, DNS and ACME TLS | $0 additional hosting cost |
 | Expected infrastructure subtotal | **$7.50–8.00** |
 
 Keep total spending within the user's **USD 10–15/month ceiling**, allowing room for applicable tax and small backups. A new domain, transfer overages and model/provider usage are additional. Credits are not a reason to increase the server size, and their service eligibility/expiry must be checked in Billing. AWS promotional credits normally exclude domain registration. Check actual account tax and usage before promising a total bill. Do not purchase a domain or add a paid service silently.
@@ -124,21 +124,25 @@ node byoa/connect.mjs --api https://app.YOUR_DOMAIN --watch
 
 Approve the normal organization pairing in the app. Your computer and worker must stay online for real tasks. The public synthetic `/demo` remains inspectable without your computer. Existing Codex/model subscription or provider costs are separate from the AWS hosting estimate.
 
-## 4. Verify before sharing with judges
+## 4. Hosted verification and release checks
 
-- A fresh signed-out browser can open `https://HOST/demo`; cases are labeled synthetic.
-- Login/signup work with Secure, HttpOnly, SameSite cookies; Google sign-in remains optional.
-- `/api/health` and `/api/setup/owner` return public 404, private account routes return 401 without a session.
-- Repeated invalid sign-in requests receive 429; another IP cannot spoof `X-Forwarded-For` through Caddy.
-- No DB/storage/API port is reachable from the internet; only HTTPS, HTTP redirect, and restricted SSH.
-- A separate organization cannot read the first organization's task; revoked evidence disappears from replies/artifacts.
-- A real paired worker completes one intended task if live execution is part of the judging demo.
-- Desktop/mobile layouts, refresh, logout and network failures work on the actual HTTPS URL.
-- On the selected 1 GB host, check free disk, active 2 GiB swap, container RSS/restarts/OOM state and response times during seed, sign-in, demo browsing and one intended worker task. Inspect memory pressure and swap activity; a running instance alone does not establish usable capacity.
+The following checks passed on the hosted release on 2026-10-02:
 
-Verified locally: isolated proxy tests for SPA routes, blocked diagnostics/setup/dotfiles and authentication throttling; Caddy configuration validation without certificate issuance; deployment scripts/Compose validation; provisioner no-write/price/account/firewall tests; fresh and repeated **Linux PostgreSQL 17** migrations; exact catalog attestation using the existing Windows API against that Linux database; changed migration history rejected. The isolated proxy test had no API backend and confirms proxy behavior only. Release run 36968370011 subsequently built, checked and published all five Linux amd64 images, including the API and storage images. The selected 1 GB AWS instance is now running in `us-east-1`. End-to-end HTTPS, the fresh hosted judge journey and capacity under the small profile remain pending and must pass before submission.
+- Fresh PostgreSQL 17 setup applied **32 migrations**; API startup attestation and private storage initialization passed. The three explicitly synthetic demo cases were seeded.
+- Actual Chrome at **1440 px desktop and 390 px mobile** loaded the supplied logo and all three cases through their real navigation links. Refresh passed, with no page errors or document overflow.
+- The installation owner signed in through the hosted UI. The session cookie was **Secure, HttpOnly and SameSite=Strict**; CSRF protection, logout and signed-out reload passed. Google sign-in is not configured; no Google flow was tested.
+- Normal HTTPS signup and organization creation passed for independent accounts. The owning organization read a synthetic brief with **200**; another organization received **404**. A spoofed `X-Grimoire-Organization` header received the application's expected **409 `ACTIVE_ORGANIZATION_CHANGED`**. Four synthetic verification accounts were created across two runs, and all verification sessions were revoked afterward; no model tasks were run.
+- Public `/api/health` and `/api/setup/owner` returned **404**; anonymous `/api/me` returned **401**. Five private service ports were closed to external connections.
+- Nine invalid login attempts with varying client-supplied `X-Forwarded-For` values returned **six 401s followed by three 429s**. Those changing headers did not bypass the observed throttle.
+- A **host-local public synthetic workload of 480 requests over 120 seconds (4 requests/second)** had **p95 24.28 ms**, **maximum 153.952 ms**, and **zero request errors, container restarts or OOM events**. Subsequent `vmstat` observation showed no sustained swap activity. These timings exclude external network latency and do not establish capacity for model execution, a real worker or sustained multi-user traffic.
+
+Previous local evidence also covers isolated proxy behavior, migration repeatability and tamper rejection. The hosted isolation check above covers brief reads and organization-header enforcement. Source/task/artifact revocation has **not been fully reverified on the hosted deployment beyond the public revoked demo case**; do not describe earlier local coverage as hosted tests. [The sanitized evidence record](../../docs/evidence/aws-judging-20261002.json) separates the completed hosted checks from these limits.
+
+For later releases, repeat HTTPS signup/sign-in, cookie/CSRF/logout, organization isolation, public route boundaries, demo refresh, desktop/mobile layout and capacity checks against the actual URL. Verify source/task/artifact revocation and withdrawn evidence in replies on the hosted app before relying on those paths. If judging includes live agent execution, enroll a real worker and complete one intended task, measuring memory pressure and response times during that run. Keep the worker's computer online. Network-failure behavior and any newly configured Google flow need their own hosted verification.
 
 ## Backups and end of judging
+
+A private PostgreSQL logical backup of approximately **1.1 MB** was created and downloaded on 2026-10-02. Its archive catalog parsed successfully with `pg_restore --list`, and the remote/local SHA-256 hashes matched. These checks verify archive readability and transfer integrity, not a completed restore. The single Lightsail snapshot **`grimoire-demo-backup-20261002`** was **in progress at this verification point**; snapshot completion and restoration have not yet been verified. The logical dump alone does not contain pinned object versions.
 
 Run `sudo bash deploy/aws/backup.sh` before a release or snapshot. Keep the private logical dump with an instance snapshot containing the object volume. Verify restoration on an isolated host before trusting a backup. Do not leave daily snapshots accumulating: snapshot billing is incremental but grows with changed data and retained copies.
 
