@@ -72,6 +72,7 @@ try {
   assert.equal(await editor().inputValue(), '');
   assert.equal((await api(`/scions/${scion.id}/agent-tasks`)).tasks.length, 2);
   check('Enter adds a newline; Ctrl+Enter saves exactly one note and starts no task.');
+  await shot('06-desktop-add-note');
 
   await editor().fill(`Retained while access is unavailable ${stamp}`);
   const readPattern = `**/api/scions/${scion.id}/agent-tasks/${tasks[0].id}/conversation`;
@@ -124,6 +125,17 @@ try {
   await until(() => fullyAboveComposer(newNote), 'mobile latest note above composer');
   await shot('03-mobile-midnight');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await page.setViewportSize({ width: 320, height: 740 });
+  await editor().scrollIntoViewIfNeeded();
+  await shot('07-narrow-composer');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  assert.ok(await form().evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return Array.from(element.querySelectorAll('.task-chat-composer-actions button, .task-chat-composer-actions select')).every(control => {
+      const box = control.getBoundingClientRect();
+      return box.left >= bounds.left && box.right <= bounds.right && box.width > 0;
+    });
+  }), '320px composer controls stay inside the composer');
   await page.setViewportSize({ width: 390, height: 500 });
   await editor().focus(); await editor().scrollIntoViewIfNeeded();
   assert.equal(await page.locator('.task-chat-dock').evaluate(element => getComputedStyle(element).position), 'static');

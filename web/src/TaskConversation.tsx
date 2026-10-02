@@ -104,6 +104,15 @@ function ConversationBody({ token, scion, task, nativeAgents, canPrepare, onNavi
   const readyChanged = useCallback((ready: boolean) => setConnectionReady(ready), []);
   const locked = busy || Boolean(draft.retry) || authEnded;
   const permitted = Boolean(data && canPrepare && (draft.intent === 'note' || data.follow_up_available && (!research || draft.consent && connectionReady)));
+  const composerAgent = nativeAgents.find(agent => agent.id === (draft.agentId || task.agent_id));
+  const composerAgentName = composerAgent?.config.name || 'your agent';
+  const sendLabel = busy ? 'Sending…' : draft.retry ? 'Retry message' : draft.intent === 'note' ? 'Add note' : 'Send message';
+  useLayoutEffect(() => {
+    const input = editor.current;
+    if (!input) return;
+    input.style.height = '0px';
+    input.style.height = `${Math.min(180, Math.max(60, input.scrollHeight))}px`;
+  }, [draft.body]);
   const responses = data?.responses ?? [];
   const items = [
     ...(data?.messages ?? []).map(message => ({ id: message.id, timestamp: message.created_at, message, response: null })),
@@ -183,11 +192,20 @@ function ConversationBody({ token, scion, task, nativeAgents, canPrepare, onNavi
       {jumpVisible && data && <button type="button" className="task-chat-jump button secondary" onClick={showLatest}>Jump to latest <span aria-hidden="true">↓</span></button>}
       {error && <p className="task-chat-error" role="alert">{error}</p>}{notice && <p className="task-chat-notice" role="status">{notice}</p>}
       <form ref={form} className="task-chat-composer" aria-label="Message task" onSubmit={send}>
-        <label className="task-chat-editor-label" htmlFor={`task-message-${task.id}`}>{research ? 'Public follow-up brief' : 'Message'}</label>
-        <textarea ref={editor} id={`task-message-${task.id}`} value={draft.body} maxLength={4000} rows={3} disabled={locked || !canPrepare} onChange={event => update({ body: event.target.value })} placeholder={draft.intent === 'note' ? 'Add a note to this task…' : research ? 'What should the agent research next? Include only public information…' : 'Ask your agent to refine the plan…'} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); form.current?.requestSubmit(); } }} />
+        <label className="task-chat-sr-only" htmlFor={`task-message-${task.id}`}>{research ? 'Public follow-up brief' : 'Message'}</label>
+        <textarea ref={editor} id={`task-message-${task.id}`} aria-describedby={`task-message-help-${task.id}`} value={draft.body} maxLength={4000} rows={2} disabled={locked || !canPrepare} onChange={event => update({ body: event.target.value })} placeholder={draft.intent === 'note' ? 'Add a note to this task…' : research ? `Message ${composerAgentName} — what should we research next? Public information only…` : `Message ${composerAgentName} — describe what you want done…`} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); form.current?.requestSubmit(); } }} />
         {research && <ResearchConsent token={token} scion={scion} connectionId={draft.connectionId} consent={draft.consent} disabled={locked} onConnection={value => update({ connectionId: value, consent: false })} onConsent={value => update({ consent: value })} onReady={readyChanged} />}
-        <div className="task-chat-composer-actions"><div className="task-chat-options"><label>Message action<select aria-label="Message action" value={draft.intent} disabled={locked || !canPrepare} onChange={event => update({ intent: event.target.value as Draft['intent'], consent: false })}><option value="note">Add note</option>{allowsAgent && <option value="follow_up">Ask agent</option>}</select></label>{draft.intent === 'follow_up' && <label>Agent<select aria-label="Agent" value={draft.agentId} disabled={locked || !canPrepare} onChange={event => update({ agentId: event.target.value })}><option value="">Current task agent</option>{nativeAgents.filter(agent => !agent.config.paused).map(agent => <option key={agent.id} value={agent.id}>{agent.config.name}</option>)}</select></label>}</div><button type="submit" className="task-chat-send button primary" disabled={busy || !draft.body.trim() || !data || !canPrepare || !draft.retry && !permitted}>{busy ? 'Sending…' : draft.retry ? 'Retry message' : draft.intent === 'note' ? 'Add note' : 'Send message'}<span aria-hidden="true">↑</span></button></div>
-        <div className="task-chat-composer-help"><span>{draft.intent === 'follow_up' ? 'Creates a linked task from the current brief and your message. Human review stays separate.' : 'A note records your message without starting agent work.'}</span><kbd>Ctrl / ⌘ Enter</kbd></div>
+        <div className="task-chat-composer-actions">
+          <div className="task-chat-options">
+            <button type="button" className="task-chat-add" aria-label="Manage task evidence" title="Add or manage Scion evidence" disabled={busy || authEnded || !canPrepare} onClick={() => onNavigate(`/scions/${scion.id}/sources`)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+            <select className="task-chat-mode" aria-label="Message action" title="Ask agent starts follow-up work. Add note saves without starting work." value={draft.intent} disabled={locked || !canPrepare} onChange={event => update({ intent: event.target.value as Draft['intent'], consent: false })}><option value="note">Add note</option>{allowsAgent && <option value="follow_up">Ask agent</option>}</select>
+          </div>
+          <div className="task-chat-recipient">
+            {draft.intent === 'follow_up' && <label className="task-chat-agent"><span className="task-chat-sr-only">Agent</span><AgentAvatar id={composerAgent?.id || task.agent_id || undefined} name={composerAgentName} size="sm" /><select aria-label="Agent" title={composerAgentName} value={draft.agentId} disabled={locked || !canPrepare} onChange={event => update({ agentId: event.target.value })}><option value="">{nativeAgents.find(agent => agent.id === task.agent_id)?.config.name || 'Current task agent'}</option>{nativeAgents.filter(agent => !agent.config.paused || agent.id === draft.agentId).map(agent => <option key={agent.id} value={agent.id}>{agent.config.name}{agent.config.paused ? ' (paused)' : ''}</option>)}</select></label>}
+            <button type="submit" className="task-chat-send" aria-label={sendLabel} title={`${sendLabel} (Ctrl / ⌘ Enter)`} disabled={busy || !draft.body.trim() || !data || !canPrepare || !draft.retry && !permitted}>{busy ? <span aria-hidden="true">…</span> : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" /></svg>}</button>
+          </div>
+        </div>
+        <p className="task-chat-sr-only" id={`task-message-help-${task.id}`}>{draft.intent === 'follow_up' ? 'Creates a linked task from the current brief and your message. Human review stays separate.' : 'A note records your message without starting agent work.'} Press Ctrl or Command and Enter to send.</p>
         {draft.intent === 'follow_up' && data && !data.follow_up_available && <p className="task-chat-blocker">{data.follow_up_reason || 'Follow-up work is not available yet. You can add a note.'}</p>}
       </form>
     </div>
