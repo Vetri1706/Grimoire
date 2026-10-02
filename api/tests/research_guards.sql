@@ -58,6 +58,7 @@ SELECT set_config('app.current_principal_id','d3520000-0000-4000-8000-0000000000
 DO $$
 DECLARE scion uuid:=gen_random_uuid();task uuid:=gen_random_uuid();capture uuid:=gen_random_uuid();report uuid:=gen_random_uuid();lease uuid:=gen_random_uuid();
  candidate jsonb;body jsonb;denied boolean;cancel_task uuid:=gen_random_uuid();
+ child uuid;parent uuid;child_done uuid;child_running uuid;child_report uuid;message uuid;followup_body jsonb;idx integer;
 BEGIN
  INSERT INTO grimoire.intake_scions(id,org_id,created_by) VALUES(scion,app.current_org_id(),app.current_principal_id());
  INSERT INTO grimoire.intake_revisions(org_id,scion_id,number,name,product_description,product_category,change_summary,created_by)
@@ -96,6 +97,31 @@ BEGIN
  PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
  UPDATE grimoire.intake_agent_tasks SET status='completed',completed_at=clock_timestamp(),proposal_id=report,output_sha256=repeat('c',64),preparation_note='SQL protocol fixture only; no provider run' WHERE id=task;
  IF EXISTS(SELECT 1 FROM grimoire.intake_research_reviews WHERE report_id=report) THEN RAISE EXCEPTION 'Completion created a review'; END IF;
+ -- Two genuine native follow-up records, but protocol-only output: one already
+ -- saved and one still running when the parent's receipt is withdrawn below.
+ -- Neither child lists the parent's capture as its own source receipt.
+ parent:=task;
+ FOR idx IN 1..2 LOOP
+  PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000011',true);
+  child:=gen_random_uuid();message:=gen_random_uuid();child_report:=gen_random_uuid();
+  INSERT INTO grimoire.intake_task_messages(id,org_id,scion_id,scion_revision,thread_task_id,author_principal_id,author_name,body,intent,request_key,request_sha256)
+  VALUES(message,app.current_org_id(),scion,1,task,app.current_principal_id(),'Research owner',candidate->>'objective','follow_up',message::text,repeat('e',64));
+  INSERT INTO grimoire.intake_agent_tasks(id,org_id,scion_id,scion_revision,task_kind,input,created_by,request_key,request_sha256,timeout_seconds)
+  VALUES(child,app.current_org_id(),scion,1,'research_public_web',jsonb_build_object('candidate_proposal',candidate),app.current_principal_id(),child::text,repeat('f',64),240);
+  INSERT INTO grimoire.intake_task_followups VALUES(app.current_org_id(),task,parent,message,child,clock_timestamp());
+  UPDATE grimoire.intake_agent_tasks SET status='dispatched',dispatched_at=clock_timestamp() WHERE id=child;
+  PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
+  PERFORM set_config('app.task_messages_protocol','1',true);
+  UPDATE grimoire.intake_agent_tasks SET status='running',attempt=1,claimed_by=app.current_principal_id(),claimed_at=clock_timestamp(),lease_token=lease,lease_until=clock_timestamp()+interval '270 seconds' WHERE id=child;
+  PERFORM set_config('app.agent_task_id',child::text,true);
+  followup_body:=body||jsonb_build_object('sources','[]'::jsonb,'capture_ids','[]'::jsonb);
+  IF idx=1 THEN
+   INSERT INTO grimoire.intake_research_reports(id,org_id,scion_id,scion_revision,agent_task_id,input,created_by,request_sha256)
+   VALUES(child_report,app.current_org_id(),scion,1,child,followup_body,app.current_principal_id(),repeat('b',64));
+   UPDATE grimoire.intake_agent_tasks SET status='completed',completed_at=clock_timestamp(),proposal_id=child_report,output_sha256=repeat('c',64),preparation_note='Protocol-only follow-up; no provider executed' WHERE id=child;
+   child_done:=child;parent:=child;
+  ELSE child_running:=child; END IF;
+ END LOOP;
  PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000011',true);
  INSERT INTO grimoire.intake_research_reviews(id,org_id,report_id,reviewer_id,note,request_key) VALUES(gen_random_uuid(),app.current_org_id(),report,app.current_principal_id(),'Reviewed protocol fixture only','explicit-review');
  IF NOT app.intake_research_lock_captures(task,capture) THEN RAISE EXCEPTION 'Handler cannot lock exact receipt for withdrawal'; END IF;
@@ -103,7 +129,21 @@ BEGIN
  INSERT INTO grimoire.intake_research_capture_revocations(org_id,capture_id,reason,created_by) VALUES(app.current_org_id(),capture,'Withdraw fixture',app.current_principal_id()) ON CONFLICT DO NOTHING;
  IF (SELECT count(*) FROM grimoire.intake_watch_events WHERE subject_id=capture AND kind='research_source_revoked')<>1 THEN RAISE EXCEPTION 'Duplicate withdrawal duplicated audit effects'; END IF;
  IF NOT EXISTS(SELECT 1 FROM grimoire.intake_watch_node_states WHERE node_kind='agent_task' AND node_id=task AND blocked AND stale) THEN RAISE EXCEPTION 'Withdrawal failed to block native task'; END IF;
+ IF (SELECT count(*) FROM grimoire.intake_watch_node_states WHERE node_kind='agent_task' AND node_id IN(child_done,child_running) AND blocked AND stale)<>2 THEN RAISE EXCEPTION 'Prior-result withdrawal did not block all dependent follow-ups'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM grimoire.intake_research_reports r JOIN grimoire.intake_watch_node_states w ON (w.org_id,w.node_kind,w.node_id)=(r.org_id,'agent_task',r.agent_task_id) WHERE r.agent_task_id=child_done AND w.blocked) THEN RAISE EXCEPTION 'Existing follow-up report escaped global visibility projection'; END IF;
+ PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
+ PERFORM set_config('app.agent_task_id',child_running::text,true);
+ denied:=false;BEGIN
+  INSERT INTO grimoire.intake_research_reports(id,org_id,scion_id,scion_revision,agent_task_id,input,created_by,request_sha256)
+  VALUES(gen_random_uuid(),app.current_org_id(),scion,1,child_running,followup_body,app.current_principal_id(),repeat('b',64));
+ EXCEPTION WHEN SQLSTATE 'G2601' THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'Withdrawn parent evidence allowed a new follow-up report'; END IF;
+ PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000011',true);
  IF app.intake_research_report_valid(task,body) THEN RAISE EXCEPTION 'Revoked capture still accepted as report input'; END IF;
+ UPDATE grimoire.intake_agent_tasks SET status='cancel_requested' WHERE id=child_running;
+ PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
+ UPDATE grimoire.intake_agent_tasks SET status='cancelled',cancelled_at=clock_timestamp(),completed_at=clock_timestamp() WHERE id=child_running;
+ PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000011',true);
  INSERT INTO grimoire.intake_agent_tasks(id,org_id,scion_id,scion_revision,task_kind,input,created_by,request_key,request_sha256,timeout_seconds)
  VALUES(cancel_task,app.current_org_id(),scion,1,'research_public_web',jsonb_build_object('candidate_proposal',candidate),app.current_principal_id(),cancel_task::text,repeat('d',64),240);
  UPDATE grimoire.intake_agent_tasks SET status='dispatched',dispatched_at=clock_timestamp() WHERE id=cancel_task;
@@ -114,6 +154,6 @@ BEGIN
  PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
  denied:=false;BEGIN PERFORM app.intake_research_assert_task(cancel_task,lease);EXCEPTION WHEN SQLSTATE 'G2901' THEN denied:=true;END;
  IF NOT denied THEN RAISE EXCEPTION 'Cancelled research lease still permits capture/submission'; END IF;
- RAISE NOTICE 'PASS exact report captures, no approval promotion, signed lease, completion separate from review, idempotent withdrawal, native blocking and cancellation';
+ RAISE NOTICE 'PASS exact captures, no approval promotion, signed lease, separate review, idempotent withdrawal, cancellation, prior-result withdrawal propagation and artifact-insert rejection';
 END $$;
 ROLLBACK;

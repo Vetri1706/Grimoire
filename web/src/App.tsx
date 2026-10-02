@@ -250,7 +250,7 @@ function CaseRecord({ runtime, nativeAgents, token, scion: initialScion, view: r
     </>}
     <div className="work-scion-body">
     {view === 'research' ? <ResearchWorkspace key={`${token}:${scion.id}`} token={token} scion={scion} nativeAgents={nativeAgents} runtime={runtime} canPrepare={canPrepare} preferredTaskId={focusedId} onNavigate={onNavigate} onDirty={markSourceDirty} />
-    : physical && focusedTask && focusedId ? <TaskRunDetail token={token} scion={scion} preferredTaskId={focusedId} nativeAgents={nativeAgents} runtime={runtime} canWrite={canWrite} canPrepare={canPrepare} control={connection} onNavigate={onNavigate} />
+    : physical && focusedTask && focusedId ? <TaskRunDetail token={token} scion={scion} preferredTaskId={focusedId} nativeAgents={nativeAgents} runtime={runtime} canWrite={canWrite} canPrepare={canPrepare} control={connection} onNavigate={onNavigate} onDirty={markSourceDirty} />
     : view === 'tasks' || !physical && view === 'agent-work' ? <TaskWorkspace key={`${token}:${scion.id}`} token={token} scion={scion} nativeAgents={nativeAgents} runtime={runtime} canManage={canManage} canWrite={canWrite} canPrepare={canPrepare} preferredTaskId={focusedId} control={connection} onNavigate={onNavigate} onScionSaved={async next => { setScion(next); await connection.refresh(); }} onDirty={markSourceDirty} />
     : view === 'overview' ? <ScionOverview scion={scion} connection={connection} onOpen={openView} onEdit={editIntake} canWrite={canManage} />
     : view === 'graph' ? <ControlSurface graphOnly connection={connection} onAction={nodeAction} />

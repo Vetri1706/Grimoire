@@ -33,6 +33,14 @@
 .task-record-row strong { display: block; font-size: var(--text-body); font-weight: 500; overflow-wrap: anywhere; }
 .task-record-row small { display: block; font-size: var(--text-small); margin: 5px 0 9px; }
 .task-detail { min-width: 0; padding: 28px; }
+.task-detail:has(.task-conversation) { padding-bottom: 4px; }
+.task-detail:has(.task-conversation) .task-detail-heading { max-width: 60rem; margin-inline: auto; }
+.task-thread-brief { padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.task-thread-brief summary, .task-conversation-context>summary { cursor: pointer; font-size: var(--text-meta); font-weight: 500; }
+.task-conversation-context { border-top: 1px solid var(--border); }
+.task-conversation-context>summary { padding: 16px 0; }
+.task-conversation-context .task-deliverable { scroll-margin-block: 28px 320px; }
+.task-conversation-context .task-questions { scroll-margin-block: 28px 320px; }
 .task-detail-heading { margin-bottom: 22px; flex-wrap: wrap; }
 .task-detail-heading h2 { margin-top: 10px; }
 .task-detail-heading p { font-size: var(--text-small); }

@@ -307,3 +307,5 @@ npm.cmd --prefix web run build
 | `docs/reference/GG40_page_capture.txt` | Supplied reference capture; not a canonical document-body hash |
 
 See `api/README.md` for request/response shapes and limits, and `harness/README.md` for direct harness invocation. The [Grimoire OS control surface](docs/control-surface.md) projects the case graph, persistent internal Watchtower, and existing Rust tasks. [Native Grimoire agents](docs/native-agents.md) own versioned profiles, skills, assignments, pause/resume and real Codex task history; no Paperclip backend or management redirect is used. Completion never grants approval. The sibling Paperclip clone is unchanged.
+
+[Task conversations](docs/task-conversation.md) add saved Handler notes, actual agent replies and linked follow-up work to the task workspace. Digital planning and public research use the existing native worker queue; review and approval remain separate actions.

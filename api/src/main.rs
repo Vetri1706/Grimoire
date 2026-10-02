@@ -13,6 +13,7 @@ mod research;
 mod scope;
 mod sources;
 mod storage;
+mod task_conversation;
 mod worker_connections;
 mod workspace;
 
@@ -195,6 +196,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(offers::routes())
         .merge(byoa::routes())
         .merge(research::routes())
+        .merge(task_conversation::routes())
         .merge(capabilities::routes())
         .merge(control_surface::routes())
         .merge(demo::routes())

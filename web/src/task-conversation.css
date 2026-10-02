@@ -1,0 +1,58 @@
+.task-conversation { min-width: 0; display: flex; flex-direction: column; min-height: 560px; }
+.company-main>#main-content:has(.task-conversation) { scroll-padding-bottom: var(--task-chat-dock-height, 320px); }
+.task-conversation :is(input, textarea, select, button, summary) { scroll-margin-block: 24px var(--task-chat-dock-height, 320px); }
+.task-thread-flow, .task-chat-dock { width: 100%; max-width: 60rem; margin-inline: auto; }
+.task-thread-flow { flex: 1; padding: 20px 4px 28px; }
+.task-thread-intro { margin-bottom: 32px; }
+.task-thread-records { display: flex; flex-direction: column; gap: 28px; }
+.task-thread-latest { height: 1px; scroll-margin: 0; }
+.task-thread-entry { min-width: 0; max-width: 100%; }
+.task-thread-author { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: var(--text-meta); }
+.task-thread-author strong { font-weight: 500; }
+.task-thread-human-avatar { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--foreground); font-size: var(--text-small); }
+.task-thread-entry-human { align-self: flex-end; width: fit-content; max-width: min(86%, 48rem); }
+.task-thread-entry-human .task-thread-author { justify-content: flex-end; }
+.task-thread-entry-human .task-thread-entry-content { padding: 16px 20px; border: 1px solid var(--info-border); border-radius: 16px 16px 4px 16px; background: var(--info-surface); }
+.task-thread-entry-agent { width: 100%; }
+.task-thread-entry-agent .task-thread-entry-content { padding-left: 2px; }
+.task-thread-entry>time { display: block; margin-top: 8px; font-size: var(--text-small); }
+.task-thread-entry-human>time { text-align: right; }
+.task-thread-message { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; font-size: var(--text-body); }
+.task-thread-message-kind, .task-thread-result-boundary { display: block; margin-top: 12px; font-size: var(--text-small); }
+.task-thread-system-event { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--text-meta); }
+.task-thread-system-event>.text-button { margin-left: auto; font-size: var(--text-meta); }
+.task-thread-entry-system { padding-block: 12px; border-block: 1px solid var(--border); }
+.task-thread-entry-system>time { margin-left: 28px; }
+.task-thread-deliverable { display: flex; justify-content: space-between; gap: 20px; width: 100%; padding: 16px; margin-top: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--foreground); font: inherit; text-align: left; }
+.task-thread-deliverable:hover { background: var(--accent); }
+.task-thread-access, .task-thread-withheld { padding: 14px 16px; border: 1px solid var(--warning-border); border-radius: var(--radius); background: var(--warning-surface); line-height: 1.6; }
+.task-thread-access p { margin-top: 0; }
+.task-thread-empty { padding-block: 24px; }
+.task-thread-actions { margin-top: 28px; }
+.task-chat-dock { position: sticky; bottom: 0; z-index: 2; padding-top: 12px; padding-bottom: 12px; background: var(--card); }
+.task-chat-jump { display: flex; align-items: center; gap: 10px; margin: 0 auto 12px; min-height: 36px; padding: 6px 14px; border-radius: 999px; font-size: var(--text-meta); }
+.task-chat-composer { padding: 18px; border: 1px solid var(--input); border-radius: 16px; background: var(--card); box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--foreground) 8%, transparent); }
+.task-chat-editor-label { display: block; font-size: var(--text-small); font-weight: 500; margin-bottom: 6px; }
+.task-chat-composer textarea { display: block; width: 100%; min-height: 82px; max-height: 260px; border: 0; border-radius: 0; padding: 6px 0; resize: vertical; background: transparent; color: var(--foreground); font: inherit; line-height: 1.65; box-shadow: none; }
+.task-chat-composer textarea:focus-visible { outline-offset: 4px; }
+.task-chat-composer-actions { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
+.task-chat-options { display: flex; flex-wrap: wrap; gap: 12px; }
+.task-chat-options label, .task-chat-research>label:first-child { display: grid; gap: 5px; font-size: var(--text-small); }
+.task-chat-options select { max-width: 220px; min-height: 34px; padding: 5px 24px 5px 8px; font-size: var(--text-meta); }
+.task-chat-send { display: inline-flex; align-items: center; justify-content: center; gap: 16px; min-height: 40px; }
+.task-chat-send>span { font-size: 22px; line-height: 1; }
+.task-chat-composer-help { display: flex; align-items: start; gap: 16px; margin-top: 14px; font-size: var(--text-small); line-height: 1.5; }
+.task-chat-composer-help>span { flex: 1; }
+.task-chat-composer-help kbd { white-space: nowrap; font: inherit; }
+.task-chat-blocker, .task-chat-research>p { font-size: var(--text-small); line-height: 1.6; margin: 12px 0 0; }
+.task-chat-error, .task-chat-notice { margin: 0 0 12px; padding: 12px 16px; font-size: var(--text-meta); border-radius: var(--radius); }
+.task-chat-error { border: 1px solid var(--destructive-border); background: var(--destructive-surface); }
+.task-chat-notice { border: 1px solid var(--info-border); background: var(--info-surface); }
+.task-chat-research { display: grid; gap: 12px; padding-top: 14px; margin-top: 12px; border-top: 1px solid var(--border); }
+.task-chat-research select { max-width: 360px; width: 100%; }
+.task-chat-consent { display: flex; align-items: flex-start; gap: 10px; font-size: var(--text-small); line-height: 1.6; }
+.task-chat-consent input { flex: none; margin-top: 4px; }
+/* The main scrollport already ends above the mobile navigation. */
+@media(max-width:850px) { .task-conversation { min-height: 440px; } }
+@media(max-height:600px) { .task-chat-dock { position: static; }.company-main>#main-content:has(.task-conversation) { scroll-padding-bottom: 24px; } }
+@media(max-width:600px) { .task-thread-entry-human { max-width: 94%; }.task-thread-flow { padding-inline: 0; }.task-chat-composer { padding: 14px; }.task-chat-composer-help kbd { display: none; }.task-chat-options { width: 100%; }.task-chat-options label { flex: 1; min-width: 0; }.task-chat-options select { width: 100%; max-width: none; }.task-chat-send { margin-left: auto; }.task-chat-composer-help { font-size: 12px; } }

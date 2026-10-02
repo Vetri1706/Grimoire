@@ -9,6 +9,7 @@ import type { ControlSurfaceConnection } from './control-api';
 import AgentAvatar from './AgentAvatar';
 import AgentTasks from './AgentTasks';
 import TaskSidePanel from './TaskSidePanel';
+import TaskConversation from './TaskConversation';
 import type { TaskArtifact, TaskDependency } from './TaskSidePanel';
 import { TaskStatus } from './TaskDirectory';
 import { taskFailureExplanation, taskWorkflow } from './task-workflow';
@@ -18,7 +19,7 @@ import './task-run-detail.css';
 type Props = {
   token: string; scion: Scion; preferredTaskId: string; nativeAgents: NativeAgent[];
   runtime?: AgentRuntime; canWrite: boolean; canPrepare?: boolean;
-  control: ControlSurfaceConnection; onNavigate: (path: string) => void;
+  control: ControlSurfaceConnection; onNavigate: (path: string) => void; onDirty?: (dirty: boolean) => void;
 };
 
 const taskTitle = (task: AgentTask) => task.task_kind === 'prepare_capability_plan' ? 'Prepare capability plan' : task.task_kind === 'prepare_physical_scope' ? 'Prepare physical scope' : 'Prepare supplier offer worksheet';
@@ -87,7 +88,7 @@ export default function TaskRunDetail(props: Props) {
   return <TaskRunDetailBody key={`${props.token}:${props.scion.id}`} {...props} />;
 }
 
-function TaskRunDetailBody({ token, scion, preferredTaskId, nativeAgents, runtime, canWrite, canPrepare = false, control, onNavigate }: Props) {
+function TaskRunDetailBody({ token, scion, preferredTaskId, nativeAgents, runtime, canWrite, canPrepare = false, control, onNavigate, onDirty }: Props) {
   const { tasks, error, loading, refresh } = useTaskRecords(token, scion.id, scion.current_revision);
   const { inspectorDock, inspectorSide, showInspector, hideInspector } = useLayoutPreferences();
   const panelOpen = inspectorDock !== 'hidden';
@@ -141,7 +142,8 @@ function TaskRunDetailBody({ token, scion, preferredTaskId, nativeAgents, runtim
       <p>{error || control.error || (loading || control.loading || !projection ? 'Details will appear after the current Scion and source permissions are checked.' : 'This task is not in the latest available records. Return to Tasks or refresh to check again.')}</p>
       {!loading && <button className="button secondary" type="button" onClick={() => void recheck()}>Check again</button>}
     </div> : selected && <div data-inspector-side={inspectorSide} className={`task-run-layout${panelOpen ? '' : ' task-run-layout-wide'}`}>
-      <article className="task-run-main">
+      <article className="task-run-main task-run-chat">
+        <TaskConversation token={token} scion={scion} task={selected} nativeAgents={nativeAgents} canPrepare={canPrepare} onNavigate={onNavigate} onDirty={onDirty} onChanged={recheck} intro={<>
         <header className="task-run-heading">
           <TaskStatus workflow={workflowFor(selected)} />
           <h2>{taskTitle(selected)}</h2>
@@ -157,9 +159,11 @@ function TaskRunDetailBody({ token, scion, preferredTaskId, nativeAgents, runtim
         </div>}
         {selected.status === 'failed' && <p className="task-run-blocker">{taskFailureExplanation(selected.failure_code)}</p>}
         {selected.status === 'completed' && <p className="task-run-review-note">Preparation is complete. Open the proposal to inspect its current review and confirmation state.</p>}
+        </>}>
         <AgentTasks key={selected.id} runtime={checkedRuntime} token={token} scionId={scion.id} currentRevision={scion.current_revision}
           canWrite={canWrite} canPrepareCapability={canPrepare} canDispatchTask={() => !blocked && !stale} tasks={[selected]} error="" compact
           onOpen={openOutput} onChanged={recheck} />
+        </TaskConversation>
       </article>
       {panelOpen && <TaskSidePanel key={selected.id} task={selected} scion={scion} agent={agent} runtime={checkedRuntime}
         workflow={workflowFor(selected)} relatedTasks={relatedTasks} artifacts={artifacts} dependencies={dependencies}

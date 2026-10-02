@@ -5,13 +5,14 @@ import type { InspectorDock, LayoutGeometry } from './layout-preferences';
 import './layout-preferences.css';
 
 type LayoutContextValue = LayoutGeometry & {
+  scopeKey: string;
   effectiveInspectorWidth: number; inspectorResizeMax: number;
   setSidebarWidth: (value: number) => void; setInspectorWidth: (value: number) => void;
   setInspectorDock: (value: InspectorDock) => void; showInspector: () => void;
   hideInspector: () => void; resetLayout: () => void;
 };
 const nothing = () => {};
-const LayoutContext = createContext<LayoutContextValue>({ ...defaultLayout, effectiveInspectorWidth: 340, inspectorResizeMax: 520, setSidebarWidth: nothing, setInspectorWidth: nothing, setInspectorDock: nothing, showInspector: nothing, hideInspector: nothing, resetLayout: nothing });
+const LayoutContext = createContext<LayoutContextValue>({ ...defaultLayout, scopeKey: '', effectiveInspectorWidth: 340, inspectorResizeMax: 520, setSidebarWidth: nothing, setInspectorWidth: nothing, setInspectorDock: nothing, showInspector: nothing, hideInspector: nothing, resetLayout: nothing });
 export const useLayoutPreferences = () => useContext(LayoutContext);
 
 export function LayoutProvider({ userId, organizationId, children }: { userId: string; organizationId: string; children: ReactNode }) {
@@ -53,7 +54,7 @@ function ScopedLayoutProvider({ storageKey, children }: { storageKey: string; ch
   const inspectorResizeMax = Math.min(520, Math.max(280, viewportWidth - geometry.sidebarWidth - 440));
   const effectiveInspectorWidth = Math.min(geometry.inspectorWidth, inspectorResizeMax);
   const style = { '--company-rail': `${geometry.sidebarWidth}px`, '--task-inspector-width': `${effectiveInspectorWidth}px` } as CSSProperties;
-  return <LayoutContext.Provider value={{ ...geometry, effectiveInspectorWidth, inspectorResizeMax, setSidebarWidth, setInspectorWidth, setInspectorDock, showInspector, hideInspector, resetLayout }}>
+  return <LayoutContext.Provider value={{ ...geometry, scopeKey: storageKey, effectiveInspectorWidth, inspectorResizeMax, setSidebarWidth, setInspectorWidth, setInspectorDock, showInspector, hideInspector, resetLayout }}>
     <div className="layout-preferences" data-inspector-dock={geometry.inspectorDock} style={style}>{children}</div>
   </LayoutContext.Provider>;
 }

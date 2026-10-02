@@ -72,6 +72,8 @@ impl From<sqlx::Error> for ApiError {
             Some("G4301") => Self(StatusCode::CONFLICT,"AGENT_UNAVAILABLE","The agent is paused or its runtime bounds do not allow this task.".into()),
             Some("G4302") => Self(StatusCode::PRECONDITION_FAILED,"AGENT_CONFIG_STALE","This configuration has a newer revision. Reopen it before saving.".into()),
             Some("G5201") => Self(StatusCode::FORBIDDEN,"RESEARCH_CONSENT_REQUIRED","This research needs explicit task consent to an active authorized computer.".into()),
+            Some("G5501") => Self(StatusCode::CONFLICT,"TASK_FOLLOWUP_UNAVAILABLE","Wait for the active task to finish or cancel it before requesting follow-up.".into()),
+            Some("G5502") => Self(StatusCode::CONFLICT,"WORKER_UPGRADE_REQUIRED","Update the local worker before running a message-bound task.".into()),
             Some("G2601") => Self(StatusCode::FORBIDDEN,"SOURCE_RIGHTS_DENIED","Source permission has been revoked.".into()),
             Some("G2801") => Self(StatusCode::UNPROCESSABLE_ENTITY,"INVALID_SCOPE","The exact physical scope or evidence binding is incomplete or unavailable.".into()),
             Some("G2802") => Self(StatusCode::CONFLICT,"SCOPE_BLOCKED","The exact scope is ambiguous, incomplete, stale, or bound to mismatched evidence.".into()),

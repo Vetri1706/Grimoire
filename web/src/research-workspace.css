@@ -23,6 +23,13 @@
 .research-layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--task-inspector-width, 340px); align-items: start; border-block: 1px solid var(--border); }
 .research-layout-wide { grid-template-columns: minmax(0, 1fr); }
 .research-main { min-width: 0; padding: 28px; }
+.research-chat-main { padding: 0 28px; }
+.research-deliverable { margin-block: 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.research-deliverable>summary { cursor: pointer; padding: 16px 18px; font-weight: 500; }
+.research-deliverable>summary small { display: block; margin: 5px 0 0 18px; font-weight: 400; font-size: var(--text-meta); }
+.research-deliverable>.research-result { padding: 6px 20px 22px; }
+.research-chat-main .research-objective { max-width: 70ch; }
+.research-chat-main .research-objective>p { white-space: pre-wrap; line-height: 1.65; }
 .research-task-heading, .research-assignee, .research-task-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .research-task-heading { gap: 20px; }
 .research-task-heading>small { font-size: var(--text-meta); }

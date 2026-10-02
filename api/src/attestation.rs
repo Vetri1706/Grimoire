@@ -44,6 +44,8 @@ pub const MIGRATIONS: &[(&str, &[u8])] = &[
     migration!("intake", "0052_public_web_research.sql"),
     migration!("intake", "0053_research_capture_guards.sql"),
     migration!("intake", "0054_research_receipt_locks.sql"),
+    migration!("intake", "0055_task_conversations.sql"),
+    migration!("intake", "0056_task_conversation_dependencies.sql"),
 ];
 
 #[derive(FromRow)]

@@ -6,6 +6,7 @@
 .task-run-layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--task-inspector-width, 340px); align-items: start; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .task-run-layout-wide { grid-template-columns: minmax(0, 1fr); }
 .task-run-main { padding: 28px; min-width: 0; }
+.task-run-main.task-run-chat { padding: 0 28px; }
 .task-run-heading { margin-bottom: 24px; }
 .task-run-heading h2 { margin: 12px 0 16px; font-size: var(--text-heading); line-height: 1.25; font-weight: 600; }
 .task-run-heading p { font-size: var(--text-meta); margin: 12px 0 0; }
@@ -32,6 +33,7 @@
 @media (max-width: 600px) {
   .task-run-toolbar { align-items: flex-start; padding: 16px; }
   .task-run-main, .task-run-unavailable { padding: 24px 16px; }
+  .task-run-main.task-run-chat { padding: 0 16px; }
   .task-run-toolbar>div { gap: 8px; }
   .task-run-toolbar .button { padding-inline: 10px; }
   .task-run-assignment>span:last-child { flex-basis: 100%; padding: 0; margin: 2px 0 0; border: 0; }

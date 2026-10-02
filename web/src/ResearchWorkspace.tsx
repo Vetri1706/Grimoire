@@ -11,6 +11,7 @@ import { TaskStatus } from './TaskDirectory';
 import { useLayoutPreferences } from './LayoutPreferences';
 import TaskSidePanel from './TaskSidePanel';
 import AgentAvatar from './AgentAvatar';
+import TaskConversation from './TaskConversation';
 import './research-workspace.css';
 
 type Props = { token: string; scion: Scion; nativeAgents: NativeAgent[]; runtime?: AgentRuntime; canPrepare: boolean; preferredTaskId: string | null; onNavigate: (path: string) => void; onDirty: (dirty: boolean) => void };
@@ -29,6 +30,7 @@ export default function ResearchWorkspace({ token, scion, nativeAgents, canPrepa
   const [objective, setObjective] = useState(''); const [agentId, setAgentId] = useState(''); const [connectionId, setConnectionId] = useState('');
   const [consent, setConsent] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [reviewNote, setReviewNote] = useState('');
+  const [chatDirty, setChatDirty] = useState(false);
   const submission = useRef<{ body: string; revision: number; key: string; task?: AgentTask; unknown: boolean } | null>(null);
   const reviewRetry = useRef<{ reportId: string; body: string; key: string } | null>(null);
   const mounted = useRef(true); const pending = useRef<AbortController | null>(null);
@@ -44,7 +46,7 @@ export default function ResearchWorkspace({ token, scion, nativeAgents, canPrepa
   const researchTimeout = Math.min(300, selectedAgent?.config.timeout_seconds ?? 300);
   const selectedConnection = capableConnections.find(connection => connection.connection_id === connectionId);
   const locked = busy || Boolean(submission.current);
-  const dirty = Boolean(objective.trim() || reviewNote.trim() || submission.current);
+  const dirty = Boolean(objective.trim() || reviewNote.trim() || submission.current || chatDirty);
   const reportFor = (task: AgentTask) => data?.reports.find(item => item.agent_task_id === task.id);
   const workflowFor = (task: AgentTask) => { const item = reportFor(task); return taskWorkflow({ status: task.status, stale: task.scion_revision !== scion.current_revision || item?.status === 'stale', blocked: item?.status === 'blocked', reviewed: item?.status === 'current' && Boolean(item.input) && Boolean(item.reviews.length) }); };
   const openTask = (id: string) => onNavigate(`/scions/${scion.id}/research/${id}`);
@@ -102,7 +104,13 @@ export default function ResearchWorkspace({ token, scion, nativeAgents, canPrepa
     catch (failure) { if (mounted.current) setError(errorText(failure)); } finally { if (mounted.current) setBusy(false); }
   }
 
-  const artifacts = report ? [{ id: report.id, title: 'Procurement research report', kind: 'Public web research', status: report.status, onOpen: () => document.getElementById('research-result')?.scrollIntoView({ block: 'start' }) }] : [];
+  function openResearchResult() {
+    const result = document.getElementById('research-result');
+    const disclosure = result?.closest('details');
+    if (disclosure) disclosure.open = true;
+    result?.scrollIntoView({ block: 'start' });
+  }
+  const artifacts = report ? [{ id: report.id, title: 'Procurement research report', kind: 'Public web research', status: report.status, onOpen: openResearchResult }] : [];
   return <section className="research-workspace">
     <header className="research-toolbar"><div><button className="text-button" type="button" onClick={() => onNavigate('/tasks')}>← All tasks</button><h2>{selected ? 'Research procurement' : preparing ? 'Start public web research' : 'Research'}</h2></div><div>{selected && <button ref={panelTrigger} type="button" className="button secondary" aria-expanded={panelOpen} onClick={() => panelOpen ? layout.hideInspector() : layout.showInspector()}>{panelOpen ? 'Hide task panel' : 'Show task panel'}</button>}{!preparing && <button type="button" className="button primary" disabled={!canPrepare || !data} onClick={() => onNavigate(`/scions/${scion.id}/research/new`)}>Research the web</button>}</div></header>
     {(error || readError) && <p role="alert" className="error-message">{unsupported ? 'The running API does not yet support public research. Start the updated API after its database migration; your brief is preserved.' : error || readError}<button type="button" className="text-button" onClick={() => void refresh()}>Check again</button></p>}
@@ -119,16 +127,20 @@ export default function ResearchWorkspace({ token, scion, nativeAgents, canPrepa
     </form>}
     {!preparing && !selected && data && <div className="research-task-list">{preferredTaskId ? <p role="status">This task is unavailable in the current Scion.</p> : data.tasks.length ? data.tasks.map(task => <button className="research-task-row" key={task.id} onClick={() => openTask(task.id)}><span><strong>Procurement research</strong><small>Revision {task.scion_revision} · {when(task.created_at)}</small></span><TaskStatus workflow={workflowFor(task)} /><span aria-hidden="true">→</span></button>) : <div className="research-empty"><h3>Turn a sourcing question into a researched plan</h3><p>Describe the requirement. Your agent searches public information and prepares a cited report for you to review.</p></div>}</div>}
     {selected && <div className={`research-layout${panelOpen ? '' : ' research-layout-wide'}`} data-inspector-side={layout.inspectorSide}>
-      <article className="research-main">
+      <article className="research-main research-chat-main">
+        <TaskConversation token={token} scion={scion} task={selected} nativeAgents={nativeAgents} canPrepare={canPrepare} onNavigate={onNavigate} onDirty={setChatDirty} onChanged={refresh}
+          renderResponse={response => response.task_id === selected.id && report?.input ? <button type="button" className="task-thread-deliverable" onClick={openResearchResult}><span>Procurement research report</span><span>Inspect result →</span></button> : undefined} intro={<>
         <div className="research-task-heading"><TaskStatus workflow={workflowFor(selected)} />{nativeAgents.find(agent => agent.id === selected.agent_id) && <span className="research-assignee"><AgentAvatar id={selected.agent_id!} name={nativeAgents.find(agent => agent.id === selected.agent_id)!.config.name} size="sm" />{nativeAgents.find(agent => agent.id === selected.agent_id)!.config.name}</span>}<small>Scion revision {selected.scion_revision}</small></div>
         {selected.scion_revision !== scion.current_revision && <p className="research-blocker">The brief has changed. This result belongs to an earlier revision. Start replacement research against the current brief.</p>}
-        {data?.briefs.find(brief => brief.task_id === selected.id) && <section className="research-objective"><h3>Research brief</h3><p>{data.briefs.find(brief => brief.task_id === selected.id)!.objective}</p></section>}
+        {taskBrief && <details className="task-thread-brief research-objective"><summary>Public research brief · Revision {selected.scion_revision}</summary><p>{taskBrief.objective}</p></details>}
         {selected.status === 'failed' && <p className="research-blocker">{taskFailureExplanation(selected.failure_code)} <code>{selected.failure_code}</code></p>}
         {['dispatched', 'running', 'cancel_requested'].includes(selected.status) && <p role="status">{selected.status === 'dispatched' ? 'Waiting for the authorized research worker.' : selected.status === 'cancel_requested' ? 'Waiting for the worker to stop.' : 'The agent is researching public sources. Its result will appear here.'}</p>}
         <div className="research-task-actions">{selected.status === 'queued' && <button className="button primary" disabled={busy || !canPrepare || selected.scion_revision !== scion.current_revision} onClick={() => void command(selected, 'dispatch')}>Start research</button>}{['queued', 'dispatched', 'running'].includes(selected.status) && <button className="button secondary" disabled={busy || !canPrepare} onClick={() => void command(selected, 'cancel')}>Cancel task</button>}{['failed', 'cancelled'].includes(selected.status) && <button className="button primary" disabled={!canPrepare} onClick={() => onNavigate(`/scions/${scion.id}/research/new`)}>Create replacement research</button>}</div>
-        {report && <ResearchResult report={report} canPrepare={canPrepare} busy={busy} onRevoke={id => void revoke(id)} />}
+        </>}>
+        {report && <details className="research-deliverable"><summary><span>Research report</span><small>{report.status === 'current' ? 'Deliverable · review required' : report.status}</small></summary><ResearchResult report={report} canPrepare={canPrepare} busy={busy} onRevoke={id => void revoke(id)} /></details>}
         {selected.status === 'completed' && report?.input && report.status === 'current' && <section className="research-review"><h3>Review result</h3><p>Check the sources and record your assessment. This does not approve a supplier, purchase, price, or product identity.</p>{report.reviews.map(receipt => <div className="research-review-receipt" key={receipt.id}><p>{receipt.note}</p><small>Review recorded {when(receipt.created_at)}</small></div>)}<form onSubmit={event => void review(event)}><label>Review note<textarea rows={3} value={reviewNote} maxLength={4000} onChange={event => setReviewNote(event.target.value)} disabled={busy || Boolean(reviewRetry.current)} required /></label><button className="button primary" disabled={busy || !canPrepare || !reviewNote.trim()}>{reviewRetry.current ? 'Retry saved review' : 'Record review'}</button></form></section>}
         {!report && selected.status === 'completed' && <p role="status">The saved report is not available in this view. Recheck access before relying on the result.</p>}
+        </TaskConversation>
       </article>
       {panelOpen && <TaskSidePanel task={selected} scion={scion} agent={nativeAgents.find(agent => agent.id === selected.agent_id)} runtime={taskRuntime} workflow={workflowFor(selected)} relatedTasks={data!.tasks.map(task => ({ id: task.id, title: 'Research procurement', status: workflowFor(task), agentId: task.agent_id ?? undefined, agentName: nativeAgents.find(agent => agent.id === task.agent_id)?.config.name }))} artifacts={artifacts} dependencies={(report?.captures ?? []).map(capture => ({ id: capture.id, title: (capture.status === 'revoked') ? 'Withdrawn web source' : capture.final_url || capture.url || 'Source unavailable', status: (capture.status === 'revoked') ? 'Revoked' : capture.status }))} reviewCount={report?.reviews.length} onNavigate={onNavigate} onSelectTask={openTask} onClose={() => { layout.hideInspector(); panelTrigger.current?.focus(); }} />}
     </div>}
@@ -139,8 +151,8 @@ function ResearchResult({ report, canPrepare, busy, onRevoke }: { report: Resear
   if (!report.input) return <p className="research-blocker">Source access has changed. This report is hidden until replacement research is available.</p>;
   const input = report.input;
   return <section id="research-result" className="research-result"><div className="research-result-heading"><h3>Research report</h3><span>Agent findings · unverified</span></div><p>{input.summary}</p>
-    <section><h3>Procurement process</h3>{input.process_steps.length ? <ol className="research-steps">{input.process_steps.map((step, index) => <li key={index}><h4>{step.title}</h4><p>{step.detail}</p><div className="research-citations">{step.source_urls.length ? step.source_urls.map(url => <SourceLink key={url} url={url} />) : <span>Agent inference ? no source attached</span>}</div></li>)}</ol> : <p>No supported process steps were found.</p>}</section>
-    <section><h3>Candidates to assess</h3>{input.candidates.length ? input.candidates.map((candidate, index) => <article className="research-candidate" key={index}><h4><SourceLink url={candidate.url}>{candidate.name}</SourceLink></h4><p>{candidate.rationale}</p><div className="research-citations">{candidate.source_urls.length ? candidate.source_urls.map(url => <SourceLink key={url} url={url} />) : <span>Agent inference ? no source attached</span>}</div></article>) : <p>No supported candidates were found.</p>}</section>
+    <section><h3>Procurement process</h3>{input.process_steps.length ? <ol className="research-steps">{input.process_steps.map((step, index) => <li key={index}><h4>{step.title}</h4><p>{step.detail}</p><div className="research-citations">{step.source_urls.length ? step.source_urls.map(url => <SourceLink key={url} url={url} />) : <span>Agent inference; no source attached</span>}</div></li>)}</ol> : <p>No supported process steps were found.</p>}</section>
+    <section><h3>Candidates to assess</h3>{input.candidates.length ? input.candidates.map((candidate, index) => <article className="research-candidate" key={index}><h4><SourceLink url={candidate.url}>{candidate.name}</SourceLink></h4><p>{candidate.rationale}</p><div className="research-citations">{candidate.source_urls.length ? candidate.source_urls.map(url => <SourceLink key={url} url={url} />) : <span>Agent inference; no source attached</span>}</div></article>) : <p>No supported candidates were found.</p>}</section>
     {input.unresolved_gaps.length > 0 && <section><h3>Still needs an answer</h3><ul>{input.unresolved_gaps.map((gap, index) => <li key={index}>{gap}</li>)}</ul></section>}
     <section><h3>Sources</h3><p className="research-help">Captures record what the server retrieved at that time. They do not verify the agent’s interpretation or establish current pricing or availability.</p>{input.sources.map((source, index) => <div className="research-source" key={index}><SourceLink url={source.url}>{source.title}</SourceLink><small>{source.url}</small></div>)}{report.captures.map(capture => <details className="research-capture" key={capture.id}><summary>{capture.final_url || capture.url} · {(capture.status === 'revoked') ? 'Withdrawn' : capture.status}</summary>{(capture.status === 'revoked') ? <p>Captured content has been withdrawn.</p> : <><p className="research-help">Retrieved {when(capture.fetched_at)}</p>{capture.failure_code && <p>{capture.failure_code}</p>}{capture.excerpt && <pre>{capture.excerpt}</pre>}{capture.content_sha256 && <p className="research-hash">SHA-256 <code>{capture.content_sha256}</code></p>}{canPrepare && <button type="button" className="text-button" disabled={busy} onClick={() => onRevoke(capture.id)}>Withdraw source</button>}</>}</details>)}</section>
     <details className="research-provenance"><summary>Research provenance</summary><p>Report saved {when(report.created_at)} · Scion revision {report.scion_revision}</p><ol>{input.queries.map((query, index) => <li key={index}>{query.query}<small>{when(query.observed_at)}</small></li>)}</ol><code>{report.id}</code></details>
