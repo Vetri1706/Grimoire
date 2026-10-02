@@ -1,0 +1,142 @@
+name: grimoire-aws
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '5m'
+    max-file: '2'
+
+services:
+  db:
+    image: postgres:17-bookworm
+    network_mode: host
+    command: [postgres, -c, listen_addresses=127.0.0.1, -c, port=55432, -c, shared_buffers=128MB, -c, max_connections=40, -c, work_mem=4MB]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run configure.sh}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C --auth-host=scram-sha-256
+    volumes:
+      - pg17:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -p 55432 -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *logging
+
+  storage:
+    image: ${STORAGE_IMAGE:-grimoire-storage:local}
+    network_mode: host
+    command: [server, /data, --address, '127.0.0.1:19000', --console-address, '127.0.0.1:19001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Run configure.sh}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Run configure.sh}
+      MINIO_BROWSER: 'off'
+      # Soft Go GC target; the container limit remains the hard boundary.
+      GOMEMLIMIT: 448MiB
+      GOMAXPROCS: '2'
+    volumes:
+      - objects:/data
+    mem_limit: 640m
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    image: postgres:17-bookworm
+    network_mode: host
+    profiles: [tools]
+    entrypoint: [sh, /workspace/deploy/aws/init-db.sh]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run configure.sh}
+      INTAKE_DB_PASSWORD: ${INTAKE_DB_PASSWORD:?Run configure.sh}
+      PGPORT: '55432'
+    volumes:
+      - ../../db:/workspace/db:ro
+      - ../../api/src/attestation.rs:/workspace/api/src/attestation.rs:ro
+      - ./init-db.sh:/workspace/deploy/aws/init-db.sh:ro
+      - ./migrate.sh:/workspace/deploy/aws/migrate.sh:ro
+    logging: *logging
+
+  storage-init:
+    image: ${MC_IMAGE:-grimoire-mc:local}
+    network_mode: host
+    profiles: [tools]
+    entrypoint: [sh, /init-storage.sh]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Run configure.sh}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Run configure.sh}
+      GRIMOIRE_S3_ACCESS_KEY: ${GRIMOIRE_S3_ACCESS_KEY:?Run configure.sh}
+      GRIMOIRE_S3_SECRET_KEY: ${GRIMOIRE_S3_SECRET_KEY:?Run configure.sh}
+      GRIMOIRE_S3_BUCKET: grimoire-sources-prod
+    volumes:
+      - ./init-storage.sh:/init-storage.sh:ro
+    logging: *logging
+
+  api:
+    image: ${API_IMAGE:-grimoire-api:local}
+    network_mode: host
+    environment:
+      DATABASE_URL: postgres://grimoire_intake_app:${INTAKE_DB_PASSWORD:?Run configure.sh}@127.0.0.1:55432/grimoire_prod
+      GRIMOIRE_BIND: 127.0.0.1:8080
+      GRIMOIRE_COOKIE_SECURE: 'true'
+      GRIMOIRE_GOOGLE_CLIENT_ID: ${GRIMOIRE_GOOGLE_CLIENT_ID:-}
+      GRIMOIRE_S3_ENDPOINT: http://127.0.0.1:19000
+      GRIMOIRE_S3_REGION: us-east-1
+      GRIMOIRE_S3_BUCKET: grimoire-sources-prod
+      GRIMOIRE_S3_ACCESS_KEY: ${GRIMOIRE_S3_ACCESS_KEY:?Run configure.sh}
+      GRIMOIRE_S3_SECRET_KEY: ${GRIMOIRE_S3_SECRET_KEY:?Run configure.sh}
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_started
+    read_only: true
+    tmpfs: [/tmp:size=16m]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 384m
+    restart: unless-stopped
+    logging: *logging
+
+  web:
+    image: ${WEB_IMAGE:-grimoire-web:local}
+    network_mode: host
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    read_only: true
+    tmpfs: [/var/cache/nginx:size=24m, /var/run:size=1m, /tmp:size=8m]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    restart: unless-stopped
+    logging: *logging
+
+  https:
+    image: caddy:2.10.2-alpine
+    network_mode: host
+    environment:
+      DOMAIN: ${DOMAIN:?Set the DNS hostname}
+      ACME_EMAIL: ${ACME_EMAIL:?Set certificate contact email}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+      - caddy_config:/config
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    restart: unless-stopped
+    logging: *logging
+
+  seed-demo:
+    image: ${OPS_IMAGE:-grimoire-ops:local}
+    network_mode: host
+    profiles: [tools]
+    command: [node, /app/scripts/seed-judge-demo.mjs, --api, 'http://127.0.0.1:8080', --database, grimoire_prod, --config, /run/operator.env]
+    volumes:
+      - ./.env:/run/operator.env:ro
+    logging: *logging
+
+volumes:
+  pg17:
+  objects:
+  certificates:
+  caddy_config:

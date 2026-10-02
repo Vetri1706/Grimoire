@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { SESSION_AUTH, request } from './api';
 import type { SessionState } from './api';
 import GoogleSignIn from './GoogleSignIn';
+import GrimoireLogo from './GrimoireLogo';
 import './onboarding.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : 'The request failed. Please retry.';
@@ -10,7 +11,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
 function Shell({ step, title, description, appearance, children, centered = false }: { step: string; title: string; description: string; appearance: ReactNode; children: ReactNode; centered?: boolean }) {
   const progress = <ol className="onboarding-steps" aria-label="Onboarding progress"><li data-current={step.startsWith('STEP 1 ') || undefined} aria-current={step.startsWith('STEP 1 ') ? 'step' : undefined}>Handler identity</li><li data-current={step.startsWith('STEP 2 ') || undefined} aria-current={step.startsWith('STEP 2 ') ? 'step' : undefined}>Organization</li><li data-current={step.startsWith('STEP 3 ') || undefined} aria-current={step.startsWith('STEP 3 ') ? 'step' : undefined}>First Scion</li></ol>;
   return <main className={`onboarding-page${centered ? ' onboarding-creation-page' : ''}`}>
-    <header className="onboarding-brand"><span className="onboarding-mark" aria-hidden="true">G</span><span>GRIMOIRE</span><span className="local-tag">WORKSPACE</span>{appearance}</header>
+    <header className="onboarding-brand"><GrimoireLogo size={36} /><span>GRIMOIRE</span><span className="local-tag">WORKSPACE</span>{appearance}</header>
     <div className="onboarding-layout">
       <section className="onboarding-intro">{centered && progress}<p className="eyebrow">{step}</p><h1>{title}</h1><p>{description}</p>{!centered && progress}</section>
       {children}

@@ -8,3 +8,4 @@
 *.exe
 web/.vite/
 *.tsbuildinfo
+deploy/aws/backups/

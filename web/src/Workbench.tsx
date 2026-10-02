@@ -7,6 +7,7 @@ import { proposalPath } from './workspace-api';
 import type { ProposalSummary, WorkspaceState, useWorkspace } from './workspace-api';
 import TaskDirectory from './TaskDirectory';
 import AgentAvatar from './AgentAvatar';
+import GrimoireLogo from './GrimoireLogo';
 import { taskWorkflow } from './task-workflow';
 import WorkStateGlyph from './WorkStateGlyph';
 import { useLayoutPreferences } from './LayoutPreferences';
@@ -134,7 +135,7 @@ function OrganizationMenu({ principal, organizations, route, onNavigate, onSwitc
   }, [open]);
   const act = (action: () => void) => { setOpen(false); trigger.current?.focus(); action(); };
   return <div className="company-organization" ref={root} onBlur={event => { if (!root.current?.contains(event.relatedTarget as Node)) setOpen(false); }}>
-    <button ref={trigger} className="company-brand" aria-label="Organization menu" title={principal.organization_name} data-organization-id={principal.org_id} aria-expanded={open} aria-controls={open ? 'organization-options' : undefined} onClick={() => setOpen(value => !value)}><span className="company-avatar">G</span><span><strong>Grimoire</strong><small>{principal.organization_name}</small></span><WorkIcon name="chevrons" /></button>
+    <button ref={trigger} className="company-brand" aria-label="Organization menu" title={principal.organization_name} data-organization-id={principal.org_id} aria-expanded={open} aria-controls={open ? 'organization-options' : undefined} onClick={() => setOpen(value => !value)}><GrimoireLogo /><span><strong>Grimoire</strong><small>{principal.organization_name}</small></span><WorkIcon name="chevrons" /></button>
     {open && <div id="organization-options" className="company-organization-options" role="group" aria-label="Organizations" aria-busy={busy}>
       <p className="company-menu-label">Your organizations</p>
       <div className="company-organization-list">{organizations.map(organization => <button key={organization.org_id} autoFocus={organization.org_id === principal.org_id} aria-label={`Switch to ${organization.organization_name}`} aria-current={organization.org_id === principal.org_id ? 'true' : undefined} data-organization-id={organization.org_id} disabled={busy} onClick={() => act(() => { if (organization.org_id !== principal.org_id) onSwitch(organization.org_id); })}><span className="company-avatar">{organization.organization_name.charAt(0)}</span><span>{organization.organization_name}</span>{organization.org_id === principal.org_id && <span className="company-organization-check" aria-hidden="true">✓</span>}</button>)}</div>

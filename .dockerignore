@@ -1,0 +1,23 @@
+# Deliberate build-context allowlist: never send local data or credentials.
+**
+!api/
+!api/Cargo.toml
+!api/Cargo.lock
+!api/src/
+!api/src/**
+!db/
+!db/**
+!deploy/
+!deploy/aws/
+!deploy/aws/**
+!scripts/
+!scripts/seed-judge-demo.mjs
+!web/
+!web/dist/
+!web/dist/**
+**/.env
+**/.env.*
+**/secrets/**
+**/*.dump
+**/*.log
+**/backups/**

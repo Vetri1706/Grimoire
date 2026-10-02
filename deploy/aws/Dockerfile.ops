@@ -1,0 +1,6 @@
+FROM node:22-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY scripts/seed-judge-demo.mjs /app/scripts/seed-judge-demo.mjs
+# The operator invokes this one-shot image; it is never a public service.

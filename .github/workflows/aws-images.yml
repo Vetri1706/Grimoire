@@ -1,0 +1,112 @@
+name: Build AWS host images
+
+# Deliberately manual: this workflow neither provisions AWS nor deploys a host.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the successfully built SHA-tagged images to GHCR
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  images:
+    name: Build ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        component: [api, web, ops, storage, mc]
+    steps:
+      - name: Check out the requested revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node for the frontend build
+        if: matrix.component == 'web'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the actual production frontend
+        if: matrix.component == 'web'
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Name the image using the full source revision
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          echo "tag=ghcr.io/${REPOSITORY,,}-${COMPONENT}:sha-${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build Linux amd64 image off the production host
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: deploy/aws/Dockerfile.${{ matrix.component }}
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.image.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Check packaged executable and architecture
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          test "$(docker image inspect "$IMAGE" --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
+          case "$COMPONENT" in
+            storage|mc) docker run --rm "$IMAGE" --version ;;
+            web) docker run --rm "$IMAGE" nginx -t ;;
+            ops) docker run --rm "$IMAGE" node --version ;;
+            api) docker run --rm --entrypoint sh "$IMAGE" -c 'test -x /usr/local/bin/grimoire-api' ;;
+          esac
+
+      - name: Sign in to GHCR only when publishing is requested
+        if: inputs.publish
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the checked image
+        if: inputs.publish
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+        run: docker push "$IMAGE"
+
+      - name: Record the build boundary
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          printf 'Image: `%s`\n\nPublish requested: `%s`\n\n' "$IMAGE" "$PUBLISH" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'This checks image packaging only. Database attestation, live storage, HTTPS, host memory and the deployed judge journey still require verification.' >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,3 @@
+.grimoire-logo { display: block; position: relative; flex-shrink: 0; overflow: hidden; }
+/* Frame the supplied PNG's transparent margins without changing its artwork. */
+.grimoire-logo img { position: absolute; width: 146.2%; height: 146.2%; max-width: none; left: -25.4%; top: -25.6%; object-fit: contain; }

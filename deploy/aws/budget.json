@@ -1,0 +1,13 @@
+{
+  "BudgetName": "Grimoire-monthly-account-spend",
+  "BudgetLimit": { "Amount": "15", "Unit": "USD" },
+  "TimeUnit": "MONTHLY",
+  "BudgetType": "COST",
+  "CostTypes": {
+    "IncludeCredit": false,
+    "IncludeRefund": false,
+    "IncludeTax": true,
+    "UseBlended": false,
+    "UseAmortized": false
+  }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import ControlSurface from './ControlSurface';
+import GrimoireLogo from './GrimoireLogo';
 import { useControlSurface } from './control-api';
 import { demoRequest, isDemoCatalog } from './demo-api';
 import type { DemoCatalog, DemoScenario } from './demo-api';
@@ -35,7 +36,7 @@ export default function PublicDemo() {
   }, [retry]);
   const selected = catalog?.scenarios.find(scenario => scenario.slug === slug) ?? catalog?.scenarios.find(scenario => scenario.slug === 'current');
   return <main className="public-demo">
-    <header className="demo-header"><a className="demo-brand" href="/" aria-label="Grimoire home"><span aria-hidden="true">G</span>GRIMOIRE</a><span className="demo-readonly">SYNTHETIC JUDGE DEMO · READ ONLY</span><ThemePicker /><a className="button secondary" href="/">Sign in / open workspace <span aria-hidden="true">↗</span></a></header>
+    <header className="demo-header"><a className="demo-brand" href="/" aria-label="Grimoire home"><GrimoireLogo />GRIMOIRE</a><span className="demo-readonly">SYNTHETIC JUDGE DEMO · READ ONLY</span><ThemePicker /><a className="button secondary" href="/">Sign in / open workspace <span aria-hidden="true">↗</span></a></header>
     <section className="demo-intro"><p className="eyebrow">A PLAN. ITS EVIDENCE. YOUR DECISION.</p><h1>See why a plan needs review.</h1><p>Explore a website plan, the sources it depends on, and the decisions that still need a person.</p><details className="demo-boundary"><summary>How this demo works <span>Read-only · synthetic records</span></summary><p>{catalog?.description ?? 'These are saved synthetic examples of the review workflow.'}</p><p>Each case is a separate saved record. Selecting one reads its current state; it does not revise a requirement or revoke a source. No actual Codex or Paperclip run was executed. No personal login or private workspace is shared.</p><dl><div><dt>Project (Scion)</dt><dd>The brief and requirements being reviewed.</dd></div><div><dt>Watchtower</dt><dd>Server checks that record changes to requirements, sources and tasks.</dd></div><div><dt>Provenance</dt><dd>Where a record came from and which revision it uses.</dd></div></dl></details></section>
     {error ? <section className="demo-unavailable" role="alert"><h2>Demo unavailable</h2><p>{error}</p><p>Case content is hidden. No simulated state is substituted.</p><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}>Retry demo</button></section> : !catalog ? <p className="demo-loading" role="status">Loading the published synthetic cases…</p> : <>
       <nav className="demo-scenarios" aria-label="Synthetic case scenarios">{catalog.scenarios.map((scenario, index) => <a key={scenario.slug} href={`#${scenario.slug}`} aria-current={scenario.slug === selected?.slug ? 'page' : undefined}><span className="demo-step">0{index + 1}</span><div><h2>{scenario.title}</h2><p>{scenario.description}</p></div><span aria-hidden="true">↗</span></a>)}</nav>

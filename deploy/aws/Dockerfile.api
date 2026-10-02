@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+ARG RUST_IMAGE=rust:1.96.0-bookworm
+FROM ${RUST_IMAGE} AS build
+WORKDIR /build
+# The binary embeds the exact migration bytes and reviewed catalog at compile time.
+COPY api/Cargo.toml api/Cargo.lock ./api/
+COPY api/src ./api/src
+COPY db ./db
+ENV CARGO_BUILD_JOBS=2
+RUN cargo build --manifest-path api/Cargo.toml --release --locked \
+    && strip api/target/release/grimoire-api
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 grimoire \
+    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin grimoire
+COPY --from=build /build/api/target/release/grimoire-api /usr/local/bin/grimoire-api
+COPY deploy/aws/api-entrypoint.sh /usr/local/bin/grimoire-api-entrypoint
+USER 10001:10001
+ENV GRIMOIRE_BIND=127.0.0.1:8080
+ENTRYPOINT ["sh", "/usr/local/bin/grimoire-api-entrypoint"]

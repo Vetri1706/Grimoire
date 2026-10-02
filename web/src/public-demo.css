@@ -1,7 +1,6 @@
 .public-demo { max-width: 1480px; min-height: 100vh; margin: 0 auto; padding: 24px clamp(16px,4vw,64px); }
 .demo-header { display: flex; align-items: center; gap: 24px; padding: 16px 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-background); box-shadow: var(--panel-shadow); backdrop-filter: blur(12px); }
 .demo-brand { display: inline-flex; align-items: center; gap: 10px; font-size: .9rem; font-weight: 600; letter-spacing: -.3px; color: var(--foreground); text-decoration: none; }
-.demo-brand>span { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius); color: var(--primary-foreground); background: var(--primary); font: 600 1rem var(--font-sans); }
 .demo-readonly { font: var(--text-small) var(--font-mono); color: var(--muted-foreground); letter-spacing: .6px; }
 .demo-header>.button { margin-left: auto; text-decoration: none; white-space: nowrap; font-size: .75rem; }
 .demo-intro { padding: 40px 0 28px; max-width: 960px; }

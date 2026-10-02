@@ -11,7 +11,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const options = Object.fromEntries(process.argv.slice(2).map((item, index, args) =>
   item.startsWith('--') ? [item.slice(2), args[index + 1]] : []).filter(pair => pair.length));
 const database = options.database ?? 'grimoire_dev';
-assert.ok(['grimoire_dev', 'grimoire_test'].includes(database), 'Only named local Grimoire databases are supported.');
+assert.ok(['grimoire_dev', 'grimoire_test', 'grimoire_prod'].includes(database), 'Only named Grimoire databases are supported; seed through host-local HTTP.');
 const api = new URL(options.api ?? 'http://127.0.0.1:8080');
 assert.ok(api.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(api.hostname) && !api.username && !api.password,
   'Seed from the deployment host through loopback HTTP; never send seed credentials to a remote server.');

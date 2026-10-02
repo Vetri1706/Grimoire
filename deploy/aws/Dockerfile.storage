@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+# Upstream's final security release requires source builds. Never substitute an
+# older prebuilt MinIO image: RELEASE.2025-10-15T17-29-55Z fixes a policy bypass.
+# Build off-host; compilation does not fit the production 2-GB memory budget.
+ARG GO_IMAGE=golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195
+FROM ${GO_IMAGE} AS build
+ARG MINIO_COMMIT=9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
+ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOMAXPROCS=2
+WORKDIR /src
+RUN git init . \
+    && git remote add origin https://github.com/minio/minio.git \
+    && git fetch --depth=1 origin "${MINIO_COMMIT}" \
+    && git checkout --detach FETCH_HEAD \
+    && test "$(git rev-parse HEAD)" = "${MINIO_COMMIT}" \
+    && go mod download \
+    && go mod verify \
+    && mkdir -p /out/notices \
+    && go build -p 2 -mod=readonly -trimpath \
+        -ldflags "$(go run buildscripts/gen-ldflags.go 2025-10-15T17:29:55Z)" \
+        -o /out/minio . \
+    && /out/minio --version \
+    && cp LICENSE /out/notices/LICENSE \
+    && cp CREDITS /out/notices/CREDITS \
+    && git archive --format=tar.gz --prefix=minio/ HEAD > /out/notices/upstream-source.tar.gz \
+    && printf '%s\n' "Upstream release: RELEASE.2025-10-15T17-29-55Z" \
+        "Source commit: ${MINIO_COMMIT}" \
+        'Unmodified upstream source; locally compiled distribution.' > /out/notices/SOURCE.txt
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10002 minio \
+    && useradd --uid 10002 --gid 10002 --no-create-home --shell /usr/sbin/nologin minio \
+    && mkdir -p /data /home/minio \
+    && chown 10002:10002 /data /home/minio
+COPY --from=build /out/minio /usr/local/bin/minio
+COPY --from=build /out/notices/ /usr/share/doc/minio/
+LABEL org.opencontainers.image.title="Grimoire private MinIO storage" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+      io.grimoire.upstream.source="https://github.com/minio/minio" \
+      io.grimoire.upstream.revision="9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a"
+USER 10002:10002
+ENV HOME=/home/minio MINIO_BROWSER=off
+EXPOSE 19000
+ENTRYPOINT ["/usr/local/bin/minio"]
+CMD ["server", "/data", "--address", "127.0.0.1:19000", "--console-address", "127.0.0.1:19001"]

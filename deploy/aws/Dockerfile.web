@@ -1,0 +1,6 @@
+FROM nginx:1.28-alpine
+# Build web/dist with npm ci && npm run build before building this image.
+COPY web/dist/ /usr/share/nginx/html/
+COPY deploy/aws/nginx.conf /etc/nginx/nginx.conf
+RUN test -f /usr/share/nginx/html/index.html && nginx -t
+EXPOSE 8088
