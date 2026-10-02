@@ -2,6 +2,9 @@ param(
     [ValidateSet('PrepareCatalog','Check')]
     [string]$Task = 'Check',
     [string]$ApiBinary,
+    [string]$ConfigFile,
+    [ValidatePattern('^grimoire_[a-z0-9_]*test$')]
+    [string]$UpgradeDatabase = 'grimoire_test',
     [ValidatePattern('^grimoire_startup_[a-z0-9_]+_test$')]
     [string]$CleanDatabase = 'grimoire_startup_agents_v1_test'
 )
@@ -9,12 +12,13 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $localRoot = Join-Path $projectRoot '.local'
 $cleanDatabase = $CleanDatabase
-$upgradeDatabase = 'grimoire_test'
+$upgradeDatabase = $UpgradeDatabase
 $psql = Join-Path $projectRoot '.tools/pgsql/bin/psql.exe'
 if (-not $ApiBinary) { $ApiBinary = Join-Path $projectRoot 'api/target/debug/grimoire-api.exe' }
 if (-not (Test-Path -LiteralPath $psql)) { throw 'Native PostgreSQL 17 psql is unavailable. No database was changed.' }
 $config = @{}
-foreach ($line in Get-Content -LiteralPath (Join-Path $projectRoot '.env')) {
+if (-not $ConfigFile) { $ConfigFile = Join-Path $projectRoot '.env' }
+foreach ($line in Get-Content -LiteralPath $ConfigFile) {
     if ($line -match '^([A-Z0-9_]+)=(.*)$') { $config[$Matches[1]] = $Matches[2] }
 }
 foreach ($key in @('POSTGRES_PASSWORD','INTAKE_DB_PASSWORD')) {
@@ -103,7 +107,13 @@ $migrationFiles = @(
     'db/intake/0045_handler_registration.sql',
     'db/intake/0046_public_judge_demo.sql',
     'db/intake/0047_google_identity.sql',
-    'db/intake/0048_handler_profile.sql'
+    'db/intake/0048_handler_profile.sql',
+    'db/intake/0049_workspace_preparation.sql',
+    'db/intake/0050_worker_connections.sql',
+    'db/intake/0051_capability_plan_reviews.sql',
+    'db/intake/0052_public_web_research.sql',
+    'db/intake/0053_research_capture_guards.sql',
+    'db/intake/0054_research_receipt_locks.sql'
 )
 $attestationSource = Get-Content -LiteralPath (Join-Path $projectRoot 'api/src/attestation.rs') -Raw
 $compiledFiles = @([regex]::Matches($attestationSource, 'migration!\("([^"]+)",\s*"([^"]+)"\)') | ForEach-Object { "db/$($_.Groups[1].Value)/$($_.Groups[2].Value)" })

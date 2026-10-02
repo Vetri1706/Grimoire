@@ -12,10 +12,10 @@
 .onboarding-access { min-width: 0; }
 .onboarding-card { padding: 24px; border: 1px solid var(--border); background: var(--panel-background); border-radius: var(--radius); box-shadow: var(--panel-shadow), inset 0 1px 0 var(--panel-rim); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .onboarding-card h2 { margin: 6px 0 16px; font-size: var(--text-heading); }
-.onboarding-card label { margin: 0 0 4px; color: var(--foreground); font-size: .875rem; font-weight: 500; }
+.onboarding-card label { margin: 0 0 4px; color: var(--foreground); font-size: var(--text-body); font-weight: 500; }
 .onboarding-fields { display: grid; gap: 12px; }
-.onboarding-card input { min-height: 40px; padding: 8px 12px; font-size: .875rem; line-height: 22px; }
-.onboarding-card .button { min-height: 40px; padding: 8px 14px; font-size: .875rem; line-height: 22px; }
+.onboarding-card input { min-height: 40px; padding: 8px 12px; font-size: var(--text-body); line-height: 22px; }
+.onboarding-card .button { min-height: 40px; padding: 8px 14px; font-size: var(--text-body); line-height: 22px; }
 .onboarding-card .error-message { margin: 12px 0 0; }
 .onboarding-card>.button.full { margin-top: 16px; }
 .onboarding-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
@@ -23,19 +23,19 @@
 .onboarding-boundary summary { cursor: pointer; font-weight: 500; line-height: 1.5; }
 .onboarding-boundary p { margin-top: 10px; line-height: 1.6; }
 .onboarding-access-tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; background: var(--muted); }
-.onboarding-access-tabs button { flex: 1; min-height: 32px; padding: 5px 10px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--foreground); font: inherit; font-size: .875rem; transition: background var(--motion-duration-fast) var(--motion-ease-standard), box-shadow var(--motion-duration-fast) var(--motion-ease-standard); }
+.onboarding-access-tabs button { flex: 1; min-height: 32px; padding: 5px 10px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-body); transition: background var(--motion-duration-fast) var(--motion-ease-standard), box-shadow var(--motion-duration-fast) var(--motion-ease-standard); }
 .onboarding-access-tabs button[aria-pressed="true"] { background: var(--surface-raised); color: var(--foreground); box-shadow: var(--shadow-sm); }
 :root[data-theme="light"] .onboarding-access-tabs button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
 .onboarding-access-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 16px; padding: 0 2px; }
 .onboarding-demo-link { display: flex; flex-direction: column; gap: 2px; text-decoration: none; }
-.onboarding-demo-link strong { display: flex; gap: 10px; align-items: center; color: var(--foreground); font-size: .875rem; font-weight: 500; }
-.onboarding-demo-link span { color: var(--foreground); font-size: .75rem; line-height: 1.5; }
+.onboarding-demo-link strong { display: flex; gap: 10px; align-items: center; color: var(--foreground); font-size: var(--text-body); font-weight: 500; }
+.onboarding-demo-link span { color: var(--foreground); font-size: var(--text-meta); line-height: 1.5; }
 .onboarding-demo-link:hover strong { text-decoration: underline; text-underline-offset: 4px; }
-.onboarding-owner-link { font-size: .75rem; color: var(--foreground); }
+.onboarding-owner-link { font-size: var(--text-meta); color: var(--foreground); }
 .onboarding-google { margin-top: 14px; }
-.onboarding-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--foreground); font-size: .75rem; }
+.onboarding-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--foreground); font-size: var(--text-meta); }
 .onboarding-divider::before, .onboarding-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-.onboarding-google-status { color: var(--foreground); font-size: .75rem; line-height: 1.5; margin: 8px 0 0; }
+.onboarding-google-status { color: var(--foreground); font-size: var(--text-meta); line-height: 1.5; margin: 8px 0 0; }
 .onboarding-google-status .text-button { color: var(--foreground); font: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .onboarding-google-button { width: 100%; min-height: 40px; }
 .onboarding-google-button[hidden] { display: none; }
@@ -69,7 +69,7 @@
 }
 @media (max-width: 430px) {
   .onboarding-brand .theme-picker select { min-width: 92px; }
-  .onboarding-steps li { font-size: .75rem; }
+  .onboarding-steps li { font-size: var(--text-meta); }
   .onboarding-actions { flex-direction: column-reverse; }
   .onboarding-actions .button { width: 100%; }
   .onboarding-organization-card .onboarding-actions { flex-direction: row; }

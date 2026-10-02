@@ -506,6 +506,11 @@ mod tests {
 
     #[test]
     fn signed_google_claims_require_current_bounded_lifetime_and_nonce() {
+        // Key generation can take several seconds under parallel test load.
+        // Build it before sampling time, and keep iat fixed across the cases so
+        // an overlong lifetime cannot become valid as the loop advances.
+        let _ = rsa();
+        let base = claims();
         let now = jsonwebtoken::get_current_timestamp();
         for (field, value) in [
             ("exp", json!(now)),
@@ -518,7 +523,7 @@ mod tests {
             ("sub", json!("x".repeat(256))),
             ("sub", json!("subject with spaces")),
         ] {
-            let mut bad = claims();
+            let mut bad = base.clone();
             bad[field] = value;
             assert!(!accepts(&bad), "{field}");
         }

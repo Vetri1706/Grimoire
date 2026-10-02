@@ -19,13 +19,14 @@ type adaptiveConnector struct {
 }
 
 type adaptivePlan struct {
-	ID            string          `json:"id"`
-	ScionRevision int             `json:"scion_revision"`
-	AgentTaskID   string          `json:"agent_task_id"`
-	Status        string          `json:"status"`
-	Input         json.RawMessage `json:"input"`
-	CreatedBy     string          `json:"created_by"`
-	CreatedAt     string          `json:"created_at"`
+	ID            string             `json:"id"`
+	ScionRevision int                `json:"scion_revision"`
+	AgentTaskID   string             `json:"agent_task_id"`
+	Status        string             `json:"status"`
+	Input         json.RawMessage    `json:"input"`
+	CreatedBy     string             `json:"created_by"`
+	CreatedAt     string             `json:"created_at"`
+	Reviews       []capabilityReview `json:"reviews"`
 }
 
 type adaptiveComparison struct {
@@ -819,7 +820,10 @@ func (h *harness) runAdaptive() error {
 	}); e != nil {
 		return e
 	}
-	return h.adaptiveStaleChecks()
+	if err := h.adaptiveStaleChecks(); err != nil {
+		return err
+	}
+	return h.runCapabilityReviews()
 }
 
 func mustJSON(value any) []byte { data, _ := json.Marshal(value); return data }

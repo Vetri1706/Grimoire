@@ -1,0 +1,7 @@
+.work-state-glyph { display: inline-grid; place-items: center; box-sizing: border-box; width: 15px; height: 15px; flex: 0 0 15px; border-radius: 50%; border: 1.5px solid currentColor; line-height: 1; font-size: 12px; font-weight: 600; color: var(--foreground); }
+.work-state-glyph-todo { border-style: dashed; }
+.work-state-glyph-in_progress { color: var(--info); background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+.work-state-glyph-needs_input { color: var(--warning); }
+.work-state-glyph-needs_review { color: var(--review); }
+.work-state-glyph-blocked { color: var(--destructive); }
+.work-state-glyph-completed { color: var(--success); }

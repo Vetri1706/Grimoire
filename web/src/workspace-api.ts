@@ -5,12 +5,12 @@ import type { Scion } from './api';
 import type { DataConnector } from './adaptive-api';
 import type { ControlSurfaceState } from './control-api';
 
-export type ProposalSummary = { id: string; scion_id: string; scion_revision: number; kind: 'capability_proposal' | 'comparison' | 'scope' | 'offers'; title: string; status: string; created_at: string };
+export type ProposalSummary = { id: string; scion_id: string; scion_revision: number; kind: 'capability_proposal' | 'comparison' | 'scope' | 'offers' | 'research'; title: string; status: string; created_at: string; agent_task_id?: string };
 export type WorkspaceState = {
   org_id: string; generated_at: string; scions: Scion[]; proposals: ProposalSummary[]; collection_limit: number;
-  tasks: (Omit<ControlSurfaceState['operations']['tasks'][number], 'completed_at' | 'failure_code'> & { scion_id: string })[];
+  tasks: (ControlSurfaceState['operations']['tasks'][number] & { scion_id: string; agent_id: string | null; agent_revision: number | null; review_recorded: boolean })[];
   reviews: (ControlSurfaceState['operations']['human_review'][number] & { scion_id: string })[];
-  events: (Omit<ControlSurfaceState['operations']['events'][number], 'subject_id'> & { scion_id: string })[];
+  events: (ControlSurfaceState['operations']['events'][number] & { scion_id: string })[];
   watches: (Omit<ControlSurfaceState['watchtower']['watches'][number], 'label'> & { scion_id: string })[];
   agents: NativeAgent[]; skills: NativeSkill[]; agent_runtime: AgentRuntime;
   connectors: DataConnector[];
@@ -18,7 +18,7 @@ export type WorkspaceState = {
 
 export function proposalPath(proposal: ProposalSummary) {
   const view = proposal.kind === 'capability_proposal' ? 'proposals' : proposal.kind === 'comparison' ? 'comparisons' : proposal.kind;
-  return `/scions/${proposal.scion_id}/${view}/${proposal.id}`;
+  return `/scions/${proposal.scion_id}/${view}/${proposal.kind === 'research' ? proposal.agent_task_id ?? proposal.id : proposal.id}`;
 }
 
 export function useWorkspace(token: string, orgId: string | undefined) {

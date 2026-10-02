@@ -18,7 +18,8 @@ const proposalStatus = (proposal: ScopeProposal) => bindingBlocked(proposal)
   : proposal.confirmation ? 'Synthetic confirmation recorded' : 'Awaiting independent review';
 function Failure({ children }: { children: ReactNode }) { return <div className="error-message" role="alert"><div>{children}</div></div>; }
 
-// A retry of an unchanged command reuses its key. Tokens stay in request headers.
+// An uncertain retry reuses its key. A confirmed successful command retires it
+// so a later, explicit submission can create new work even with the same input.
 export function useScopeWrite(token: string) {
   const retry = useRef<{ signature: string; key: string } | null>(null);
   const pending = useRef(new Set<AbortController>());
@@ -30,10 +31,15 @@ export function useScopeWrite(token: string) {
     const body = JSON.stringify(input);
     const signature = JSON.stringify([path, revision, body]);
     if (retry.current?.signature !== signature) retry.current = { signature, key: crypto.randomUUID() };
+    const command = retry.current;
     const controller = new AbortController();
     pending.current.add(controller);
     const timer = window.setTimeout(() => controller.abort(), 10000);
-    try { return await request<T>(token, path, { method: 'POST', body, signal: controller.signal, cache: 'no-store', headers: { 'Idempotency-Key': retry.current.key, 'If-Match': `"${revision}"` } }); }
+    try {
+      const result = await request<T>(token, path, { method: 'POST', body, signal: controller.signal, cache: 'no-store', headers: { 'Idempotency-Key': command.key, 'If-Match': `"${revision}"` } });
+      if (retry.current === command) retry.current = null;
+      return result;
+    }
     finally { window.clearTimeout(timer); pending.current.delete(controller); }
   };
 }

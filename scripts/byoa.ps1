@@ -1,8 +1,24 @@
-param([ValidateSet('Check','Once','Watch','Start','Stop','Status')][string]$Mode='Watch')
+param(
+    [ValidateSet('Connect','Check','Once','Watch','Start','Stop','Status')][string]$Mode='Watch',
+    [string]$ApiUrl,
+    [switch]$WatchAfterConnect,
+    [ValidatePattern('^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$')][string]$Connection
+)
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $bridgePath=Join-Path $projectRoot 'byoa/bridge.mjs'
+$node=(Get-Command node.exe -ErrorAction Stop).Source
+if ($Mode -eq 'Connect' -and (-not $ApiUrl -or $Connection)) { throw 'Connect requires -ApiUrl with an HTTPS or HTTP loopback origin. Do not supply -Connection until pairing completes.' }
+if ($ApiUrl -and $Mode -ne 'Connect') { throw '-ApiUrl is used only for Connect. Enrolled workers use their saved origin; select them with -Connection.' }
+if ($WatchAfterConnect -and $Mode -ne 'Connect') { throw '-WatchAfterConnect is used only with -Mode Connect.' }
+if ($Connection) {
+    $description=& $node (Join-Path $projectRoot 'byoa/connection.mjs') --describe $Connection
+    if ($LASTEXITCODE -ne 0) { throw 'The saved connection could not be verified. Connect again or inspect its private local file.' }
+    $Connection=($description | ConvertFrom-Json).connection_id
+    if ($Connection -notmatch '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$') { throw 'Invalid saved connection identity.' }
+}
 $workerRoot=Join-Path $projectRoot '.local/byoa'
+if ($Connection) { $workerRoot=Join-Path $workerRoot "workers/$Connection" }
 $workerFile=Join-Path $workerRoot 'worker.json'
 function Get-ManagedWorker {
     if (-not (Test-Path -LiteralPath $workerFile)) { return $null }
@@ -44,21 +60,28 @@ if ($Mode -in @('Status','Stop')) {
 }
 $agentToken=$null
 $configFile=Join-Path $projectRoot '.env'
-if (Test-Path -LiteralPath $configFile) {
+if (-not $Connection -and $Mode -ne 'Connect' -and (Test-Path -LiteralPath $configFile)) {
     foreach ($line in Get-Content -LiteralPath $configFile) {
         if ($line -match '^GRIMOIRE_TOKEN_AGENT_A=([a-f0-9]{64})$') { $agentToken=$Matches[1] }
     }
 }
-if (-not $agentToken -and $Mode -ne 'Check') { throw 'Local proposal-only agent enrollment is required. Run the documented migration/provisioning step.' }
-$node=(Get-Command node.exe -ErrorAction Stop).Source
+if (-not $Connection -and -not $agentToken -and $Mode -notin @('Check','Connect')) { throw 'Connect this local worker first: scripts/byoa.ps1 -Mode Connect -ApiUrl YOUR_GRIMOIRE_ORIGIN. Then use -Connection with the returned ID.' }
 $processInfo=[Diagnostics.ProcessStartInfo]::new($node)
 $processInfo.UseShellExecute=$false
 $processInfo.CreateNoWindow=$true
 $processInfo.RedirectStandardOutput=$true
 $processInfo.RedirectStandardError=$true
 $processInfo.WorkingDirectory=$projectRoot
-$processInfo.ArgumentList.Add($bridgePath)
-$processInfo.ArgumentList.Add('--'+$Mode.ToLowerInvariant())
+if ($Mode -eq 'Connect') {
+    $processInfo.ArgumentList.Add((Join-Path $projectRoot 'byoa/connect.mjs'))
+    $processInfo.ArgumentList.Add('--api')
+    $processInfo.ArgumentList.Add($ApiUrl)
+    if ($WatchAfterConnect) { $processInfo.ArgumentList.Add('--watch') }
+} else {
+    $processInfo.ArgumentList.Add($bridgePath)
+    $processInfo.ArgumentList.Add('--'+$Mode.ToLowerInvariant())
+    if ($Connection) { $processInfo.ArgumentList.Add('--connection'); $processInfo.ArgumentList.Add($Connection) }
+}
 $processInfo.Environment.Clear()
 foreach ($name in @('SystemRoot','WINDIR','PATH','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA','TEMP','TMP','HOMEDRIVE','HOMEPATH','HOME','CODEX_HOME')) {
     $value=[Environment]::GetEnvironmentVariable($name)
@@ -66,6 +89,7 @@ foreach ($name in @('SystemRoot','WINDIR','PATH','PATHEXT','USERPROFILE','APPDAT
 }
 if ($agentToken) { $processInfo.Environment['GRIMOIRE_TOKEN_AGENT_A']=$agentToken }
 foreach ($name in @('GRIMOIRE_API_URL','GRIMOIRE_CODEX_BIN')) {
+    if ($name -eq 'GRIMOIRE_API_URL' -and ($Connection -or $Mode -eq 'Connect')) { continue }
     $value=[Environment]::GetEnvironmentVariable($name)
     if ($value) { $processInfo.Environment[$name]=$value }
 }
@@ -80,7 +104,9 @@ if ($Mode -eq 'Start') {
         # Temporarily sanitize only this process environment, then restore it.
         foreach ($name in $original.Keys) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }
         foreach ($entry in $processInfo.Environment.GetEnumerator()) { [Environment]::SetEnvironmentVariable($entry.Key,$entry.Value,'Process') }
-        $worker=Start-Process -FilePath $node -ArgumentList @("`"$bridgePath`"",'--watch') -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $workerRoot 'worker-output.log') -RedirectStandardError (Join-Path $workerRoot 'worker-error.log') -PassThru
+        $workerArguments=@("`"$bridgePath`"",'--watch')
+        if ($Connection) { $workerArguments+=@('--connection',$Connection) }
+        $worker=Start-Process -FilePath $node -ArgumentList $workerArguments -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $workerRoot 'worker-output.log') -RedirectStandardError (Join-Path $workerRoot 'worker-error.log') -PassThru
     } finally {
         foreach ($name in @([Environment]::GetEnvironmentVariables('Process').Keys)) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }
         foreach ($entry in $original.GetEnumerator()) { [Environment]::SetEnvironmentVariable($entry.Key,$entry.Value,'Process') }

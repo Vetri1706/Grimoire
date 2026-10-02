@@ -26,7 +26,7 @@ async function fresh() {
   return context;
 }
 async function snapshot(page, name) { await page.screenshot({ path: resolve(evidence, `${name}.png`), fullPage: true }); }
-async function dashboard(page) { await page.getByRole('heading', { name: 'Dashboard', exact: true }).waitFor(); }
+async function taskHome(page) { await page.getByRole('heading', { name: 'Tasks', exact: true, level: 1 }).waitFor(); }
 async function openAccountMenu(page) {
   const trigger = page.getByRole('button', { name: 'Account menu', exact: true });
   if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
@@ -44,11 +44,12 @@ async function signup(context, suffix) {
   await page.getByRole('heading', { name: 'What is your organization called?', exact: true }).waitFor();
   await page.locator('#organization-name').fill(`Private synthetic organization ${stamp} ${suffix}`);
   await page.getByRole('button', { name: /Create organization/ }).click();
-  await dashboard(page);
+  await taskHome(page);
   const state = await context.request.get(`${base}/api/session`).then(response => response.json());
   assert.equal(state.handler.installation_owner, false);
   assert.equal(state.organizations.length, 1);
   assert.equal(state.active_organization.can_manage_workspace, true);
+  assert.equal(state.active_organization.can_prepare_workspace, true);
   for (const permission of ['can_write', 'can_confirm_scope', 'can_propose_scope', 'is_agent']) assert.equal(state.active_organization[permission], false);
   return { page, login, org: state.active_organization.org_id };
 }
@@ -87,7 +88,7 @@ try {
   await alice.page.locator('#login-name').fill(alice.login);
   await alice.page.locator('#handler-passphrase').fill(passphrase);
   await alice.page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await dashboard(alice.page);
+  await taskHome(alice.page);
   assert.equal(await alice.page.getByRole('button', { name: 'Organization menu', exact: true }).getAttribute('data-organization-id'), alice.org);
   await alice.page.locator('#main-content').getByText(scionName, { exact: true }).first().waitFor();
   checks.push('logout clears access after reload; login restores the same private organization');

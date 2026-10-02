@@ -88,6 +88,11 @@ pub(super) async fn worker_seen(tx: &mut Tx, headers: &HeaderMap) -> Result<(), 
         sqlx::query("SELECT app.intake_worker_seen()")
             .execute(&mut **tx)
             .await?;
+        if crate::research::capable(headers) {
+            sqlx::query("SELECT app.intake_research_worker_seen()")
+                .execute(&mut **tx)
+                .await?;
+        }
     }
     Ok(())
 }
@@ -227,7 +232,7 @@ async fn assign(
     Path((id, task)): Path<(String, String)>,
 ) -> ApiResult {
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
-    if !actor.can_write || actor.is_agent {
+    if !actor.can_prepare_workspace || actor.is_agent {
         return Err(ApiError::forbidden());
     }
     sqlx::query("SELECT app.intake_bind_agent_task($1,$2)")

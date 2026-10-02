@@ -737,8 +737,8 @@ async fn active_actor(tx: &mut Tx, row: &SessionContextRow) -> Result<Option<Act
         .bind(Uuid::new_v4().to_string())
         .execute(&mut **tx)
         .await?;
-    let capabilities: (bool, bool, bool, bool, bool) = sqlx::query_as(
-        "SELECT app.intake_scope_can_confirm(),app.intake_scope_can_propose(),app.intake_scope_is_agent(),app.intake_can_write(),app.intake_can_manage_workspace()",
+    let capabilities: (bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+        "SELECT app.intake_scope_can_confirm(),app.intake_scope_can_propose(),app.intake_scope_is_agent(),app.intake_can_write(),app.intake_can_manage_workspace(),app.intake_can_prepare_workspace()",
     )
     .fetch_one(&mut **tx)
     .await?;
@@ -749,6 +749,7 @@ async fn active_actor(tx: &mut Tx, row: &SessionContextRow) -> Result<Option<Act
         organization_name,
         can_write: capabilities.3 && !capabilities.2,
         can_manage_workspace: capabilities.4 && !capabilities.2,
+        can_prepare_workspace: capabilities.5 && !capabilities.2,
         can_confirm_scope: capabilities.0,
         can_propose_scope: capabilities.1,
         is_agent: capabilities.2,

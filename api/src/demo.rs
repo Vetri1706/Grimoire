@@ -113,6 +113,7 @@ async fn scenario(State(pool): State<PgPool>, Path(slug): Path<String>) -> ApiRe
         organization_name: "Grimoire public synthetic judge workspace".into(),
         can_write: false,
         can_manage_workspace: false,
+        can_prepare_workspace: false,
         can_confirm_scope: false,
         can_propose_scope: false,
         is_agent: false,

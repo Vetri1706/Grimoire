@@ -120,6 +120,27 @@ async fn visible(tx: &mut Tx, id: Uuid) -> Result<i32, ApiError> {
         .await?
         .ok_or_else(ApiError::not_found)
 }
+// The database also enforces this predicate in task RLS, task transitions and
+// immutable agent assignment. Workspace preparation does not confer physical
+// scope, supplier-offer or approval authority.
+pub(super) async fn authorize_preparation(
+    tx: &mut Tx,
+    scion: Uuid,
+    revision: i32,
+    kind: &str,
+) -> Result<(), ApiError> {
+    let allowed: bool = sqlx::query_scalar("SELECT app.intake_can_control_preparation($1,$2,$3)")
+        .bind(scion)
+        .bind(revision)
+        .bind(kind)
+        .fetch_one(&mut **tx)
+        .await?;
+    if allowed {
+        Ok(())
+    } else {
+        Err(ApiError::forbidden())
+    }
+}
 async fn load(tx: &mut Tx, id: Uuid, lock: bool) -> Result<Task, ApiError> {
     sqlx::query_as::<_, Task>(&format!(
         "SELECT {COLUMNS} FROM grimoire.intake_agent_tasks WHERE id=$1{}",
@@ -239,9 +260,7 @@ async fn dispatch(
     if task.scion_id != scion {
         return Err(ApiError::not_found());
     }
-    if !actor.can_write || actor.is_agent {
-        return Err(ApiError::forbidden());
-    }
+    authorize_preparation(&mut tx, task.scion_id, task.scion_revision, &task.task_kind).await?;
     if precondition(&headers)? != task.scion_revision {
         return Err(ApiError::stale());
     }
@@ -263,16 +282,14 @@ async fn cancel(
     headers: HeaderMap,
     Path((scion, id)): Path<(String, String)>,
 ) -> ApiResult {
-    let (mut tx, actor) = authenticate(&pool, &headers).await?;
+    let (mut tx, _) = authenticate(&pool, &headers).await?;
     let scion = parse_id(&scion)?;
     visible(&mut tx, scion).await?;
     let task = load(&mut tx, parse_id(&id)?, true).await?;
     if task.scion_id != scion {
         return Err(ApiError::not_found());
     }
-    if !actor.can_write || actor.is_agent {
-        return Err(ApiError::forbidden());
-    }
+    authorize_preparation(&mut tx, task.scion_id, task.scion_revision, &task.task_kind).await?;
     match task.status.as_str() {
         "queued" | "dispatched" => {
             sqlx::query("UPDATE grimoire.intake_agent_tasks SET status='cancelled',cancelled_at=clock_timestamp(),completed_at=clock_timestamp() WHERE id=$1").bind(task.id).execute(&mut *tx).await?;
@@ -377,7 +394,7 @@ async fn create(
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     let id = parse_id(&id)?;
     visible(&mut tx, id).await?;
-    if !actor.can_write || actor.is_agent {
+    if !actor.can_prepare_workspace || actor.is_agent {
         return Err(ApiError::forbidden());
     }
     crate::agents::lock_org(&mut tx, &actor).await?;
@@ -388,18 +405,22 @@ async fn create(
         "prepare_physical_scope",
         "prepare_offer_normalization",
         "prepare_capability_plan",
+        "research_public_web",
     ]
     .contains(&input.task_kind.as_str())
-        || input.candidate_proposal["synthetic"] != true
+        || (input.task_kind != "research_public_web"
+            && input.candidate_proposal["synthetic"] != true)
         || !input.candidate_proposal.is_object()
         || serde_json::to_vec(&input)?.len() > 48000
         || !(30..=300).contains(&input.timeout_seconds)
     {
         return Err(ApiError::invalid(
-            "Use a supported synthetic preparation task with timeout_seconds between 30 and 300.",
+            "Use a supported preparation task with timeout_seconds between 30 and 300.",
         ));
     }
+    authorize_preparation(&mut tx, id, base, &input.task_kind).await?;
     match input.task_kind.as_str() {
+        "research_public_web" => crate::research::validate_candidate(&input.candidate_proposal)?,
         "prepare_physical_scope" => crate::scope::validate_candidate(&input.candidate_proposal)?,
         "prepare_capability_plan" => {
             if input.candidate_proposal != json!({"synthetic":true}) {
@@ -477,7 +498,7 @@ async fn next(State(pool): State<PgPool>, headers: HeaderMap) -> ApiResult {
     // No task input is returned until claim validates current Scion/source permissions.
     expire(&mut tx, &actor).await?;
     crate::agents::worker_seen(&mut tx, &headers).await?;
-    let id:Option<Uuid>=sqlx::query_scalar("SELECT task.id FROM grimoire.intake_agent_tasks task LEFT JOIN grimoire.intake_task_agent_bindings binding ON (binding.org_id,binding.task_id)=(task.org_id,task.id) LEFT JOIN grimoire.intake_managed_entities entity ON (entity.org_id,entity.id)=(binding.org_id,binding.agent_id) LEFT JOIN grimoire.intake_managed_revisions revision ON (revision.org_id,revision.entity_id,revision.number)=(entity.org_id,entity.id,entity.current_revision) WHERE task.status='dispatched' AND (binding.task_id IS NULL OR ($1 AND NOT (revision.config->>'paused')::boolean)) AND NOT EXISTS(SELECT 1 FROM grimoire.intake_agent_tasks WHERE status IN ('running','cancel_requested')) ORDER BY task.dispatched_at,task.id LIMIT 1").bind(crate::agents::protocol(&headers)).fetch_optional(&mut *tx).await?;
+    let id:Option<Uuid>=sqlx::query_scalar("SELECT task.id FROM grimoire.intake_agent_tasks task LEFT JOIN grimoire.intake_task_agent_bindings binding ON (binding.org_id,binding.task_id)=(task.org_id,task.id) LEFT JOIN grimoire.intake_managed_entities entity ON (entity.org_id,entity.id)=(binding.org_id,binding.agent_id) LEFT JOIN grimoire.intake_managed_revisions revision ON (revision.org_id,revision.entity_id,revision.number)=(entity.org_id,entity.id,entity.current_revision) WHERE task.status='dispatched' AND (task.task_kind<>'research_public_web' OR ($2 AND app.intake_research_connection(task.input->'candidate_proposal',true))) AND (binding.task_id IS NULL OR ($1 AND NOT (revision.config->>'paused')::boolean)) AND NOT EXISTS(SELECT 1 FROM grimoire.intake_agent_tasks WHERE status IN ('running','cancel_requested')) ORDER BY task.dispatched_at,task.id LIMIT 1").bind(crate::agents::protocol(&headers)).bind(crate::research::capable(&headers)).fetch_optional(&mut *tx).await?;
     tx.commit().await?;
     Ok(Json(json!({"task":id.map(|id|json!({"id":id}))})).into_response())
 }
@@ -493,6 +514,15 @@ async fn claim(
     let task = load(&mut tx, id, true).await?;
     if task.status != "dispatched" {
         return Err(conflict());
+    }
+    if task.task_kind == "research_public_web" {
+        let permitted: bool = sqlx::query_scalar("SELECT app.intake_research_connection($1,true)")
+            .bind(sqlx::types::Json(&task.input.0["candidate_proposal"]))
+            .fetch_one(&mut *tx)
+            .await?;
+        if !crate::research::capable(&headers) || !permitted {
+            return Err(ApiError(StatusCode::FORBIDDEN,"RESEARCH_WORKER_REQUIRED","This task requires the explicitly selected computer running the updated public research worker.".into()));
+        }
     }
     let profile: Option<Value> = sqlx::query_scalar(
         "SELECT snapshot FROM grimoire.intake_task_agent_bindings WHERE task_id=$1",

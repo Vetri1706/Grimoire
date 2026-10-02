@@ -18,26 +18,30 @@ async fn read(State(pool): State<PgPool>, headers: HeaderMap) -> ApiResult {
         .collect();
     let proposals: Vec<Value> = sqlx::query_scalar(
         "WITH proposals AS (
-          SELECT id,org_id,scion_id,scion_revision,created_at,'capability_proposal'::text AS kind,'Capability plan'::text AS title FROM grimoire.intake_capability_plans
-          UNION ALL SELECT id,org_id,scion_id,scion_revision,created_at,'comparison','Evidence comparison' FROM grimoire.intake_evidence_comparisons
-          UNION ALL SELECT id,org_id,scion_id,scion_revision,created_at,'scope','Physical scope' FROM grimoire.intake_scope_proposals
-          UNION ALL SELECT id,org_id,scion_id,scion_revision,created_at,'offers','Offer normalization' FROM grimoire.intake_comparison_proposals
-        ) SELECT jsonb_build_object('id',proposal.id,'scion_id',proposal.scion_id,'scion_revision',proposal.scion_revision,'kind',proposal.kind,'title',proposal.title,'created_at',proposal.created_at,
+          SELECT id,org_id,scion_id,scion_revision,created_at,'capability_proposal'::text AS kind,'Capability plan'::text AS title,NULL::uuid AS agent_task_id FROM grimoire.intake_capability_plans
+          UNION ALL SELECT id,org_id,scion_id,scion_revision,created_at,'comparison','Evidence comparison',NULL::uuid FROM grimoire.intake_evidence_comparisons
+          UNION ALL SELECT id,org_id,scion_id,scion_revision,created_at,'scope','Physical scope',NULL::uuid FROM grimoire.intake_scope_proposals
+          UNION ALL SELECT id,org_id,scion_id,scion_revision,created_at,'offers','Offer normalization',NULL::uuid FROM grimoire.intake_comparison_proposals
+          UNION ALL SELECT id,org_id,scion_id,scion_revision,created_at,'research','Public research report',agent_task_id FROM grimoire.intake_research_reports
+        ) SELECT jsonb_build_object('id',proposal.id,'scion_id',proposal.scion_id,'scion_revision',proposal.scion_revision,'kind',proposal.kind,'agent_task_id',proposal.agent_task_id,'title',proposal.title,'created_at',proposal.created_at,
           'status',CASE WHEN state.blocked THEN 'blocked' WHEN state.stale OR proposal.scion_revision<>scion.current_revision THEN 'stale' WHEN proposal.kind IN ('scope','offers') THEN 'inspect' ELSE 'proposed' END)
         FROM proposals proposal JOIN grimoire.intake_scions scion ON (scion.org_id,scion.id)=(proposal.org_id,proposal.scion_id)
-        LEFT JOIN grimoire.intake_watch_node_states state ON (state.org_id,state.node_kind,state.node_id)=(proposal.org_id,proposal.kind,proposal.id)
+        LEFT JOIN grimoire.intake_watch_node_states state ON (state.org_id,state.node_kind,state.node_id)=(proposal.org_id,CASE WHEN proposal.kind='research' THEN 'agent_task' ELSE proposal.kind END,COALESCE(proposal.agent_task_id,proposal.id))
         ORDER BY proposal.created_at DESC,proposal.id LIMIT 300"
     ).fetch_all(&mut *tx).await?;
     let tasks: Vec<Value> = sqlx::query_scalar(
         "SELECT jsonb_build_object('id',task.id,'scion_id',task.scion_id,'scion_revision',task.scion_revision,'task_kind',task.task_kind,'status',task.status,'created_at',task.created_at,'proposal_id',task.proposal_id,
+          'agent_id',binding.agent_id,'agent_revision',binding.agent_revision,'completed_at',task.completed_at,'failure_code',task.failure_code,
+          'review_recorded',EXISTS(SELECT 1 FROM grimoire.intake_capability_plan_reviews review WHERE review.org_id=task.org_id AND review.plan_id=task.proposal_id) OR EXISTS(SELECT 1 FROM grimoire.intake_research_reviews review WHERE review.org_id=task.org_id AND review.report_id=task.proposal_id),
           'blocked',COALESCE(state.blocked,false),'stale',COALESCE(state.stale,false) OR task.scion_revision<>scion.current_revision)
          FROM grimoire.intake_agent_tasks task JOIN grimoire.intake_scions scion ON (scion.org_id,scion.id)=(task.org_id,task.scion_id)
+         LEFT JOIN grimoire.intake_task_agent_bindings binding ON (binding.org_id,binding.task_id)=(task.org_id,task.id)
          LEFT JOIN grimoire.intake_watch_node_states state ON (state.org_id,state.node_kind,state.node_id)=(task.org_id,'agent_task',task.id)
          ORDER BY task.created_at DESC,task.id LIMIT 300"
     ).fetch_all(&mut *tx).await?;
     let reviews: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'scion_id',scion_id,'event_id',event_id,'status',status,'reason',reason,'created_at',created_at) FROM grimoire.intake_watch_reviews ORDER BY created_at DESC,id LIMIT 300")
         .fetch_all(&mut *tx).await?;
-    let events: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'scion_id',scion_id,'kind',kind,'summary',summary,'recorded_at',recorded_at,'event_key',event_key) FROM grimoire.intake_watch_events ORDER BY recorded_at DESC,id LIMIT 300")
+    let events: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'scion_id',scion_id,'kind',kind,'subject_id',subject_id,'summary',summary,'recorded_at',recorded_at,'event_key',event_key) FROM grimoire.intake_watch_events ORDER BY recorded_at DESC,id LIMIT 300")
         .fetch_all(&mut *tx).await?;
     let watches: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'scion_id',scion_id,'kind',kind,'last_successful_check',last_successful_check,'last_event_at',last_event_at,'status',CASE WHEN last_successful_check IS NULL THEN 'pending' WHEN clock_timestamp()-last_successful_check>interval '10 seconds' THEN 'delayed' ELSE 'healthy' END) FROM grimoire.intake_watches ORDER BY scion_id,kind")
         .fetch_all(&mut *tx).await?;

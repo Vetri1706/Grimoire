@@ -1,0 +1,27 @@
+.agent-avatar {
+  --avatar-light: #8ce5de;
+  --avatar-mid: #46b7c9;
+  --avatar-deep: #277d9e;
+  --avatar-accent: #e7fff4;
+  --avatar-face: #182b40;
+  --avatar-outline: rgb(24 43 64 / 12%);
+  --avatar-shadow: rgb(23 58 85 / 12%);
+  width: 36px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.agent-avatar svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.agent-avatar--sm { width: 28px; height: 32px; }
+.agent-avatar--lg { width: 64px; height: 72px; }
+.agent-avatar--hero { width: 112px; height: 126px; }
+:root[data-theme="dark"] .agent-avatar { --avatar-shadow: rgb(0 0 0 / 22%); --avatar-outline: rgb(255 255 255 / 24%); }
+@media (forced-colors: active) {
+  .agent-avatar { --avatar-face: CanvasText; --avatar-shadow: transparent; --avatar-outline: CanvasText; }
+  .agent-avatar-body { fill: Canvas; stroke: CanvasText; stroke-width: 2; }
+  .agent-avatar-highlight { display: none; }
+  .agent-avatar > svg > ellipse { display: none; }
+  .agent-avatar-mark { fill: CanvasText; fill-opacity: 1; }
+}

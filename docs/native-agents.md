@@ -8,6 +8,10 @@ the sibling checkout and its running service/data are untouched.
 
 ## Agent workflow
 
+First connect your own Codex computer under **Settings → Runtime** using the
+[local pairing flow](byoa-local.md#pair-a-users-computer). A profile is not a
+worker connection: the computer must be online to execute dispatched tasks.
+
 1. Open **Agents**, create a named agent and choose its role and reporting line.
 2. Edit its instructions, capabilities and bounded task timeout.
 3. Create reusable instruction documents under **Skills**, then assign up to eight.
@@ -27,6 +31,9 @@ The profile's Assign task form prepares capability plans. Existing physical
 scope and offer-normalization task workflows remain available on physical Scions.
 The API can bind a queued task of any supported kind to a compatible agent.
 Unassigned legacy tasks remain explicitly labelled and keep their original flow.
+An ordinary organization owner can prepare digital capability plans and internal
+evidence. Physical scope, supplier work and human review keep their separate
+authority gates; pairing an agent grants none of them.
 
 ## Persistence and authorization
 
@@ -53,6 +60,38 @@ Agent configuration is limited to `name`, `role`, `title`, `capabilities`,
 Skill configuration is `name`, `description`, `instructions`. Cyclic reporting,
 unknown fields, foreign skills and arbitrary executables/adapters are rejected.
 Source text and secrets must not be copied into these instruction documents.
+
+## Product-planning starter skills
+
+Open **Skills → Discover** to preview and install the reviewed starter pack into
+the current organization. The Paperclip-style library separates Installed,
+Discover and My Skills. Installing a skill creates an ordinary Grimoire skill
+revision; it does not dispatch work or grant tool access. Open its assignment
+links, select it in an agent's Skills, then save the agent configuration. Agent
+creation also offers installed skills in its final step.
+
+- **Capability brief** turns a synthetic digital Scion intake into capability
+  hypotheses and evidence questions.
+- **Evidence review** distinguishes supplied intake statements, assumptions and
+  missing evidence. Source bodies are absent from this worker; this skill cannot
+  claim to verify them or research a provider.
+- **Domain boundaries** clarifies actors, concepts and unresolved decisions
+  without treating proposed terms as approved requirements.
+
+These are Grimoire adaptations of Matt Pocock's `to-spec`, `research` and
+`domain-modeling`, discovered through skills.sh and pinned to commit
+`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`. Complete attribution, upstream
+hashes, adaptation version and the MIT notice remain inside the saved instruction
+text and therefore inside task snapshots. Reviewed upstream files and the
+manifest are in [the product-planning bundle](../skills/product-planning/manifest.json).
+No global Codex skill installation or runtime download is required.
+
+Edit the canonical `SKILL.md` files, then run
+`node skills/product-planning/build-catalog.mjs` to regenerate the static catalog.
+`node skills/product-planning/build-catalog.mjs --check` checks parity, upstream
+digests, attribution and API byte limits. Customized starters appear under My
+Skills; their edited text is no longer labelled a reviewed starter. Assigned
+tasks always retain their original snapshot.
 
 Task creation accepts optional `agent_id`; binding is atomic with creation.
 Configuration changes do not rewrite already assigned work. Task/source/revision

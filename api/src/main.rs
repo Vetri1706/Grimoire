@@ -9,9 +9,11 @@ mod error;
 mod google_identity;
 mod offers;
 mod onboarding;
+mod research;
 mod scope;
 mod sources;
 mod storage;
+mod worker_connections;
 mod workspace;
 
 use axum::{
@@ -45,6 +47,8 @@ pub(crate) struct Actor {
     can_write: bool,
     #[sqlx(default)]
     can_manage_workspace: bool,
+    #[sqlx(default)]
+    can_prepare_workspace: bool,
     #[sqlx(default)]
     can_confirm_scope: bool,
     #[sqlx(default)]
@@ -190,10 +194,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(scope::routes())
         .merge(offers::routes())
         .merge(byoa::routes())
+        .merge(research::routes())
         .merge(capabilities::routes())
         .merge(control_surface::routes())
         .merge(demo::routes())
         .merge(workspace::routes())
+        .merge(worker_connections::routes())
         .merge(agents::routes())
         .fallback(|| async {
             ApiError(
@@ -309,7 +315,7 @@ async fn authenticate(pool: &PgPool, headers: &HeaderMap) -> Result<(Tx, Actor),
     // true means transaction-local; commit and rollback both discard these values.
     sqlx::query("SELECT set_config('app.current_org_id',$1,true),set_config('app.current_principal_id',$2,true),set_config('app.request_id',$3,true),set_config('statement_timeout','10000',true),set_config('lock_timeout','5000',true)")
         .bind(actor.org_id.to_string()).bind(actor.principal_id.to_string()).bind(Uuid::new_v4().to_string()).execute(&mut *tx).await?;
-    let capabilities: (bool, bool, bool, bool, bool) = sqlx::query_as("SELECT app.intake_scope_can_confirm(),app.intake_scope_can_propose(),app.intake_scope_is_agent(),app.intake_can_write(),app.intake_can_manage_workspace()")
+    let capabilities: (bool, bool, bool, bool, bool, bool) = sqlx::query_as("SELECT app.intake_scope_can_confirm(),app.intake_scope_can_propose(),app.intake_scope_is_agent(),app.intake_can_write(),app.intake_can_manage_workspace(),app.intake_can_prepare_workspace()")
         .fetch_one(&mut *tx).await?;
     actor.can_confirm_scope = capabilities.0;
     actor.can_propose_scope = capabilities.1;
@@ -321,6 +327,7 @@ async fn authenticate(pool: &PgPool, headers: &HeaderMap) -> Result<(Tx, Actor),
         actor.can_write = false;
     }
     actor.can_manage_workspace = capabilities.4 && !actor.is_agent;
+    actor.can_prepare_workspace = capabilities.5 && !actor.is_agent;
     set_audit_context(&mut tx, headers, &actor).await?;
     Ok((tx, actor))
 }

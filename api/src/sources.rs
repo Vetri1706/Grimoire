@@ -483,7 +483,7 @@ async fn create(
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     let id = parse_id(&id)?;
     visible_revision(&mut tx, id, false).await?;
-    if !actor.can_write {
+    if !actor.can_prepare_workspace {
         return Err(ApiError::forbidden());
     }
     let value = input(value)?;
@@ -522,7 +522,7 @@ async fn revise(
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     let (id, source) = (parse_id(&id)?, parse_id(&source)?);
     source_state(&mut tx, id, source, false).await?;
-    if !actor.can_write {
+    if !actor.can_prepare_workspace {
         return Err(ApiError::forbidden());
     }
     // All writes and revocations serialize on this row. Check permission before
@@ -569,7 +569,7 @@ async fn claim(
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     let (id, source, n) = (parse_id(&id)?, parse_id(&source)?, number(&revision)?);
     source_state(&mut tx, id, source, false).await?;
-    if !actor.can_write {
+    if !actor.can_prepare_workspace {
         return Err(ApiError::forbidden());
     }
     let state = source_state(&mut tx, id, source, true).await?;
@@ -618,7 +618,7 @@ async fn revoke(
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     let (id, source) = (parse_id(&id)?, parse_id(&source)?);
     source_state(&mut tx, id, source, false).await?;
-    if !actor.can_write {
+    if !actor.can_prepare_workspace {
         return Err(ApiError::forbidden());
     }
     let state = source_state(&mut tx, id, source, true).await?;

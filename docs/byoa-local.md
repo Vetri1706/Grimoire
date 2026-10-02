@@ -21,6 +21,65 @@ assignment. See [native agents](native-agents.md). Protocol-2 workers consume
 the pinned profile and skill revisions, enforce pause/cancellation, and report
 actual server-side presence. Paperclip is not a backend dependency.
 
+### Pair a user's computer
+
+Sign in to Grimoire, select the intended organization, and open **Settings →
+Runtime**. From the Grimoire checkout on the computer with Codex installed:
+
+```powershell
+codex login status
+# Use the website origin, including the frontend port for local development.
+node byoa/connect.mjs --api http://127.0.0.1:5180 --watch
+# Or: pwsh -File scripts/byoa.ps1 -Mode Connect -ApiUrl http://127.0.0.1:5180 -WatchAfterConnect
+```
+
+Open the printed link, match its code, check the selected organization, and
+explicitly authorize synthetic proposal preparation. The code expires after ten
+minutes. The CLI receives the single-use worker credential; the browser never
+receives it. This grants no engineering, commercial, sourcing or approval role.
+The recorded policy is `codex-synthetic-v1`, restricted to synthetic inputs. It
+is not an authorization for private customer data or a substitute for a separate
+provider-policy decision.
+
+With `--watch`, the same connector process starts the existing Grimoire worker
+after authorization and private credential persistence. Keep the terminal open.
+The worker can claim tasks explicitly dispatched in the selected organization;
+pairing does not create or dispatch tasks. Omitting `--watch` only pairs the
+computer and prints its start command. No background service is installed.
+
+To resume a stopped connection, use its exact command in Runtime settings or
+the connection ID printed by the connector:
+
+```powershell
+node byoa/bridge.mjs --connection CONNECTION_ID --watch
+# Windows managed worker:
+pwsh -File scripts/byoa.ps1 -Mode Start -Connection CONNECTION_ID
+pwsh -File scripts/byoa.ps1 -Mode Status -Connection CONNECTION_ID
+pwsh -File scripts/byoa.ps1 -Mode Stop -Connection CONNECTION_ID
+```
+
+Private connection files are stored under ignored `.local/byoa/connections/`;
+they have Windows user-only ACLs or Unix mode 0600. The Codex login is neither
+copied nor uploaded. HTTPS is required for non-loopback sites. The enrolled
+origin is fixed, requests reject redirects, and the worker never forwards its
+credential to an alternate endpoint.
+
+Create an agent, assign a digital Scion, then explicitly dispatch its task. A
+new organization owner may prepare digital capability proposals and source
+evidence without acquiring physical scope or supplier permissions. Completion
+still creates a proposal requiring human review.
+
+Runtime settings distinguish authorized but never started, online, offline and
+revoked workers using server-recorded presence. A heartbeat confirms only the
+worker's API connection; a successful task result confirms provider execution.
+Revocation disables the worker principal and credential
+immediately. A running child is stopped when the bridge next observes denied
+control; the revoked worker cannot submit a result. An interrupted task retains
+its existing lease until expiry recovery by an authorized worker. No Windows
+process-tree containment certification is claimed by this pairing feature.
+
+### Existing developer fixture worker
+
 From `C:\proj\Grimoire\grim`:
 
 ```powershell
@@ -41,7 +100,7 @@ pwsh -NoProfile -File scripts/byoa.ps1 -Mode Status
 pwsh -NoProfile -File scripts/byoa.ps1 -Mode Stop
 
 # Tests of bridge credential filtering and output guards (no model invocation).
-node --test byoa/bridge.test.mjs
+node --test byoa/bridge.test.mjs byoa/connection.test.mjs
 ```
 
 The API and its canonical PostgreSQL database must already be running. Provision
@@ -57,7 +116,7 @@ it and refuses to kill a worker with an active child task. It never selects all
 Node processes by name. Worker output and bounded error diagnostics go to local
 files under `.local/byoa/`.
 
-The optional `GRIMOIRE_API_URL` must be an HTTP loopback origin (default
+For this legacy fixture path, `GRIMOIRE_API_URL` must be an HTTP loopback origin (default
 `http://127.0.0.1:8080`). `GRIMOIRE_CODEX_BIN` can identify an existing native Codex
 executable; otherwise the Windows npm installation is discovered. There is no
 browser-controlled executable, shell argument, working-directory, or destination
@@ -117,7 +176,9 @@ temporary-folder cleanup limitation are recorded in
 
 ## Queue API
 
-All endpoints require the existing Rust bearer authentication. Foreign and absent
+Handler endpoints support authenticated sessions with CSRF and organization
+binding, or existing enrolled bearer credentials. Worker endpoints require the
+scoped worker bearer. Foreign and absent
 task identifiers use the same hidden-resource response. The Handler list omits
 the input payload and lease token.
 

@@ -64,7 +64,7 @@ export type AgentTask = {
   agent_revision: number | null;
   scion_id: string;
   scion_revision: number;
-  task_kind: 'prepare_physical_scope' | 'prepare_offer_normalization' | 'prepare_capability_plan';
+  task_kind: 'prepare_physical_scope' | 'prepare_offer_normalization' | 'prepare_capability_plan' | 'research_public_web';
   adapter: 'codex_cli';
   status: 'queued' | 'dispatched' | 'running' | 'cancel_requested' | 'completed' | 'failed' | 'cancelled';
   proposal_id: string | null;

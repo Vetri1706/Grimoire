@@ -32,7 +32,7 @@ BEGIN
  SELECT principal_id INTO principal FROM app.intake_session_context(session_hash);
  PERFORM set_config('app.current_org_id',org_two::text,true);
  PERFORM set_config('app.current_principal_id',principal::text,true);
- IF NOT app.intake_can_manage_workspace() OR app.intake_can_write() OR app.intake_scope_can_propose() OR app.intake_scope_can_confirm() OR app.intake_scope_is_agent() THEN
+ IF NOT app.intake_can_manage_workspace() OR NOT app.intake_can_prepare_workspace() OR app.intake_can_write() OR app.intake_scope_can_propose() OR app.intake_scope_can_confirm() OR app.intake_scope_is_agent() THEN
   RAISE EXCEPTION 'organization administration obtained sourcing, engineering, or agent authority'; END IF;
  PERFORM set_config('test.onboarding_session',session_hash,true);
  PERFORM set_config('test.onboarding_other_session',other_session,true);
@@ -49,8 +49,8 @@ BEGIN
  IF saved->>'kind'<>'skill' OR (saved->>'revision')::integer<>1 THEN RAISE EXCEPTION 'workspace owner cannot configure a skill'; END IF;
  blocked:=false;
  BEGIN PERFORM app.intake_bind_agent_task(gen_random_uuid(),gen_random_uuid());
- EXCEPTION WHEN insufficient_privilege THEN blocked:=true; END;
- IF NOT blocked THEN RAISE EXCEPTION 'workspace owner gained task assignment authority'; END IF;
+ EXCEPTION WHEN SQLSTATE 'G3804' THEN blocked:=true; END;
+ IF NOT blocked THEN RAISE EXCEPTION 'workspace owner assigned a nonexistent agent or task'; END IF;
  IF app.intake_switch_organization(current_setting('test.onboarding_session'),foreign_org) THEN RAISE EXCEPTION 'foreign organization selected'; END IF;
  IF EXISTS(SELECT 1 FROM grimoire.intake_scions WHERE org_id<>app.current_org_id()) THEN RAISE EXCEPTION 'foreign organization scions leaked'; END IF;
  IF NOT app.intake_switch_organization(current_setting('test.onboarding_session'),current_setting('test.onboarding_org_one')::uuid) THEN
@@ -60,7 +60,7 @@ BEGIN
     EXISTS(SELECT 1 FROM app.intake_session_authenticate(current_setting('test.onboarding_session'))) OR
     app.intake_switch_organization(current_setting('test.onboarding_session'),current_setting('test.onboarding_org_two')::uuid) THEN
   RAISE EXCEPTION 'revoked session retained access'; END IF;
- RAISE NOTICE 'PASS runtime can configure workspace skill without task authority; foreign organizations and revoked sessions denied';
+ RAISE NOTICE 'PASS runtime can configure workspace skill; absent assignment targets, foreign organizations and revoked sessions denied';
 END $$;
 RESET ROLE;
 UPDATE grimoire.handler_sessions SET expires_at=clock_timestamp()-interval '59 minutes',created_at=clock_timestamp()-interval '1 hour'

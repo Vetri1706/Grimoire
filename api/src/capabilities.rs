@@ -45,6 +45,11 @@ struct ComparisonInput {
     unresolved_gaps: Vec<String>,
     change_summary: String,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewInput {
+    note: String,
+}
 #[derive(FromRow)]
 struct PlanRow {
     id: Uuid,
@@ -98,6 +103,10 @@ pub(super) fn routes() -> Router<PgPool> {
         .route(
             "/api/scions/{id}/evidence-comparisons",
             axum::routing::post(create_comparison),
+        )
+        .route(
+            "/api/scions/{id}/capability-plans/{plan}/reviews",
+            axum::routing::post(create_review),
         )
 }
 fn invalid(message: impl Into<String>) -> ApiError {
@@ -242,7 +251,7 @@ async fn current(tx: &mut Tx, scion: Uuid) -> Result<i32, ApiError> {
 }
 fn plan_json(row: &PlanRow, revision: i32) -> Value {
     let active = row.scion_revision == revision;
-    json!({"id":row.id,"scion_id":row.scion_id,"scion_revision":row.scion_revision,"agent_task_id":row.agent_task_id,"status":if active {"current"} else {"stale"},"input":if active {Some(&row.input.0)} else {None},"created_at":row.created_at,"created_by":row.created_by,"authority":"agent_proposal","verification_status":"unverified","approval_available":false})
+    json!({"id":row.id,"scion_id":row.scion_id,"scion_revision":row.scion_revision,"agent_task_id":row.agent_task_id,"status":if active {"current"} else {"stale"},"input":if active {Some(&row.input.0)} else {None},"created_at":row.created_at,"created_by":row.created_by,"authority":"agent_proposal","verification_status":"unverified","approval_available":false,"reviews":[]})
 }
 async fn load_plan(tx: &mut Tx, scion: Uuid, id: Uuid) -> Result<PlanRow, ApiError> {
     sqlx::query_as(&format!(
@@ -411,6 +420,11 @@ pub(super) async fn snapshot(tx: &mut Tx, id: Uuid, revision: i32) -> Result<Val
             value["input"] = Value::Null;
             value["blocked_reason"] = json!(reason);
         }
+        if value["status"] == "current" && !value["input"].is_null() {
+            let reviews: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'plan_id',plan_id,'scion_revision',scion_revision,'reviewer_id',reviewer_id,'note',note,'created_at',created_at) FROM grimoire.intake_capability_plan_reviews WHERE plan_id=$1 ORDER BY created_at DESC,id")
+                .bind(plan.id).fetch_all(&mut **tx).await?;
+            value["reviews"] = json!(reviews);
+        }
         plan_values.push(value);
     }
     let mut comparisons = Vec::new();
@@ -536,9 +550,7 @@ async fn create_comparison(
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     let id = parse_id(&id)?;
     let revision = current(&mut tx, id).await?;
-    if !actor.can_write || actor.is_agent {
-        return Err(ApiError::forbidden());
-    }
+    crate::byoa::authorize_preparation(&mut tx, id, revision, "prepare_capability_plan").await?;
     let base = precondition(&headers)?;
     if revision != base {
         return Err(ApiError::stale());
@@ -587,6 +599,37 @@ async fn create_comparison(
     let response = comparison_json(&mut tx, &row, revision).await?;
     tx.commit().await?;
     Ok(created_response(response, replayed))
+}
+
+async fn create_review(
+    State(pool): State<PgPool>,
+    headers: HeaderMap,
+    Path((id, plan)): Path<(String, String)>,
+    body: Result<Json<ReviewInput>, JsonRejection>,
+) -> ApiResult {
+    let (mut tx, actor) = authenticate(&pool, &headers).await?;
+    let scion = parse_id(&id)?;
+    current(&mut tx, scion).await?;
+    let plan = parse_id(&plan)?;
+    if !actor.can_prepare_workspace || actor.is_agent {
+        return Err(ApiError::forbidden());
+    }
+    let input = parse(body)?;
+    bounded(&input.note, 2000)?;
+    let result: Value =
+        sqlx::query_scalar("SELECT app.intake_record_capability_review($1,$2,$3,$4,$5)")
+            .bind(scion)
+            .bind(plan)
+            .bind(precondition(&headers)?)
+            .bind(&input.note)
+            .bind(key(&headers)?)
+            .fetch_one(&mut *tx)
+            .await?;
+    tx.commit().await?;
+    Ok(created_response(
+        result["review"].clone(),
+        result["replayed"] == true,
+    ))
 }
 
 #[cfg(test)]

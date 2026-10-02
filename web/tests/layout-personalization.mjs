@@ -1,0 +1,117 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+
+assert.equal(process.env.GRIMOIRE_TEST_DISPOSABLE, '1');
+const base = process.env.GRIMOIRE_WEB_URL ?? 'http://127.0.0.1:5182';
+const database = process.env.GRIMOIRE_TEST_DATABASE ?? 'grimoire_codex_flow_test';
+assert.ok(database.endsWith('_test'));
+assert.ok(['127.0.0.1', 'localhost'].includes(new URL(base).hostname));
+assert.equal((await (await fetch(`${base}/api/health`)).json()).database.name, database);
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const evidence = path.join(root, '.local', 'layout-personalization', String(Date.now()));
+await mkdir(evidence, { recursive: true });
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+const page = await context.newPage(); page.setDefaultTimeout(20000);
+const errors = [], checks = [];
+page.on('pageerror', error => errors.push(error.message));
+let org;
+const api = async (route, { method = 'GET', data, expected = 200, extra = {} } = {}) => {
+  const response = await context.request.fetch(`${base}/api${route}`, { method, data, headers: { 'X-Grimoire-CSRF': '1', ...(org ? { 'X-Grimoire-Organization': org } : {}), ...extra } });
+  assert.equal(response.status(), expected, `${route}: ${await response.text()}`); return response.json();
+};
+const mutation = data => ({ method: 'POST', expected: 201, data, extra: { 'Idempotency-Key': randomUUID() } });
+const shot = name => page.screenshot({ path: path.join(evidence, `${name}.png`), fullPage: true, animations: 'disabled' });
+const navigation = () => page.getByRole('separator', { name: 'Resize navigation', exact: true });
+const inspector = () => page.getByRole('complementary', { name: 'Task inspector', exact: true });
+const panelResize = () => page.getByRole('separator', { name: 'Resize task inspector', exact: true });
+async function waitWidth(locator, width) { await page.waitForFunction(({ selector, width }) => Math.abs((document.querySelector(selector)?.getBoundingClientRect().width ?? 0) - width) <= 1, { selector: locator, width }); }
+async function drag(locator, delta) {
+  const bounds = await locator.boundingBox(); assert.ok(bounds);
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + Math.min(60, bounds.height / 2));
+  await page.mouse.down(); await page.mouse.move(bounds.x + bounds.width / 2 + delta, bounds.y + Math.min(60, bounds.height / 2), { steps: 8 }); await page.mouse.up();
+}
+async function menu(name) { await page.getByRole('button', { name: 'Task panel layout', exact: true }).click(); await page.getByRole('menuitemradio', { name, exact: true }).click(); }
+async function noOverflow(label) { assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `${label}: document overflow`); }
+try {
+  const stamp = randomUUID().slice(0, 8);
+  await api('/session/signup', { method: 'POST', expected: 201, data: { login_name: `layout-${stamp}`, display_name: 'Synthetic Layout Handler', passphrase: `Synthetic-only-${randomUUID()}` } });
+  org = (await api('/organizations', mutation({ name: `Synthetic layout ${stamp}` }))).active_organization.org_id;
+  const firstOrg = org;
+  const scion = await api('/scions', mutation({ name: `Layout Scion ${stamp}`, product_category: 'digital', product_description: 'Synthetic workshop planning for UI geometry tests.', decision: 'Identify capabilities.', requirements: ['Visitors request a place.'], questions: [], change_summary: 'Disposable layout fixture.' }));
+  const task = await api(`/scions/${scion.id}/agent-tasks`, { ...mutation({ task_kind: 'prepare_capability_plan', candidate_proposal: { synthetic: true }, timeout_seconds: 120 }), extra: { 'Idempotency-Key': randomUUID(), 'If-Match': '"1"' } });
+  const route = `${base}/#/scions/${scion.id}/tasks/${task.id}`;
+  await page.goto(route); await inspector().waitFor();
+  await waitWidth('.company-sidebar', 270); await waitWidth('.task-side-panel', 340);
+  await navigation().focus(); await page.keyboard.press('ArrowRight'); await waitWidth('.company-sidebar', 278);
+  await page.keyboard.press('End'); await waitWidth('.company-sidebar', 420);
+  await page.keyboard.press('Home'); await waitWidth('.company-sidebar', 208);
+  await page.keyboard.press('Enter'); await waitWidth('.company-sidebar', 270);
+  await drag(navigation(), 40); await waitWidth('.company-sidebar', 310);
+  await drag(panelResize(), -50); await waitWidth('.task-side-panel', 390);
+  checks.push('Navigation and inspector resize by pointer; keyboard bounds and reset work');
+  await menu('Dock left');
+  await page.waitForFunction(() => document.querySelector('.task-side-panel')?.dataset.side === 'left');
+  const placement = await page.evaluate(() => ({ panel: document.querySelector('.task-side-panel').getBoundingClientRect().x, main: document.querySelector('.task-detail').getBoundingClientRect().x }));
+  assert.ok(placement.panel < placement.main, 'Dock left moves the actual panel before task content');
+  await panelResize().focus(); await page.keyboard.press('ArrowRight'); await waitWidth('.task-side-panel', 398);
+  const trigger = await page.getByRole('button', { name: 'Task panel layout', exact: true }).boundingBox();
+  const area = await page.locator('.task-layout').boundingBox(); assert.ok(trigger && area);
+  await page.mouse.move(trigger.x + trigger.width / 2, trigger.y + trigger.height / 2); await page.mouse.down();
+  await page.mouse.move(area.x + area.width - 40, trigger.y + trigger.height / 2, { steps: 10 }); await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('.task-side-panel')?.dataset.side === 'right');
+  assert.equal(await page.getByRole('menu', { name: 'Task panel layout', exact: true }).count(), 0, 'Dragging must not open the click menu');
+  checks.push('Dock menu and pointer drag move the inspector; resizing follows the docked edge');
+  await page.reload(); await inspector().waitFor();
+  await waitWidth('.company-sidebar', 310); await waitWidth('.task-side-panel', 398);
+  await page.getByRole('button', { name: 'Close task inspector', exact: true }).click();
+  assert.equal(await inspector().count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Show task panel', exact: true }).evaluate(button => document.activeElement === button), true);
+  await page.goto(`${base}/#/tasks`); await page.getByRole('heading', { name: 'Tasks', exact: true }).waitFor();
+  await page.goto(route); await page.getByRole('button', { name: 'Show task panel', exact: true }).waitFor();
+  assert.equal(await inspector().count(), 0);
+  await page.reload(); await page.getByRole('button', { name: 'Show task panel', exact: true }).click(); await inspector().waitFor();
+  checks.push('Geometry and hidden state survive navigation/reload; closing restores keyboard focus');
+  await page.goto(`${base}/#/settings/appearance`); await page.getByRole('heading', { name: 'Appearance', exact: true }).waitFor();
+  await page.getByLabel('Navigation width', { exact: true }).fill('420');
+  await page.getByLabel('Task panel width', { exact: true }).fill('520');
+  await page.getByLabel('Task panel placement', { exact: true }).selectOption('left');
+  await page.goto(route); await inspector().waitFor();
+  await page.setViewportSize({ width: 1200, height: 900 }); await noOverflow('small desktop');
+  assert.ok((await page.locator('.task-detail').boundingBox()).width >= 410, 'Task body retains a usable width while inspector geometry adapts');
+  await shot('compact-desktop-docked-left');
+  await page.setViewportSize({ width: 900, height: 900 }); await noOverflow('tablet');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector('.company-bottom-navigation') !== null);
+  await noOverflow('mobile'); assert.equal(await navigation().count(), 0); assert.equal(await panelResize().isVisible(), false);
+  await page.getByRole('button', { name: 'Task panel layout', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Hide task panel', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('button', { name: 'Task panel layout', exact: true }).evaluate(button => document.activeElement === button), true);
+  await shot('mobile-stacked-panel');
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  checks.push('Narrow desktop preserves task width; mobile stacks panels and keeps menu keyboard access');
+  org = (await api('/organizations', mutation({ name: `Independent layout ${stamp}` }))).active_organization.org_id;
+  await page.goto(`${base}/#/tasks`); await page.reload(); await navigation().waitFor(); await waitWidth('.company-sidebar', 270);
+  await api('/session/active-organization', { method: 'POST', data: { organization_id: firstOrg } }); org = firstOrg;
+  await page.goto(route); await page.reload(); await inspector().waitFor(); await waitWidth('.company-sidebar', 420);
+  const stored = await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key.startsWith('grimoire:layout:v1:')).map(([key, value]) => ({ key, value: JSON.parse(value) })));
+  assert.ok(stored.length >= 2);
+  for (const record of stored) assert.deepEqual(Object.keys(record.value).sort(), ['inspectorDock', 'inspectorSide', 'inspectorWidth', 'sidebarWidth']);
+  checks.push('Organizations retain independent geometry and storage contains only whitelisted layout values');
+  await page.goto(`${base}/#/settings/appearance`); await page.getByRole('button', { name: 'Reset workspace layout', exact: true }).click();
+  await page.getByText('Default layout restored.', { exact: true }).waitFor();
+  await page.goto(route); await inspector().waitFor(); await waitWidth('.company-sidebar', 270); await waitWidth('.task-side-panel', 340);
+  assert.equal(await inspector().getAttribute('data-side'), 'right');
+  await shot('default-layout-restored');
+  assert.deepEqual(errors, []);
+  checks.push('Appearance reset restores default widths, position and visibility');
+  await writeFile(path.join(evidence, 'results.json'), JSON.stringify({ status: 'PASS', database, checks, provider_calls: 0, browser_errors: errors }, null, 2));
+  console.log(JSON.stringify({ status: 'PASS', evidence, checks: checks.length, provider_calls: 0 }));
+} catch (error) {
+  await shot('failure').catch(() => {}); await writeFile(path.join(evidence, 'failure.json'), JSON.stringify({ message: error.message, checks, browser_errors: errors }, null, 2)); throw error;
+} finally { await browser.close(); }

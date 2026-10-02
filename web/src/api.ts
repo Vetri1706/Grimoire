@@ -29,6 +29,7 @@ export type Principal = {
   organization_name: string;
   can_write: boolean;
   can_manage_workspace: boolean;
+  can_prepare_workspace: boolean;
   can_confirm_scope: boolean;
   can_propose_scope: boolean;
   is_agent: boolean;

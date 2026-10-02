@@ -120,7 +120,7 @@ try {
     }), 403, 'SESSION_REQUEST_DENIED');
     assert.deepEqual(status(await request('/api/session'), 200).data.organizations, []);
   });
-  await check('organization creation grants only workspace administration', async () => {
+  await check('organization creation grants workspace preparation without sourcing or approval authority', async () => {
     const response = status(await request('/api/organizations', {
       method: 'POST', body: { name: 'Synthetic Alpha' }, headers: keyHeaders('alpha'),
     }), 201);
@@ -128,6 +128,7 @@ try {
     organization = actor.org_id;
     identifiers.alpha = organization;
     assert.equal(actor.can_manage_workspace, true);
+    assert.equal(actor.can_prepare_workspace, true);
     for (const capability of ['can_write', 'can_confirm_scope', 'can_propose_scope', 'is_agent']) {
       assert.equal(actor[capability], false, `Unexpected privilege: ${capability}`);
     }
@@ -169,9 +170,40 @@ try {
     assert.equal(response.data.revision.name, 'Revised synthetic website');
     assert.equal(response.headers.get('etag'), '"2"');
   });
+  await check('organization admin records internal evidence with an idempotent source receipt', async () => {
+    const path = `/api/scions/${identifiers.scion}/sources`;
+    const options = { method: 'POST', headers: { ...keyHeaders('source'), 'If-Match': '"2"' },
+      body: { title: 'Synthetic onboarding note', origin: 'synthetic://onboarding', owner: 'Synthetic onboarding owner',
+        synthetic: true, source_text: 'Synthetic note', rights_status: 'granted',
+        permission_basis: 'I authored this synthetic test note.', permitted_use: 'scion_review',
+        change_summary: 'Synthetic workspace preparation regression' } };
+    identifiers.source = status(await request(path, options), 201).data.source_id;
+    assert.equal(status(await request(path, options), 201).data.source_id, identifiers.source);
+  });
+  await check('organization admin queues and cancels a digital task idempotently', async () => {
+    const path = `/api/scions/${identifiers.scion}/agent-tasks`;
+    const options = { method: 'POST', headers: { ...keyHeaders('task'), 'If-Match': '"2"' },
+      body: { task_kind: 'prepare_capability_plan', candidate_proposal: { synthetic: true }, timeout_seconds: 120 } };
+    const created = status(await request(path, options), 201).data;
+    identifiers.task = created.id;
+    assert.equal(created.status, 'queued');
+    assert.equal(status(await request(path, options), 201).data.id, identifiers.task);
+    status(await request(path, { ...options, body: { ...options.body, timeout_seconds: 90 } }), 409, 'IDEMPOTENCY_CONFLICT');
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      assert.equal(status(await request(`${path}/${identifiers.task}/cancel`, { method: 'POST' }), 200).data.status, 'cancelled');
+    }
+    const events = status(await request(`${path}/${identifiers.task}/events`), 200).data.events;
+    assert.deepEqual(events.map(event => event.status), ['queued', 'cancelled']);
+  });
+  await check('organization admin cannot queue physical scope or supplier-offer preparation', async () => {
+    for (const task_kind of ['prepare_physical_scope', 'prepare_offer_normalization']) {
+      status(await request(`/api/scions/${identifiers.scion}/agent-tasks`, {
+        method: 'POST', headers: { ...keyHeaders(task_kind), 'If-Match': '"2"' },
+        body: { task_kind, candidate_proposal: { synthetic: true }, timeout_seconds: 120 },
+      }), 403, 'INTAKE_WRITE_DENIED');
+    }
+  });
   for (const [label, path, code] of [
-    ['source creation', `/api/scions/${identifiers.scion}/sources`, 'INTAKE_WRITE_DENIED'],
-    ['agent task creation', `/api/scions/${identifiers.scion}/agent-tasks`, 'INTAKE_WRITE_DENIED'],
     ['physical scope proposal', `/api/scions/${identifiers.scion}/scope/proposals`, 'SCOPE_PROPOSAL_DENIED'],
     ['approval', '/api/approvals', 'APPROVAL_UNAVAILABLE'],
     ['Scion sourcing approval', `/api/scions/${identifiers.scion}/sourcing-approval`, 'APPROVAL_UNAVAILABLE'],
@@ -193,6 +225,9 @@ try {
     assert.deepEqual(status(await request('/api/scions'), 200).data.scions, []);
     status(await request(`/api/scions/${identifiers.scion}`), 404, 'SCION_NOT_FOUND');
     status(await request(`/api/scions/${identifiers.scion}/revisions`), 404, 'SCION_NOT_FOUND');
+    for (const suffix of ['/control-surface', `/sources/${identifiers.source}`, `/agent-tasks/${identifiers.task}/events`]) {
+      status(await request(`/api/scions/${identifiers.scion}${suffix}`), 404);
+    }
   });
   await check('stale tab cannot read or write after a shared-session organization switch', async () => {
     status(await request('/api/scions', { org: identifiers.alpha }), 409, 'ACTIVE_ORGANIZATION_CHANGED');

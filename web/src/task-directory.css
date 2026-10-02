@@ -1,0 +1,58 @@
+.task-directory .work-page-heading .button { display: inline-flex; align-items: center; gap: 8px; }
+.task-directory-toolbar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding-bottom: 18px; }
+.task-directory-search { display: flex; gap: 8px; align-items: center; flex: 1 1 240px; max-width: 380px; border: 1px solid var(--input); padding: 0 12px; border-radius: var(--radius-md); background: var(--card); min-height: 40px; }
+.company-app .task-directory-search input { border: 0; background: transparent; box-shadow: none; padding: 8px 0; width: 100%; min-width: 0; }
+.task-directory-search:focus-within { outline: 2px solid var(--ring); outline-offset: 2px; }
+.company-app .task-directory-search input:focus { outline: none; box-shadow: none; }
+.task-directory-view-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.task-directory-view-controls label { display: flex; align-items: center; gap: 7px; font-size: var(--text-meta); }
+.task-directory-view-controls select { width: auto; min-height: 40px; font-size: var(--text-meta); }
+.task-directory-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; min-height: 40px; padding: 0 0 14px; font-size: var(--text-meta); }
+.task-directory-summary .text-button { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; font-size: inherit; }
+.task-directory-summary .text-button[aria-pressed=true] { text-decoration: underline; text-underline-offset: 4px; }
+.task-directory-columns, .task-directory-row { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(160px, 200px) 142px 88px 18px; align-items: center; gap: 20px; padding: 12px; }
+.task-directory-columns { font-size: var(--text-small); border-block: 1px solid var(--border); }
+.task-directory-row { width: 100%; min-height: 70px; text-align: left; background: transparent; border: 0; border-radius: 0; border-bottom: 1px solid var(--border); color: var(--foreground); }
+.task-directory-row:hover, .task-directory-row:active { background: var(--accent); }
+.task-directory-row:focus-visible { outline-offset: -3px; }
+.task-directory-title { min-width: 0; }
+.task-directory-title-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.task-directory-title-line code { font-size: var(--text-code, .75rem); font-family: var(--font-mono); white-space: nowrap; }
+.task-directory-row strong { font-size: var(--text-body); font-weight: 550; line-height: 1.5; }
+.task-directory-context { display: flex; flex-wrap: wrap; gap: 2px 7px; align-items: baseline; margin-top: 3px; font-size: var(--text-small); }
+.task-directory-context>span { overflow-wrap: anywhere; }
+.task-directory-row .task-directory-context small { margin-top: 0; }
+.task-directory-row small { display: block; margin-top: 3px; font-size: var(--text-small); line-height: 1.5; }
+.task-directory-assignee { display: flex; align-items: center; gap: 8px; font-size: var(--text-body); min-width: 0; overflow-wrap: anywhere; }
+.task-directory-worker-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: var(--radius-md); background: var(--surface-inset); }
+.task-directory-row time { font-size: var(--text-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.task-directory-group>h2 { display: flex; align-items: center; gap: 10px; margin: 0; padding: 16px 12px 10px; font-size: var(--text-meta); font-weight: 600; background: var(--surface-inset); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.task-directory-group>h2>span, .task-directory-ready h2>span { display: inline-grid; place-items: center; min-width: 24px; height: 24px; font-size: var(--text-small); border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--card); }
+.task-directory-ready { margin-top: 36px; }
+.task-directory-ready h2, .task-scion-picker h2 { display: flex; align-items: center; gap: 10px; font-size: var(--text-section); margin: 0 0 12px; }
+.task-directory-section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+.task-directory-section-heading p { margin-top: 5px; font-size: var(--text-meta); }
+.task-scion-picker { margin: 0 0 24px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.task-scion-picker>.text-button { margin-top: 16px; }
+.task-scion-picker .work-row strong { flex: 1; overflow-wrap: anywhere; }
+.task-directory-empty>svg { width: 28px; height: 28px; margin-bottom: 12px; }
+.task-directory-empty .button { margin-top: 16px; }
+.task-directory-limit { margin-top: 20px; font-size: var(--text-small); }
+.task-status { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-small); white-space: nowrap; color: var(--foreground); }
+@media(max-width:1200px) { .task-directory-view-controls { margin-left: 0; }.task-directory-toolbar { gap: 12px; }.task-directory-columns, .task-directory-row { grid-template-columns: minmax(220px,1fr) minmax(140px,170px) 142px 18px; gap: 14px; }.task-directory-row time, .task-directory-columns>span:nth-child(4) { display: none; } }
+@media(max-width:1000px) {
+ .task-directory-columns { display: none; }
+ .task-directory-row { grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 16px 4px; }
+ .task-directory-title { grid-column: 1 / -1; }
+ .task-directory-row>svg { display: none; }
+ .task-directory-search { max-width: none; width: 100%; min-height: 44px; }
+ .company-app .task-directory-search input { font-size: var(--text-body); }
+ .task-directory-view-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; gap: 8px; }
+ .task-directory-view-controls label { flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
+ .task-directory-view-controls label:last-child { grid-column: 1 / -1; }
+ .task-directory-view-controls select { width: 100%; min-height: 44px; padding-left: 8px; padding-right: 8px; font-size: var(--text-body); }
+ .task-directory-summary { gap: 12px; }
+ .task-directory-summary .text-button { min-height: 44px; }
+ .task-directory-row .task-status { justify-self: end; }
+ .task-directory-context { flex-wrap: wrap; gap: 3px 10px; }
+}

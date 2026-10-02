@@ -17,7 +17,7 @@ colors:
 typography:
   sans:
     fontFamily: "InterVariable, Inter, system-ui, sans-serif"
-    fontSize: "0.875rem"
+    fontSize: "1rem"
     lineHeight: "1.5"
   mono:
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
@@ -25,7 +25,7 @@ rounded:
   DEFAULT: "8px"
   control: "6.4px"
 spacing:
-  workPageInline: "24px"
+  workPageInline: "28px"
   cardInset: "20px"
   accountCardInset: "24px"
 components:
@@ -47,8 +47,8 @@ keep stale, blocked, revoked and disconnected states legible.
 The user's follow-up audit in `../paperclip/see.md` refines this direction:
 clear near-black/near-white lettering, Paperclip typography and control density,
 layered surfaces, backdrop transitions, and compact login/signup. Account entry
-uses a stronger blue atmosphere; work screens use a quieter blue background with
-legible, nearly opaque panels. The backdrop moves independently of text. It
+uses a stronger blue atmosphere; work screens use a solid canvas with
+quiet blue borders and selections. The account backdrop moves independently of text. It
 never indicates task activity or changes the meaning of a recorded status.
 
 The current UI is English, used on desktop with responsive mobile access. No
@@ -79,9 +79,10 @@ and rose/red is an error or revocation. Labels and icons still carry meaning;
 color does not establish approval or provider availability. Graph edges and
 selected nodes use the same semantic colors as lists and forms.
 
-The fixed, noninteractive `#root::before` layer uses `--workspace-aura`, switching
-to `--auth-aura` on account pages. A slow background-position transition adds
-movement without moving text or controls. `--glass-surface`, `--panel-background`,
+The fixed, noninteractive `#root::before` layer uses `--auth-aura` only on
+account pages. A brief, finite opacity/transform entrance introduces the blue
+atmosphere; work screens use a solid `--card` canvas without a gradient.
+Reduced motion removes that entrance. `--glass-surface`, `--panel-background`,
 `--panel-rim` and `--panel-shadow` provide shared depth; panel surfaces remain
 88% opaque in Pearl and 92% in Midnight. Graph content uses a solid inset canvas.
 
@@ -91,8 +92,8 @@ Bundled Inter Variable is the exact same font binary used by the local Paperclip
 checkout and serves every screen without external font requests. Use weights
 400, 500 and 600 for ordinary content, controls and headings. Use the OS
 monospace stack for technical identifiers. Timestamps and natural-language labels use
-Inter. Global type tokens are 12px small, 13px metadata, 14px body, 16px section,
-20px heading, 24px page and 44px account hero at the default 16px root size.
+Inter. Global type tokens are 12px code, 14px small/metadata, 16px body, 18px section,
+22px heading, 28px page and 44px account hero at the default 16px root size.
 Graph titles and explanatory copy use 14px; graph metadata never drops below
 12px. Other explicit UI type sizes below 12px have been raised to that minimum.
 Do not set independent root type scales in component stylesheets.
@@ -104,14 +105,21 @@ long names must wrap or remain inspectable, rather than disappear for neatness.
 ## Layout
 
 Login retains its compact two-column layout. Workspace framing follows the live
-Paperclip reference measured at 1440 and 1920px: a 240px navigation rail, 60px
-header, 24px content inset and full-width record lists. The header and navigation
+Paperclip reference at the visible scale in the user's supplied screenshots:
+a 270px navigation rail, 68px header, 28px content inset and full-width record
+lists. The reference screenshots are approximately 1.125 times the local
+Paperclip defaults (240px rail / 60px header); use explicit layout and type
+tokens instead of browser zoom. The header and navigation
 stay fixed while the main workspace scrolls independently. Navigation labels
-use 13px/500 text; record titles use 14px. The rail collapses on narrow screens.
+use 16px/400 text; record titles use 16px. Narrow screens use labeled navigation
+and a drawer, with keyboard focus contained while the drawer is open.
 The solid header contains only the page title or record breadcrumb, including
 on mobile. Organization switching and creation live in the sidebar brand menu.
 The account menu links to appearance, Settings and the judge demo; runtime
-health remains available in Settings and the state-connected work surfaces.
+health remains available in Settings and Watchtower. Settings and profile routes
+replace the work shell with their own 270px navigation rail, 68px header and
+Back to workspace action. Dashboard contains work, attention and Scions rather
+than runtime configuration or health panels.
 Long graphs scroll inside their labeled viewport without widening the page.
 
 Organization, Scion and agent creation use a centered 540px form with a prominent

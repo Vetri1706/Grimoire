@@ -1,3 +1,4 @@
+import ResearchWorkspace from './ResearchWorkspace';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiError, SESSION_AUTH, announceSessionChange, organizationSession, request, sessionChangedStorageKey, sessionInvalidatedEvent } from './api';
@@ -7,11 +8,15 @@ import Evidence from './Evidence';
 import PhysicalScope from './PhysicalScope';
 import Offers from './Offers';
 import AdaptiveScion from './AdaptiveScion';
+import TaskWorkspace from './TaskWorkspace';
+import TaskRunDetail from './TaskRunDetail';
 import ControlSurface from './ControlSurface';
 import NativeAgents from './NativeAgents';
 import { Settings } from './Settings';
+import { LayoutProvider } from './LayoutPreferences';
+import { WorkerPairing } from './WorkerConnections';
 import ScionCreation from './ScionCreation';
-import type { NativeAgent } from './agents-api';
+import type { AgentRuntime, NativeAgent } from './agents-api';
 import { useControlSurface } from './control-api';
 import type { CaseNode } from './control-api';
 import { CompanyNavigation, WorkspacePage, ScionOverview, ScionActivity, pageNames } from './Workbench';
@@ -62,13 +67,18 @@ export default function App() {
   const [refresh, setRefresh] = useState(0);
   const [notice, setNotice] = useState('');
   const dirty = useRef(false);
+  const editingBrief = useRef(edit); editingBrief.current = edit;
   const routeRef = useRef(route);
   const parts = route.split('/');
   const id = parts[1] === 'scions' && parts[2] ? parts[2] : null;
-  const page = route === '/' ? 'dashboard' : parts[1];
-  const view = parts[3] || 'overview';
+  const page = route === '/' ? 'tasks' : parts[1];
+  const workspaceReturnRoute = useRef('/tasks');
+  useEffect(() => { if (page !== 'settings' && page !== 'profile') workspaceReturnRoute.current = route; }, [page, route]);
+  const view = parts[3] || 'default';
   const focusedId = parts[4] || null;
+  const taskRoute = Boolean(id && focusedId && focusedId !== 'new' && (view === 'tasks' || view === 'agent-work' || view === 'research'));
   const canWrite = principal?.can_write === true;
+  const canPrepare = principal?.can_prepare_workspace === true;
   const canManage = principal?.can_manage_workspace === true;
   const workspace = useWorkspace(token, principal?.org_id);
 
@@ -77,10 +87,15 @@ export default function App() {
   useEffect(() => {
     const change = () => {
       const next = routeFromHash(); if (next === routeRef.current) return;
-      if (dirty.current && !window.confirm('Leave this edit? Your unsaved changes will be lost.')) {
+      const previousParts = routeRef.current.split('/'); const nextParts = next.split('/');
+      // Task selection retains the same Scion-keyed workspace and its drafts.
+      const retainsTaskDraft = !editingBrief.current && previousParts[1] === 'scions' && nextParts[1] === 'scions' && previousParts[2] === nextParts[2]
+        && (!previousParts[3] || previousParts[3] === 'tasks') && (!nextParts[3] || nextParts[3] === 'tasks');
+      if (dirty.current && !retainsTaskDraft && !window.confirm('Leave this edit? Your unsaved changes will be lost.')) {
         window.history.replaceState(null, '', `#${routeRef.current}`); return;
       }
-      dirty.current = false; routeRef.current = next; setRoute(next); setEdit(false); setNotice('');
+      if (!retainsTaskDraft) dirty.current = false;
+      routeRef.current = next; setRoute(next); setEdit(false); setNotice('');
     };
     window.addEventListener('hashchange', change); return () => window.removeEventListener('hashchange', change);
   }, []);
@@ -133,8 +148,9 @@ export default function App() {
   function acceptSession(state: SessionState) {
     dirty.current = false; setSession(state); if (state.handler.installation_owner) setSetupRequired(false); setAccessError(''); setError('');
     setCreatingOrganization(false); setSelected(null); setEdit(false); setNotice('');
-    setRefresh(value => value + 1); routeRef.current = '/';
-    window.history.replaceState(null, '', '#/'); setRoute('/'); announceSessionChange();
+    const next = /^\/connect-worker\/[a-fA-F0-9]{16}$/.test(routeRef.current) ? routeRef.current : '/';
+    setRefresh(value => value + 1); routeRef.current = next;
+    window.history.replaceState(null, '', `#${next}`); setRoute(next); announceSessionChange();
   }
   async function disconnect() {
     if (authPending.current || (dirty.current && !window.confirm('Sign out and discard this unsaved edit?'))) return;
@@ -169,29 +185,34 @@ export default function App() {
   if (!session) return <IdentityAccess setupRequired={setupRequired} appearance={appearance} onReady={acceptSession} />;
   if (!principal || creatingOrganization) return <OrganizationOnboarding session={session} appearance={appearance} allowCancel={Boolean(principal)} onReady={acceptSession} onCancel={() => setCreatingOrganization(false)} />;
   const record = selected?.id === id ? selected : null;
-  return <div className="company-app">
+  if (page === 'settings' || page === 'profile') return <LayoutProvider userId={session.handler.identity_id} organizationId={principal.org_id}><Settings session={session} connection={workspace} route={route} onSession={next => { setSession(next); announceSessionChange(); }} onSwitchOrganization={organizationId => void switchOrganization(organizationId)} onCreateOrganization={createOrganization} onNavigate={navigate} onBack={() => navigate(workspaceReturnRoute.current)} onDisconnect={() => void disconnect()} onDirty={setDirty} busy={authBusy} feedback={<>
+    {notice && <div className="settings-feedback" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}
+    {error && <ErrorMessage>{error}<button className="text-button" onClick={() => setRefresh(value => value + 1)}>Retry</button></ErrorMessage>}
+  </>} /></LayoutProvider>;
+  return <LayoutProvider userId={session.handler.identity_id} organizationId={principal.org_id}><div className="company-app">
     <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to content</a>
     <CompanyNavigation principal={principal} handler={session.handler} organizations={session.organizations} data={workspace.data} route={route} onNavigate={navigate} onSwitchOrganization={organizationId => void switchOrganization(organizationId)} onCreateOrganization={createOrganization} onDisconnect={() => void disconnect()} disconnectBusy={authBusy} canWrite={canManage} />
-<div className="company-main"><header className="company-topbar"><nav aria-label="Breadcrumb">{id ? <><button onClick={() => navigate('/scions')}>Scions</button><span>›</span><strong>{record?.revision.name ?? 'Scion'}</strong></> : <strong className="company-page-label">{route === '/new' ? 'New Scion' : pageNames[page] ?? 'Workspace'}</strong>}{(page === 'agents' || page === 'skills') && parts[2] && <><span>›</span><span>{parts[2] === 'new' ? 'Create' : (page === 'agents' ? workspace.data?.agents : workspace.data?.skills)?.find(item => item.id === parts[2])?.config.name ?? 'Record'}</span></>}{id && view !== 'overview' && <><span>›</span><span>{scionViewNames[view] ?? 'Record'}</span></>}</nav></header>
+<div className="company-main"><header className="company-topbar"><nav aria-label="Breadcrumb">{id ? <><button onClick={() => navigate(taskRoute ? '/tasks' : '/scions')}>{taskRoute ? 'Tasks' : 'Scions'}</button><span>›</span><strong>{record?.revision.name ?? 'Scion'}</strong></> : <strong className="company-page-label">{route === '/new' ? 'New Scion' : pageNames[page] ?? 'Workspace'}</strong>}{(page === 'agents' || page === 'skills') && parts[2] && <><span>›</span><span>{parts[2] === 'new' ? 'Create' : page === 'skills' && parts[2] === 'discover' ? 'Discover' : page === 'skills' && parts[2] === 'studio' ? 'My Skills' : (page === 'agents' ? workspace.data?.agents : workspace.data?.skills)?.find(item => item.id === parts[2])?.config.name ?? 'Record'}</span></>}{id && !taskRoute && view !== 'overview' && <><span>›</span><span>{scionViewNames[view] ?? (record?.revision.product_category === 'digital' ? 'Tasks' : 'Overview')}</span></>}</nav></header>
     <main id="main-content" tabIndex={-1}>
       {notice && <div className="work-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}
       {error && <ErrorMessage>{error}<button className="text-button" onClick={() => setRefresh(value => value + 1)}>Retry</button></ErrorMessage>}
-      {id ? loading ? <div className="loading-panel" role="status">Loading Scion…</div> : record ? edit ? <div className="work-form-page"><IntakeForm key={`${record.id}-edit`} token={token} scion={record} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /></div> : <CaseRecord nativeAgents={workspace.data?.agents ?? []} key={record.id} token={token} scion={record} view={view} focusedId={focusedId} onNavigate={navigate} principalId={principal.principal_id} canManage={canManage} canWrite={canWrite} onDirty={setDirty} onEdit={current => { setSelected(current); setEdit(true); }} /> : null
+      {id ? loading ? <div className="loading-panel" role="status">Loading Scion…</div> : record ? edit ? <div className="work-form-page"><IntakeForm key={`${record.id}-edit`} token={token} scion={record} onSaved={saved} onDirty={setDirty} onCancel={() => { if (!dirty.current || window.confirm('Discard this unsaved revision?')) { dirty.current = false; setEdit(false); } }} /></div> : <CaseRecord runtime={workspace.data?.agent_runtime} nativeAgents={workspace.data?.agents ?? []} key={record.id} token={token} scion={record} view={view} focusedId={focusedId} onNavigate={navigate} principalId={principal.principal_id} canManage={canManage} canWrite={canWrite} canPrepare={canPrepare} onDirty={setDirty} onEdit={current => { setSelected(current); setEdit(true); }} /> : null
       : route === '/new' ? !canManage ? <ErrorMessage>A Handler identity is required to create a Scion.</ErrorMessage> : <ScionCreation token={token} onSaved={saved} onCancel={() => navigate('/scions')} onDirty={setDirty} />
-      : (page === 'settings' || page === 'profile') ? <Settings session={session} connection={workspace} route={route} onSession={next => { setSession(next); announceSessionChange(); }} onSwitchOrganization={organizationId => void switchOrganization(organizationId)} onCreateOrganization={createOrganization} onNavigate={navigate} onDirty={setDirty} busy={authBusy} />
-      : (page === 'agents' || page === 'skills') && workspace.data ? <NativeAgents token={token} page={page} route={route} data={workspace.data} canWrite={canManage} canExecute={canWrite} onNavigate={navigate} onChanged={workspace.refresh} onDirty={setDirty} />
+      : page === 'connect-worker' ? <WorkerPairing key={`${principal.org_id}:${parts[2]}`} token={token} principal={principal} code={parts[2] || ''} onNavigate={navigate} />
+      : (page === 'agents' || page === 'skills') && workspace.data ? <NativeAgents token={token} page={page} route={route} data={workspace.data} canWrite={canManage} canExecute={canWrite} canPrepare={canPrepare} onNavigate={navigate} onChanged={workspace.refresh} onDirty={setDirty} />
       : <WorkspacePage key={page} page={pageNames[page] ? page : 'dashboard'} connection={workspace} onNavigate={navigate} canWrite={canManage} />}
     </main></div>
-  </div>;
+  </div></LayoutProvider>;
 }
 function ErrorMessage({ children }: { children: ReactNode }) { return <div className="error-message" role="alert"><Icon name="alert" size={19} /><div>{children}</div></div>; }
-const scionViewNames: Record<string, string> = { overview: 'Overview', proposals: 'Proposals', comparisons: 'Comparisons', sources: 'Evidence', 'agent-work': 'Agent work', graph: 'Dependency graph', activity: 'Activity', record: 'Brief', history: 'Revisions', scope: 'Physical scope', offers: 'Supplier offers' };
+const scionViewNames: Record<string, string> = { overview: 'Overview', tasks: 'Tasks', research: 'Research', proposals: 'Deliverables', comparisons: 'Comparisons', sources: 'Evidence', 'agent-work': 'Agent work', graph: 'Dependency graph', activity: 'Watchtower', record: 'Brief', history: 'Revisions', scope: 'Physical scope', offers: 'Supplier offers' };
 
-function CaseRecord({ nativeAgents, token, scion: initialScion, view: requestedView, focusedId, onNavigate, principalId, onEdit, canManage, canWrite, onDirty }: { nativeAgents: NativeAgent[]; token: string; scion: Scion; view: string; focusedId: string | null; onNavigate: (route: string) => void; principalId: string; canManage: boolean; canWrite: boolean; onEdit: (current: Scion) => void; onDirty: (value: boolean) => void }) {
+function CaseRecord({ runtime, nativeAgents, token, scion: initialScion, view: requestedView, focusedId, onNavigate, principalId, onEdit, canManage, canWrite, canPrepare, onDirty }: { runtime?: AgentRuntime; nativeAgents: NativeAgent[]; token: string; scion: Scion; view: string; focusedId: string | null; onNavigate: (route: string) => void; principalId: string; canManage: boolean; canWrite: boolean; canPrepare: boolean; onEdit: (current: Scion) => void; onDirty: (value: boolean) => void }) {
   const [scion, setScion] = useState(initialScion);
   const connection = useControlSurface(token, initialScion.id);
   const physical = scion.revision.product_category !== 'digital';
-  const view = !scionViewNames[requestedView] || (!physical && ['scope', 'offers'].includes(requestedView)) ? 'overview' : requestedView;
+  const view = !physical && requestedView === 'default' ? 'tasks'
+    : !scionViewNames[requestedView] || (!physical && ['scope', 'offers'].includes(requestedView)) ? physical ? 'overview' : 'tasks' : requestedView;
   useEffect(() => { setScion(initialScion); }, [initialScion]);
   useEffect(() => {
     if (!connection.data || connection.data.scion_revision === scion.current_revision) return;
@@ -208,7 +229,7 @@ function CaseRecord({ nativeAgents, token, scion: initialScion, view: requestedV
   }
   function openView(next: string, id?: string) {
     if (!leaveSource() || (!physical && ['scope', 'offers'].includes(next))) return;
-    onNavigate(`/scions/${scion.id}${next === 'overview' ? '' : '/' + next}${id ? '/' + id : ''}`);
+    onNavigate(`/scions/${scion.id}/${!physical && next === 'agent-work' ? 'tasks' : next}${id ? '/' + id : ''}`);
   }
   function editIntake() { if (leaveSource()) onEdit(scion); }
   function nodeAction(node: CaseNode) {
@@ -216,24 +237,30 @@ function CaseRecord({ nativeAgents, token, scion: initialScion, view: requestedV
     if (node.safe_next_action.kind === 'edit_intake') { editIntake(); return; }
     if (node.kind === 'scion' || node.id === 'connector:handler_intake') { openView('record'); return; }
     if (node.kind === 'evidence_source' || node.kind === 'data_connector') { openView('sources'); return; }
-    if (node.kind === 'agent_task') { openView('agent-work', node.id.replace(/^task:/, '')); return; }
+    if (node.kind === 'agent_task') { const taskId = node.id.replace(/^task:/, ''); const task = connection.data?.operations.tasks.find(item => item.id === taskId); openView(task?.task_kind === 'research_public_web' ? 'research' : 'agent-work', taskId); return; }
     if (node.kind === 'human_review') { openView('activity'); return; }
     openView(node.kind === 'comparison' ? 'comparisons' : 'proposals', node.id.replace(/^(plan|comparison):/, ''));
   }
-  const primaryViews = ['overview', 'proposals', 'sources', 'agent-work', 'activity'];
-  return <div className="work-scion">
+  const primaryViews = physical ? ['overview', 'agent-work', 'research', 'proposals', 'sources', 'activity'] : ['tasks', 'research', 'record', 'sources', 'activity'];
+  const focusedTask = Boolean(focusedId && focusedId !== 'new' && (view === 'tasks' || view === 'agent-work' || view === 'research'));
+  return <div className={`work-scion${focusedTask ? ' work-scion-task-detail' : ''}`}>
+    {!focusedTask && <>
     <div className="work-scion-heading"><span className="work-muted">{category(scion.revision.product_category)} · Revision {scion.current_revision}</span><div><h1>{scion.revision.name}</h1><button className="button secondary" onClick={editIntake} disabled={!canManage}><Icon name="edit" size={15} />Edit brief</button></div></div>
-    <nav className="work-scion-tabs" aria-label="Scion views">{primaryViews.map(item => <button key={item} aria-current={view === item ? 'page' : undefined} className={view === item ? 'selected' : ''} onClick={() => openView(item)}>{scionViewNames[item]}</button>)}<label className="work-more"><select aria-label="More Scion views" value={primaryViews.includes(view) ? '' : view} onChange={event => { if (event.target.value) openView(event.target.value); }}><option value="">More…</option><option value="comparisons">Evidence comparisons</option><option value="graph">Dependency graph</option><option value="record">Full brief</option><option value="history">Revision history</option>{physical && <><option value="scope">Physical scope</option><option value="offers">Supplier offers</option></>}</select></label></nav>
+    <nav className="work-scion-tabs" aria-label="Scion views">{primaryViews.map(item => <button key={item} aria-current={view === item ? 'page' : undefined} className={view === item ? 'selected' : ''} onClick={() => openView(item)}>{scionViewNames[item]}</button>)}<label className="work-more"><select aria-label="More Scion views" value={primaryViews.includes(view) ? '' : view} onChange={event => { if (event.target.value) openView(event.target.value); }}><option value="">More…</option><option value="proposals">Deliverables</option><option value="comparisons">Evidence comparisons</option><option value="graph">Dependency graph</option><option value="record">Full brief</option><option value="history">Revision history</option>{physical && <><option value="scope">Physical scope</option><option value="offers">Supplier offers</option></>}</select></label></nav>
+    </>}
     <div className="work-scion-body">
-    {view === 'overview' ? <ScionOverview scion={scion} connection={connection} onOpen={openView} onEdit={editIntake} canWrite={canManage} />
+    {view === 'research' ? <ResearchWorkspace key={`${token}:${scion.id}`} token={token} scion={scion} nativeAgents={nativeAgents} runtime={runtime} canPrepare={canPrepare} preferredTaskId={focusedId} onNavigate={onNavigate} onDirty={markSourceDirty} />
+    : physical && focusedTask && focusedId ? <TaskRunDetail token={token} scion={scion} preferredTaskId={focusedId} nativeAgents={nativeAgents} runtime={runtime} canWrite={canWrite} canPrepare={canPrepare} control={connection} onNavigate={onNavigate} />
+    : view === 'tasks' || !physical && view === 'agent-work' ? <TaskWorkspace key={`${token}:${scion.id}`} token={token} scion={scion} nativeAgents={nativeAgents} runtime={runtime} canManage={canManage} canWrite={canWrite} canPrepare={canPrepare} preferredTaskId={focusedId} control={connection} onNavigate={onNavigate} onScionSaved={async next => { setScion(next); await connection.refresh(); }} onDirty={markSourceDirty} />
+    : view === 'overview' ? <ScionOverview scion={scion} connection={connection} onOpen={openView} onEdit={editIntake} canWrite={canManage} />
     : view === 'graph' ? <ControlSurface graphOnly connection={connection} onAction={nodeAction} />
-    : view === 'activity' ? <ScionActivity connection={connection} />
+    : view === 'activity' ? <ScionActivity connection={connection} onOpenTask={id => openView(connection.data?.operations.tasks.find(task => task.id === id)?.task_kind === 'research_public_web' ? 'research' : physical ? 'agent-work' : 'tasks', id)} />
     : view === 'record' ? <section className="work-brief-page"><div className="work-section-title"><h2>Brief</h2><span className="work-muted">Handler-provided · unverified</span></div><RecordFacts revision={scion.revision} /></section>
     : view === 'history' ? <History token={token} scion={scion} />
-    : view === 'sources' ? <Evidence token={token} scion={scion} canWrite={canWrite} onDirty={markSourceDirty} />
+    : view === 'sources' ? <Evidence token={token} scion={scion} canWrite={canPrepare} onDirty={markSourceDirty} />
     : view === 'scope' ? <PhysicalScope token={token} scion={scion} principalId={principalId} canWrite={canWrite} onDirty={markSourceDirty} onSources={() => openView('sources')} onOfferProposal={id => openView('offers', id)} onCapabilityProposal={id => openView('proposals', id)} preferredProposalId={focusedId} />
     : view === 'offers' ? <Offers token={token} scion={scion} canWrite={canWrite} preferredProposalId={focusedId} onDirty={markSourceDirty} onSources={() => openView('sources')} onScopeProposal={id => openView('scope', id)} onCapabilityProposal={id => openView('proposals', id)} />
-    : <AdaptiveScion nativeAgents={nativeAgents} token={token} scion={scion} canWrite={canWrite} view={view === 'agent-work' ? 'agent-work' : view === 'comparisons' ? 'comparisons' : 'plans'} preferredPlanId={view === 'proposals' ? focusedId : null} preferredComparisonId={view === 'comparisons' ? focusedId : null} onView={openView} onDirty={markSourceDirty} onSources={() => openView('sources')} onScopeProposal={id => openView('scope', id)} onOfferProposal={id => openView('offers', id)} />}
+    : <AdaptiveScion runtime={runtime} nativeAgents={nativeAgents} token={token} scion={scion} canWrite={canWrite} canPrepare={canPrepare} view={view === 'agent-work' ? 'agent-work' : view === 'comparisons' ? 'comparisons' : 'plans'} preferredPlanId={view === 'proposals' ? focusedId : null} preferredComparisonId={view === 'comparisons' ? focusedId : null} onView={openView} onDirty={markSourceDirty} onSources={() => openView('sources')} onScopeProposal={id => openView('scope', id)} onOfferProposal={id => openView('offers', id)} />}
     </div>
   </div>;
 }
