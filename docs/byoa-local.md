@@ -166,13 +166,9 @@ failures must be reported rather than described as successful deletion.
 The provider's own data handling is outside this local cleanup; no provider-side
 deletion or physical erasure is claimed.
 
-The first live adapter test completed on 26 September 2026 using the existing
-Codex CLI login. Its proposal `7bdf2955-16f5-40e5-84a6-ea50c434b59a` remained
-unconfirmed and was authored by the enrolled agent principal. Eight Node tests
-cover the credential/output guards and CLI event classification. Actual run
-identifiers, SHA-256, API readback, retained failed attempts, and one earlier
-temporary-folder cleanup limitation are recorded in
-[`evidence/layer3-codex.txt`](evidence/layer3-codex.txt).
+Use the [test commands](testing.md) to check credential/output guards and worker
+behavior. A successful local readiness check or heartbeat does not establish
+provider execution; verify a completed task and its API result separately.
 
 ## Queue API
 

@@ -88,7 +88,7 @@ foreach ($name in @('SystemRoot','WINDIR','PATH','PATHEXT','USERPROFILE','APPDAT
     if ($value) { $processInfo.Environment[$name]=$value }
 }
 if ($agentToken) { $processInfo.Environment['GRIMOIRE_TOKEN_AGENT_A']=$agentToken }
-foreach ($name in @('GRIMOIRE_API_URL','GRIMOIRE_CODEX_BIN')) {
+foreach ($name in @('GRIMOIRE_API_URL','GRIMOIRE_CODEX_BIN','GRIMOIRE_CONNECTOR_HOME')) {
     if ($name -eq 'GRIMOIRE_API_URL' -and ($Connection -or $Mode -eq 'Connect')) { continue }
     $value=[Environment]::GetEnvironmentVariable($name)
     if ($value) { $processInfo.Environment[$name]=$value }

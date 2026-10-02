@@ -122,5 +122,5 @@ not executable plugins. Additional providers, per-agent secret vault/API-key
 issuance, provider tracing, dollar metering and monetary budgets are **not
 implemented**. Their absence is explicit; no fabricated spend or runs appear.
 
-See [native verification](verification-2026-09-27-native-agents.md) and
+See [test commands](testing.md) and
 [Watchtower boundaries](control-surface.md).

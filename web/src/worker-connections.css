@@ -20,6 +20,14 @@
 .worker-command pre { flex: 1; min-width: 0; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; font-size: var(--text-small); }
 .worker-command .button { min-height: 40px; padding: 4px 10px; font-size: var(--text-small); }
 .worker-command-wrap>p { font-size: var(--text-small); }
+.worker-download { padding: 12px 0; }
+.worker-download>.button { display: inline-flex; text-decoration: none; }
+.worker-download-checksums { display: grid; gap: 10px; }
+.worker-download-checksums dt { font-size: var(--text-small); }
+.worker-download-checksums dd { margin: 4px 0 0; }
+.worker-download-checksums code { overflow-wrap: anywhere; font-size: var(--text-small); }
+.worker-release-unavailable { padding: 12px; margin-top: 10px; background: var(--surface-inset); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.worker-release-unavailable p { margin-top: 0; }
 .worker-help, .worker-details, .worker-resume { font-size: var(--text-meta); }
 .worker-help summary, .worker-details summary, .worker-resume summary { cursor: pointer; width: fit-content; padding: 5px 0; font-weight: 500; }
 .worker-help p { margin-top: 8px; }

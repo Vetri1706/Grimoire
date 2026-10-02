@@ -146,13 +146,9 @@ It completed with `firstScionVisible: true`, five screenshots, and an empty
 workspace, first Scion, second organization, switch back, 1440×1000 desktop,
 and 390×844 narrow layouts.
 
-Screenshots:
-
-- [Owner setup, desktop](evidence/gg67-onboarding-desktop.png)
-- [First empty workspace, desktop](evidence/gg67-empty-workspace-desktop.png)
-- [First Scion form, narrow](evidence/gg67-first-scion-narrow.png)
-- [Second empty organization, desktop](evidence/gg67-second-organization-desktop.png)
-- [Switched-back first workspace, narrow](evidence/gg67-returned-workspace-narrow.png)
+These results describe the original implementation check, not a current test
+run. See [test commands](testing.md) to repeat verification against the current
+checkout.
 
 ## Failure and operational notes
 

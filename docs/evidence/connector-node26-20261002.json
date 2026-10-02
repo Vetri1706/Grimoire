@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-02",
+  "release": "0.1.1",
+  "runtime": "26.3.0",
+  "status": "validated_locally",
+  "change": "Accept Node 26.3+ within 26.x and version the website download URLs to invalidate npm's previous tarball cache. Retain pinned Node 24.21.0 LTS as the bootstrap download.",
+  "validation": {
+    "connector_tests_passed": 56,
+    "website_command_tests_passed": 5,
+    "windows_bootstrap_tests": "passed without live download; includes Node 26.3 compatibility, unsupported versions, download consent, private installation, retries and checksum rejection",
+    "frontend_build": "passed; existing Vite bundle-size warning remains",
+    "packed_release": "npm pack produced 17 allowlisted files. Tarball and Windows ZIP verified for source equality, SHA-256, isolated help/version and real local Codex readiness under Node 26.3. Offline npm exec succeeded outside checkout.",
+    "served_download": "npx.cmd --yes --package=\"http://127.0.0.1:5180/downloads/grimoire-connector.tgz?v=0.1.1\" grimoire-connector --check",
+    "served_result": "Node and local Codex checks passed. No pairing or model execution was performed.",
+    "scope": "Focused compatibility follow-up; the full-stack lifecycle checks from connector-release-20261002.json were not rerun."
+  },
+  "artifact_sha256": {
+    "package": "635d5c93926258ca184f855cd097b81c08620c658e4a0f4e4802745962899f1a",
+    "windows": "b3d0b635afe1573e742ef00b79144ec9e4896c8f43ffe66017f38467b767b7b1"
+  },
+  "pairing_performed": false,
+  "model_invoked": false,
+  "npm_published": false,
+  "deployed": false
+}

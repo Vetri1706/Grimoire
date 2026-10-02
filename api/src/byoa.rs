@@ -189,7 +189,7 @@ async fn eligible(tx: &mut Tx, task: &Task) -> Result<(), ApiError> {
     }
     Ok(())
 }
-fn lease(headers: &HeaderMap, task: &Task, actor: &Actor) -> Result<(), ApiError> {
+fn lease_identity(headers: &HeaderMap, task: &Task, actor: &Actor) -> Result<(), ApiError> {
     let supplied = headers
         .get("X-Grimoire-Task-Lease")
         .and_then(|h| h.to_str().ok())
@@ -197,8 +197,14 @@ fn lease(headers: &HeaderMap, task: &Task, actor: &Actor) -> Result<(), ApiError
     if task.claimed_by != Some(actor.principal_id)
         || supplied.is_none()
         || task.lease_token != supplied
-        || task.lease_until.is_none_or(|v| v < Utc::now())
     {
+        return Err(conflict());
+    }
+    Ok(())
+}
+fn lease(headers: &HeaderMap, task: &Task, actor: &Actor) -> Result<(), ApiError> {
+    lease_identity(headers, task, actor)?;
+    if task.lease_until.is_none_or(|v| v < Utc::now()) {
         return Err(conflict());
     }
     Ok(())
@@ -349,11 +355,12 @@ async fn cancelled(
     let (mut tx, actor) = authenticate(&pool, &headers).await?;
     agent(&actor)?;
     let task = load(&mut tx, parse_id(&id)?, true).await?;
-    lease(&headers, &task, &actor)?;
+    lease_identity(&headers, &task, &actor)?;
     if task.status == "cancelled" {
         tx.commit().await?;
         return Ok(Json(task).into_response());
     }
+    lease(&headers, &task, &actor)?;
     if task.status != "cancel_requested" {
         return Err(conflict());
     }
@@ -595,12 +602,29 @@ async fn result(
     crate::agents::lock_org(&mut tx, &actor).await?;
     let id = parse_id(&id)?;
     let task = load(&mut tx, id, true).await?;
-    lease(&headers, &task, &actor)?;
+    lease_identity(&headers, &task, &actor)?;
     let input = json_input(input)?;
-    if task.status == "completed" && task.proposal_id == Some(input.proposal_id) {
+    if task.status == "completed" {
+        // A lost success response may be recovered after the execution lease
+        // expires. This acknowledges the exact immutable receipt only; it never
+        // extends a lease, changes a result or re-executes provider work.
+        let note: Option<String> = sqlx::query_scalar(
+            "SELECT preparation_note FROM grimoire.intake_agent_tasks WHERE id=$1",
+        )
+        .bind(task.id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if task.proposal_id != Some(input.proposal_id)
+            || task.provider_run_id != input.provider_run_id
+            || task.output_sha256.as_deref() != Some(input.output_sha256.as_str())
+            || note.as_deref() != Some(input.preparation_note.as_str())
+        {
+            return Err(conflict());
+        }
         tx.commit().await?;
         return Ok(Json(task).into_response());
     }
+    lease(&headers, &task, &actor)?;
     if task.status != "running" {
         return Err(conflict());
     }
@@ -634,7 +658,7 @@ async fn fail(
     agent(&actor)?;
     let id = parse_id(&id)?;
     let task = load(&mut tx, id, true).await?;
-    lease(&headers, &task, &actor)?;
+    lease_identity(&headers, &task, &actor)?;
     let input = json_input(input)?;
     if input.failure_code.is_empty()
         || input.failure_code.len() > 100
@@ -649,6 +673,7 @@ async fn fail(
         tx.commit().await?;
         return Ok(Json(task).into_response());
     }
+    lease(&headers, &task, &actor)?;
     if task.status != "running" {
         return Err(conflict());
     }

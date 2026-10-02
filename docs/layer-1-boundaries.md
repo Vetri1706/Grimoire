@@ -24,7 +24,7 @@ to an exact intake revision, with permission enforcement and terminal source
 revocation. It uses new intake tables in the same canonical database and does
 not claim GG-40 governed-source or S3 behavior. See the
 [Layer 2 contract](layer-2-api-contract.md) and
-[execution evidence](layer-2-verification-2026-09-25.md).
+[test commands](testing.md).
 
 ## Draft semantics
 

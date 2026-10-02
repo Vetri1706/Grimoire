@@ -12,6 +12,12 @@ export async function checkCodexLogin({ environment = process.env, resolve = res
   try { binary = resolve(environment) } catch { throw new Error('CODEX_BINARY_UNAVAILABLE_INSTALL_CODEX_OR_SET_GRIMOIRE_CODEX_BIN') }
   const options = { env: childEnvironment(environment), windowsHide: true, timeout: 15000, maxBuffer: 4096 }
   try { await exec(binary, ['--version'], options) } catch { throw new Error('CODEX_BINARY_CHECK_FAILED') }
+  let help
+  try { help = await exec(binary, ['exec', '--help'], { ...options, maxBuffer: 32768 }) } catch { throw new Error('CODEX_RUNTIME_INCOMPATIBLE') }
+  // Check the actual installed contract before issuing an enrollment or claim.
+  for (const flag of ['--ignore-user-config', '--ignore-rules', '--ephemeral', '--sandbox', '--output-schema', '--output-last-message', '--json']) {
+    if (!String(help.stdout ?? '').includes(flag)) throw new Error('CODEX_RUNTIME_INCOMPATIBLE')
+  }
   let result
   try { result = await exec(binary, ['login', 'status'], options) } catch { throw new Error('CODEX_LOGIN_REQUIRED_RUN_CODEX_LOGIN_LOCALLY') }
   if (!/Logged in using /i.test(`${result.stdout}\n${result.stderr}`)) throw new Error('CODEX_LOGIN_STATUS_UNRECOGNIZED')
@@ -40,11 +46,13 @@ export async function connectWorker(options, { checkLogin = checkCodexLogin, pai
   const result = await pair({ origin: options.origin, deviceName: options.deviceName, onPairing({ browserUrl, expiresAt }) {
     log(`Open this address in your signed-in browser:\n${browserUrl}`)
     log(`Waiting for your organization approval until ${expiresAt}. Press Ctrl+C to stop.`)
+    if (options.openBrowser) Promise.resolve(options.openBrowser(browserUrl, options.origin)).then(opened => { if (!opened) log('Could not open a browser automatically. Copy the pairing address above into your browser.') }).catch(() => log('Open the pairing address above manually.'))
   } })
-  log(`Connected to organization ${JSON.stringify(result.organizationName)} (${result.organizationId}).`)
+  log(`Paired with organization ${JSON.stringify(result.organizationName)} (${result.organizationId}). Grimoire will show Connected after the worker sends a heartbeat.`)
   log(`Connection: ${result.connectionId}`)
   log('The scoped worker credential was saved in a private local file. Human review remains required for proposals.')
-  log(`Resume this worker: node byoa/bridge.mjs --connection ${result.connectionId} --watch`)
+  if (options.resumeCommand) log('To resume later, repeat the same website startup command or reopen Connect Grimoire.cmd. The saved connection will be reused.')
+  else log(`Resume this worker: node byoa/bridge.mjs --connection ${result.connectionId} --watch`)
   if (options.watch) {
     log('Starting the worker. Keep this terminal open; Grimoire shows its last heartbeat. Only a task outcome confirms Codex execution.')
     await run({ selector: result.connectionId, mode: 'watch' })

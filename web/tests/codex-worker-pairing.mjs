@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -11,6 +11,13 @@ import { connectionDirectory, loadConnection, validateOrigin } from '../../byoa/
 // Real Chrome, real disposable PostgreSQL-backed API, real pairing CLI and idle
 // worker. No task is dispatched and no provider/model invocation is authorized.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const privateState = process.env.GRIMOIRE_CONNECTOR_HOME;
+assert.ok(privateState && path.isAbsolute(privateState), 'An explicit isolated connector state directory is required.');
+assert.ok(path.resolve(privateState).startsWith(`${path.join(root, '.local')}${path.sep}`), 'Browser test connector state must stay in this checkout\'s .local test artifacts.');
+const connectorRuntime = process.env.GRIMOIRE_TEST_CONNECTOR_NODE || process.execPath;
+const connectorPackage = process.env.GRIMOIRE_TEST_CONNECTOR_PACKAGE;
+if (connectorPackage) assert.ok(path.isAbsolute(connectorPackage), 'The packed connector fixture must have an absolute path.');
+const packagedConnector = Boolean(connectorPackage);
 const base = validateOrigin(process.env.GRIMOIRE_WEB_URL ?? 'http://127.0.0.1:5182');
 const address = new URL(base);
 assert.equal(process.env.GRIMOIRE_TEST_DISPOSABLE, '1', 'Explicit disposable-installation authorization is required.');
@@ -21,6 +28,31 @@ const healthResponse = await fetch(`${base}/api/health`, { redirect: 'error', si
 assert.equal(healthResponse.status, 200);
 const health = await healthResponse.json();
 assert.equal(health.database?.name, database, 'Verify disposable database identity before any account or worker mutation.');
+const artifactSha256 = {};
+const executedModuleSha256 = {};
+const releaseResponse = await fetch(`${base}/downloads/connector-release.json`, { redirect: 'error', signal: AbortSignal.timeout(10000) });
+assert.equal(releaseResponse.status, 200);
+const release = await releaseResponse.json();
+assert.equal(release.npm.published, false);
+assert.match(release.version, /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[a-z0-9.-]{1,40})?$/);
+assert.equal(release.package.path, '/downloads/grimoire-connector.tgz');
+assert.equal(release.windows.path, '/downloads/grimoire-connector-windows.zip');
+const packageDownloadPath = `${release.package.path}?v=${release.version}`;
+const windowsDownloadPath = `${release.windows.path}?v=${release.version}`;
+if (packagedConnector) {
+  for (const [kind, downloadPath] of [['package', packageDownloadPath], ['windows', windowsDownloadPath]]) {
+    const response = await fetch(`${base}${downloadPath}`, { redirect: 'error', signal: AbortSignal.timeout(10000) });
+    assert.equal(response.status, 200);
+    const sha256 = createHash('sha256').update(new Uint8Array(await response.arrayBuffer())).digest('hex');
+    assert.equal(sha256, release[kind].sha256, 'The served archive must match the release manifest.');
+    artifactSha256[kind] = sha256;
+  }
+  for (const filename of ['cli.mjs', 'bridge.mjs', 'outbox.mjs']) {
+    const packed = await readFile(path.join(connectorPackage, filename));
+    assert.deepEqual(packed, await readFile(path.join(root, 'byoa', filename)), 'The retained package must match current release code.');
+    executedModuleSha256[filename] = createHash('sha256').update(packed).digest('hex');
+  }
+}
 
 const evidence = path.resolve(root, '.local', 'codex-worker-pairing', String(Date.now()));
 await mkdir(evidence, { recursive: true });
@@ -44,8 +76,12 @@ async function until(check, label, timeout = 25000) {
 }
 function launch(script, args) {
   const environment = childEnvironment(process.env);
+  // Test credentials must never enter the real per-user connector store. The
+  // provider child's own environment still excludes this connector setting.
+  environment.GRIMOIRE_CONNECTOR_HOME = privateState;
   if (process.env.GRIMOIRE_CODEX_BIN) environment.GRIMOIRE_CODEX_BIN = process.env.GRIMOIRE_CODEX_BIN;
-  const child = spawn(process.execPath, [path.join(root, script), ...args], { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  const entry = connectorPackage ? path.join(connectorPackage, 'cli.mjs') : path.join(root, script);
+  const child = spawn(connectorRuntime, [entry, ...args, ...(connectorPackage ? ['--no-browser'] : [])], { cwd: connectorPackage ?? root, env: environment, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   const managed = { child, stdout: '', stderr: '', exited: false, exitCode: null, error: false };
   managed.completion = new Promise(resolve => {
     child.once('error', () => { managed.error = true; });
@@ -218,7 +254,7 @@ try {
   checks.push('another organization and a separate foreign account cannot review, enumerate or revoke the enrolled connection; browser hides authorization controls after the switch');
 
   await until(async () => (await connections()).some(connection => connection.connection_id === connectionId && connection.status === 'connected'), 'real idle worker heartbeat');
-  await refreshConnections(); await rowStatus('Worker online');
+  await refreshConnections(); await rowStatus('Connected');
   const connected = (await connections())[0];
   assert.ok(connected.last_seen);
   await snapshot('runtime-real-worker-connected');
@@ -228,26 +264,48 @@ try {
   assert.equal(await page.locator('.worker-setup').count(), 0, 'Setup starts collapsed.');
   await page.getByRole('button', { name: 'Connect Codex', exact: true }).click();
   await page.locator('.worker-setup').waitFor();
-  assert.equal(await page.locator('.worker-setup .worker-command code').innerText(), `node byoa/connect.mjs --api '${base}' --watch`);
+  assert.equal(await page.locator('.worker-setup .worker-command code').first().innerText(), `npx --yes --package="${base}${packageDownloadPath}" grimoire-connector --api "${base}" --watch`);
   await page.getByRole('button', { name: 'Copy connect command', exact: true }).click();
   await page.getByRole('button', { name: 'Copy connect command copied', exact: true }).waitFor();
   await snapshot('runtime-compact-connect-setup');
+  await page.locator('.worker-help summary').filter({ hasText: 'Windows without Node.js?' }).click();
+  const download = page.getByRole('link', { name: 'Download Connector for Windows', exact: true });
+  await download.waitFor();
+  assert.equal(await download.getAttribute('href'), windowsDownloadPath);
+  assert.equal(await page.locator('.worker-download .worker-command code').innerText(), base);
+  const windowsRelease = await mainContext.request.head(`${base}${windowsDownloadPath}`);
+  assert.equal(windowsRelease.status(), 200);
+  assert.ok(!windowsRelease.headers()['content-type']?.includes('text/html'), 'The download must be a real artifact, not an SPA fallback.');
+  await snapshot('runtime-windows-download');
+  await page.locator('.worker-help summary').filter({ hasText: 'Windows without Node.js?' }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'The connection setup must not overflow a mobile viewport.');
   assert.ok((await page.locator('.worker-provider-heading>div').boundingBox()).width >= 140, 'Mobile provider copy must retain a readable column, not collapse beside the action.');
   await snapshot('runtime-connect-mobile');
-  await page.locator('.worker-setup .worker-command').scrollIntoViewIfNeeded();
-  assert.ok((await page.locator('.worker-setup .worker-command pre').boundingBox()).width >= 160, 'Mobile commands must use the available width instead of squeezing beside Copy.');
+  await page.locator('.worker-setup .worker-command').first().scrollIntoViewIfNeeded();
+  assert.ok((await page.locator('.worker-setup .worker-command pre').first().boundingBox()).width >= 160, 'Mobile commands must use the available width instead of squeezing beside Copy.');
   await snapshot('runtime-connect-mobile-command');
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'Close setup', exact: true }).click();
   assert.equal(await page.locator('.worker-setup').count(), 0);
   checks.push('the compact provider card expands into a copyable current-origin pair-and-watch command and can close without changing the connection');
 
+  await page.route('**/downloads/connector-release.json', route => route.fulfill({ status: 404, body: 'Not available' }));
+  await page.reload();
+  await page.getByRole('button', { name: 'Connect Codex', exact: true }).click();
+  await page.getByRole('button', { name: 'Check downloads again', exact: true }).waitFor();
+  assert.equal(await page.locator('.worker-setup .worker-command').count(), 0, 'Unavailable releases must not display a pretend runnable command.');
+  assert.equal(await page.getByRole('link', { name: 'Download Connector for Windows', exact: true }).count(), 0);
+  await page.unroute('**/downloads/connector-release.json');
+  await page.getByRole('button', { name: 'Check downloads again', exact: true }).click();
+  await page.getByRole('button', { name: 'Copy connect command', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Close setup', exact: true }).click();
+  checks.push('the Windows ZIP is a real same-origin download; a missing release hides startup commands and links until an explicit successful retry');
+
   await page.getByRole('button', { name: 'Appearance', exact: true }).click();
   await page.getByRole('radio', { name: /Midnight Blue/ }).check();
   await page.getByRole('button', { name: 'Runtime', exact: true }).click();
-  await rowStatus('Worker online');
+  await rowStatus('Connected');
   await snapshot('runtime-midnight-blue');
   checks.push('connection setup fits a 390px mobile viewport and the same real worker status renders in Midnight Blue');
 
@@ -258,20 +316,20 @@ try {
   assert.equal(await page.locator('.worker-connection-list article').count(), 0, 'Failed checks must hide previously connected rows.');
   await snapshot('runtime-outage-hides-stale-state');
   await page.unroute('**/api/worker-connections');
-  await refreshConnections(); await rowStatus('Worker online');
+  await refreshConnections(); await rowStatus('Connected');
   checks.push('an explicit test transport outage removes stale connected state; authenticated recovery restores real state');
 
   await stop(cli);
   await until(async () => (await connections())[0]?.status === 'disconnected', 'server heartbeat expiry after exact worker stop', 30000);
   const stoppedLastSeen = (await connections())[0].last_seen;
-  await refreshConnections(); await rowStatus('Offline');
+  await refreshConnections(); await rowStatus('Disconnected');
   assert.equal((await connections())[0].last_seen, stoppedLastSeen, 'Browser refresh must not synthesize a worker heartbeat.');
-  await page.locator('.worker-resume summary').filter({ hasText: 'Resume worker' }).click();
-  assert.equal(await page.locator('.worker-resume .worker-command code').innerText(), `node byoa/bridge.mjs --connection ${connectionId} --watch`);
+  await page.locator('.worker-resume summary').filter({ hasText: 'Resume connector' }).click();
+  assert.equal(await page.locator('.worker-resume .worker-command code').innerText(), `npx --yes --package="${base}${packageDownloadPath}" grimoire-connector --connection ${connectionId} --watch`);
   await snapshot('runtime-worker-stopped');
   const restarted = launch('byoa/bridge.mjs', ['--connection', connectionId, '--watch']);
   await until(async () => (await connections())[0]?.status === 'connected', 'restarted worker restores saved enrollment');
-  await refreshConnections(); await rowStatus('Worker online');
+  await refreshConnections(); await rowStatus('Connected');
   assert.equal((await connections()).length, 1);
   checks.push('stopping the exact worker becomes disconnected after server heartbeat expiry; restart reuses the private enrollment without a duplicate connection');
 
@@ -300,7 +358,7 @@ try {
   for (const managed of children) assert.ok(!managed.stdout.includes(record.credential) && !managed.stderr.includes(record.credential));
   assert.deepEqual(browserErrors, []);
   checks.push('pairing, presence and revocation create no tasks, Scions or approval authority; no worker credential reaches browser storage or output');
-  const report = { passed: checks.length, database, model_invoked: false, dispatched: false, checks, evidence, browser_errors: browserErrors };
+  const report = { passed: checks.length, database, packaged_connector: packagedConnector, connector_runtime: connectorRuntime, connector_release_version: release.version, connector_package_directory: connectorPackage ?? null, served_artifact_sha256: artifactSha256, executed_module_sha256: executedModuleSha256, model_invoked: false, dispatched: false, checks, evidence, browser_errors: browserErrors };
   await writeFile(path.join(evidence, 'results.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
 } finally {

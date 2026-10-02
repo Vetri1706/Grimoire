@@ -16,7 +16,7 @@ const baseRecord = () => ({ version: 1, api_origin: 'https://grimoire.example', 
 
 test('origin enrollment allows HTTPS or exact HTTP loopback only', () => {
   for (const origin of ['https://grimoire.example', 'https://grimoire.example:8443', 'http://localhost:8080', 'http://127.0.0.1:8080', 'http://[::1]:8080']) assert.equal(validateOrigin(origin + '/'), origin)
-  for (const origin of ['http://grimoire.example', 'http://127.1:8080', 'http://2130706433:8080', 'https://user:secret@grimoire.example', 'https://grimoire.example/path', 'https://grimoire.example/..', 'https://grimoire.example?destination=elsewhere', 'https://grimoire.example/#token', 'file:///tmp/credentials', ' https://grimoire.example', 'https:\\grimoire.example']) assert.throws(() => validateOrigin(origin))
+  for (const origin of ['http://grimoire.example', 'http://127.1:8080', 'http://2130706433:8080', 'https://user:secret@grimoire.example', 'https://grimoire.example/path', 'https://grimoire.example/..', 'https://grimoire.example?destination=elsewhere', 'https://grimoire.example/#token', 'file:///tmp/credentials', ' https://grimoire.example', 'https:\\grimoire.example', 'https://a!x!.test', 'https://a&whoami.test', 'https://a(x).test', 'https://a;x.test']) assert.throws(() => validateOrigin(origin))
 })
 
 test('legacy worker environment cannot authorize an external endpoint', async () => {
@@ -64,19 +64,21 @@ test('connect starts the existing worker only after successful consent and priva
   }
 })
 
-test('Codex check invokes only version/login status with no bridge, provider or deployment credentials', async () => {
+const compatibleHelp = '--ignore-user-config --ignore-rules --ephemeral --sandbox --output-schema --output-last-message --json'
+test('Codex check invokes only version/help/login status with no bridge, provider or deployment credentials', async () => {
   const calls = []
-  const result = await checkCodexLogin({ resolve: () => 'codex-native', environment: { PATH: 'bin', HOME: '/local', CODEX_HOME: '/local/codex', GRIMOIRE_TOKEN_AGENT_A: credential, OPENAI_API_KEY: 'provider-key', AWS_SECRET_ACCESS_KEY: 'aws-key', DATABASE_URL: 'postgres-secret', GRIMOIRE_CONNECTION: connectionId }, exec: async (...args) => { calls.push(args); return { stdout: '', stderr: 'Logged in using ChatGPT' } } })
+  const result = await checkCodexLogin({ resolve: () => 'codex-native', environment: { PATH: 'bin', HOME: '/local', CODEX_HOME: '/local/codex', GRIMOIRE_TOKEN_AGENT_A: credential, OPENAI_API_KEY: 'provider-key', AWS_SECRET_ACCESS_KEY: 'aws-key', DATABASE_URL: 'postgres-secret', GRIMOIRE_CONNECTION: connectionId }, exec: async (...args) => { calls.push(args); return { stdout: args[1][0] === 'exec' ? compatibleHelp : '', stderr: 'Logged in using ChatGPT' } } })
   assert.deepEqual(result, { binary_available: true, login_available: true, model_invoked: false })
-  assert.deepEqual(calls.map(call => call[1]), [['--version'], ['login', 'status']])
+  assert.deepEqual(calls.map(call => call[1]), [['--version'], ['exec', '--help'], ['login', 'status']])
   for (const [, , options] of calls) assert.deepEqual(options.env, { PATH: 'bin', HOME: '/local', CODEX_HOME: '/local/codex' })
   assert.doesNotMatch(JSON.stringify(calls), /provider-key|aws-key|postgres-secret|aaaaaaaa/)
   assert.deepEqual(childEnvironment({ PATH: 'bin', GRIMOIRE_DEVICE_SECRET: deviceSecret, GRIMOIRE_CONNECTION_CREDENTIAL: credential }), { PATH: 'bin' })
 })
 
 test('unauthenticated or unrecognized local Codex checks never emit provider output', async () => {
-  await assert.rejects(checkCodexLogin({ resolve: () => 'codex', exec: async (_binary, args) => { if (args[0] === 'login') throw new Error(`private output ${credential}`); return {} } }), error => error.message === 'CODEX_LOGIN_REQUIRED_RUN_CODEX_LOGIN_LOCALLY')
-  await assert.rejects(checkCodexLogin({ resolve: () => 'codex', exec: async () => ({ stdout: credential, stderr: '' }) }), /CODEX_LOGIN_STATUS_UNRECOGNIZED/)
+  await assert.rejects(checkCodexLogin({ resolve: () => 'codex', exec: async (_binary, args) => { if (args[0] === 'login') throw new Error(`private output ${credential}`); return { stdout: compatibleHelp } } }), error => error.message === 'CODEX_LOGIN_REQUIRED_RUN_CODEX_LOGIN_LOCALLY')
+  await assert.rejects(checkCodexLogin({ resolve: () => 'codex', exec: async (_binary, args) => ({ stdout: args[0] === 'exec' ? compatibleHelp : credential, stderr: '' }) }), /CODEX_LOGIN_STATUS_UNRECOGNIZED/)
+  await assert.rejects(checkCodexLogin({ resolve: () => 'codex', exec: async () => ({ stdout: '--sandbox', stderr: credential }) }), /CODEX_RUNTIME_INCOMPATIBLE/)
 })
 
 function pairingFixture(statuses) {

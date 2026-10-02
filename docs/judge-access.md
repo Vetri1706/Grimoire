@@ -1,4 +1,4 @@
-# Judge access and normal accounts
+# Public demo and normal accounts
 
 Grimoire supports normal Handler signup and sign-in. Signup creates a human identity with no existing organization memberships and no installation-owner authority. Creating an organization grants workspace administration; engineering, sourcing, commercial, agent execution and approval authority are separate. The one-time installation-owner setup remains a separate action.
 
@@ -28,15 +28,11 @@ The seed requires operator database credentials in the existing gitignored `.env
 
 The demo registry can be changed only by the database migration owner. Treat all data placed in the reserved synthetic organization as public. Never import personal source material into it.
 
-## Submission instructions
+## Public deployment
 
-Use the deployed frontend URL followed by `/demo` as the public testing entry. Include the repository link, runnable setup instructions and demo video in the submission. If a separate private account workflow must be judged, create a dedicated synthetic judge account and supply its working credentials in the submission's private testing instructions. **Never share a personal Codex login, provider key or production account.**
+Use the deployed frontend URL followed by `/demo` as the public testing entry. For authenticated testing, use a dedicated account with synthetic data. **Never share a personal Codex login, provider key or production account.**
 
-For an HTTPS deployment, explicitly set `GRIMOIRE_COOKIE_SECURE=true` in the API environment. The local API continues to bind to loopback; a deployment needs a same-origin HTTPS reverse proxy and appropriate access/rate controls. Complete installation-owner setup privately before exposing its entry. This change provides a local demo and account flow; it is not evidence of an AWS deployment or a public judge URL. Verify the actual deployed URL from a fresh browser before submitting.
-
-Amazon's rules require private-site credentials in testing instructions and repository/video access. Track-specific device/runtime requirements still apply. [Amazon Developer Hackathon rules](https://amazonappdev2026.devpost.com/rules)
-
-Zero to Shipped requires a live AWS application reachable at a public URL and documented coding-agent connection to AWS. A local browser pass does not establish that requirement. [AWS Builder Center contest](https://builder.aws.com/build/hackathons/e83e84e5-4f4c-383b-bbe9-4a15ac195d55/zero-to-shipped)
+For an HTTPS deployment, explicitly set `GRIMOIRE_COOKIE_SECURE=true` in the API environment. The local API continues to bind to loopback; a deployment needs a same-origin HTTPS reverse proxy and appropriate access/rate controls. Complete installation-owner setup privately before exposing its entry. Verify the actual deployed URL from a fresh browser; local checks do not establish hosted behavior. See the [AWS operating guide](../deploy/aws/README.md) for the current deployment and its verification limits.
 
 ## Verification
 

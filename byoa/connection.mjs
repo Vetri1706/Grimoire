@@ -4,18 +4,21 @@ import { mkdir, lstat, chmod, open, readdir, readFile, rename, unlink } from 'no
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { stateDirectory } from './state.mjs'
 
 const execFileAsync = promisify(execFile)
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-export const connectionDirectory = path.join(projectRoot, '.local', 'byoa', 'connections')
+export const connectionDirectory = path.join(stateDirectory(), 'connections')
 const loopback = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 // A connection is an explicit enrollment of one origin, not a URL supplied by a task.
 export function validateOrigin(value, { legacy = false } = {}) {
   let url
   try { url = new URL(value) } catch { throw new Error('INVALID_API_ORIGIN') }
+  const hostname = url.hostname
+  const safeHost = /^\[[a-f0-9:]+\]$/i.test(hostname) || (hostname.length <= 253 && hostname.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label)))
   if (typeof value !== 'string' || value.trim() !== value || url.username || url.password || url.pathname !== '/' || url.search || url.hash ||
+      !safeHost ||
       !['http:', 'https:'].includes(url.protocol) || (url.protocol === 'http:' && !loopback.has(url.hostname)) ||
       (legacy && (url.protocol !== 'http:' || !loopback.has(url.hostname)))) throw new Error(legacy ? 'LOCAL_API_REQUIRED' : 'HTTPS_OR_LOOPBACK_ORIGIN_REQUIRED')
   // Reject parser-normalized dot paths, backslashes and disguised loopback literals.
@@ -48,7 +51,7 @@ async function protect(target, directory) {
   } catch { throw new Error('CONNECTION_FILE_PERMISSION_FAILED') }
 }
 
-async function verifyPrivate(target, directory) {
+export async function verifyPrivate(target, directory) {
   const info = await lstat(target)
   if (info.isSymbolicLink() || (directory ? !info.isDirectory() : !info.isFile())) throw new Error('UNSAFE_CONNECTION_PATH')
   if (process.platform !== 'win32') {
@@ -61,8 +64,11 @@ async function verifyPrivate(target, directory) {
   } catch { throw new Error('CONNECTION_FILE_NOT_PRIVATE') }
 }
 
-export async function saveConnection(record, directory = connectionDirectory) {
-  validateRecord(record)
+export async function ensurePrivateDirectory(directory) {
+  for (let ancestor = path.resolve(directory); ; ancestor = path.dirname(ancestor)) {
+    try { if ((await lstat(ancestor)).isSymbolicLink()) throw new Error('UNSAFE_CONNECTION_PATH') } catch (error) { if (error.code !== 'ENOENT') throw error }
+    if (path.dirname(ancestor) === ancestor) break
+  }
   await mkdir(directory, { recursive: true, mode: 0o700 })
   if ((await lstat(directory)).isSymbolicLink()) throw new Error('UNSAFE_CONNECTION_PATH')
   try { await verifyPrivate(directory, true) } catch (error) {
@@ -70,6 +76,32 @@ export async function saveConnection(record, directory = connectionDirectory) {
     await protect(directory, true)
     await verifyPrivate(directory, true)
   }
+  return directory
+}
+
+export async function writePrivateJson(file, value) {
+  const directory = path.dirname(file)
+  await ensurePrivateDirectory(directory)
+  // Reject existing symlinks and unexpected file permissions before replacement.
+  try { await verifyPrivate(file, false) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  const pending = path.join(directory, `.pending-${randomUUID()}`)
+  let handle
+  try {
+    handle = await open(pending, 'wx', 0o600)
+    await protect(pending, false)
+    await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, 'utf8')
+    await handle.sync()
+    await handle.close(); handle = null
+    await rename(pending, file)
+  } finally {
+    await handle?.close().catch(() => {})
+    await unlink(pending).catch(() => {})
+  }
+}
+
+export async function saveConnection(record, directory = connectionDirectory) {
+  validateRecord(record)
+  await ensurePrivateDirectory(directory)
   const finalPath = path.join(directory, `${record.connection_id}.json`)
   // Never overwrite an enrollment silently. A separate connection can be revoked
   // explicitly in the organization runtime settings.
@@ -90,6 +122,20 @@ export async function saveConnection(record, directory = connectionDirectory) {
     await unlink(pending).catch(() => {})
     throw error
   }
+}
+
+export async function listConnections(origin, directory = connectionDirectory) {
+  if (origin) origin = validateOrigin(origin)
+  try { await verifyPrivate(directory, true) } catch (error) { if (error.code === 'ENOENT') return []; throw error }
+  const records = []
+  for (const name of (await readdir(directory)).sort()) {
+    if (!/^[a-f0-9-]{36}\.json$/i.test(name)) continue
+    const record = await loadConnection(name.slice(0, -5), directory)
+    if (origin && record.api_origin !== origin) continue
+    // Never return credentials to a listing, log or browser.
+    records.push({ connectionId: record.connection_id, organizationId: record.organization_id, organizationName: record.organization_name, origin: record.api_origin })
+  }
+  return records
 }
 
 export async function loadConnection(selector, directory = connectionDirectory) {

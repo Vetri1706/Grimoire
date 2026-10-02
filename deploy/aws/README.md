@@ -2,7 +2,7 @@
 
 The judging deployment is live at **[Grimoire](https://grimoire-52-71-93-70.sslip.io)**, with a public **[synthetic judge demo](https://grimoire-52-71-93-70.sslip.io/demo)**. It uses an explicitly approved **Lightsail Linux IPv4 1 GB / 2 vCPU / 40 GB instance: USD 7/month**, with the `small` memory profile and a **2 GiB swap file on its included disk**. React's compiled files, Rust API, PostgreSQL 17 and private versioned object storage run on that host. A real Codex worker must run on the operator's computer and connect over HTTPS; no real worker or model task was run during deployment verification.
 
-HTTPS, password sign-in, the three public demo cases and a bounded host-local capacity check passed on 2026-10-02. The instance runs in `us-east-1` with deployment configuration **`c0eadfd39e607c22658b009da523237c0f5afb34`** and the five digest-pinned images built from **`899a9fbcc8ca753f07349940a0f70f14788da607`**. See [sanitized deployment evidence](../../docs/evidence/aws-judging-20261002.json) and the verification scope below. This is a single-host judging deployment, not a high-availability service. The original 2 GB / 60 GB / USD 12 profile remains the scripts' default, but the account blocked that instance size during provisioning. Selecting `small` is explicit; the scripts do not silently downgrade a host.
+HTTPS, password sign-in, the three public demo cases and a bounded host-local capacity check passed on 2026-10-02. The instance runs in `us-east-1`. Its initial five application images came from **`899a9fbcc8ca753f07349940a0f70f14788da607`**; the API and web were subsequently replaced by the **connector 0.1.1 release** described below. See [initial deployment evidence](../../docs/evidence/aws-judging-20261002.json), [connector release evidence](../../docs/evidence/aws-connector-20261002.json), and the verification scope below. This is a single-host judging deployment, not a high-availability service. The original 2 GB / 60 GB / USD 12 profile remains the scripts' default, but the account blocked that instance size during provisioning. Selecting `small` is explicit; the scripts do not silently downgrade a host.
 
 ## Cost and limits
 
@@ -67,7 +67,11 @@ aws budgets create-budget --profile default --region us-east-1 --account-id YOUR
 
 ## 2. Build outside the small AWS instance
 
-Frontend favicon update on 2026-10-02: the web container now uses `grimoire-web:sha-9124c628ed334abd6751e1cd5ff9b70c1ca04a76`, built off-host and transferred as a checksum-verified image archive. Only `web/index.html` changed in the application; the other four application images retain their original digest pins. [Favicon release evidence](../../docs/evidence/aws-favicon-20261002.json) records the web image identity and hosted Chrome checks. Reproduce this frontend image from that exact source revision using the web build and Dockerfile below; it is loaded on the host, not published to GHCR.
+Current API/web release: **connector 0.1.1**, deployed 2026-10-02 at 06:42 UTC. Both Linux amd64 images were built off-host from the checkout based on `e7d63a81162f78736d9dbc904984b745a5475adb` plus the locally validated connector changes. A 194-file source SHA-256 manifest records those uncommitted source bytes. The API adds live busy-state projection and exact receipt recovery; the website serves the npm-pack tarball and Windows ZIP with versioned URLs, including Node 26.3 compatibility. The host's bind-mounted nginx configuration was updated with strict download handling. No npm registry package was published.
+
+The live `API_IMAGE` is pinned to `sha256:db6da234d2876890413b4178c09aad40d670e50d624b821938b4155a0cc20d19`, and `WEB_IMAGE` to `sha256:948280e152494bd419c2111daed40cb5603062ae2af368191bc9695d2b89351c`. Database, object storage, HTTPS containers and the small-host memory configuration were retained. No migration ran. The previous image references, nginx configuration and a fresh private logical database backup are retained for rollback. Full deployment and verification scope is in the connector evidence record linked above.
+
+Earlier favicon update on 2026-10-02: the web container used `grimoire-web:sha-9124c628ed334abd6751e1cd5ff9b70c1ca04a76`, built off-host and transferred as a checksum-verified image archive. Only `web/index.html` changed in that release; at that point the other four application images retained their original digest pins. [Favicon release evidence](../../docs/evidence/aws-favicon-20261002.json) records its image identity and hosted Chrome checks. That image remains available for rollback; the connector release preserves the supplied favicon.
 
 The manually triggered `.github/workflows/aws-images.yml` builds Linux amd64 images; its `publish` input defaults to false. [Successful release run 36968370011](https://github.com/Vetri1706/Grimoire/actions/runs/36968370011) built and published all five images from **`899a9fbcc8ca753f07349940a0f70f14788da607`**. The packages are publicly pullable as `ghcr.io/vetri1706/grimoire-{api,web,ops,storage,mc}:sha-899a9fbcc8ca753f07349940a0f70f14788da607`. Never publish an image containing `.env` or user data.
 
@@ -118,13 +122,13 @@ sudo docker compose --env-file deploy/aws/.env -f deploy/aws/compose.yaml run --
 
 The owner script prompts privately for a new passphrase and does not print session cookies. Use normal HTTPS sign-in afterward. The `/demo` seed creates only explicit synthetic judging cases. It does not execute a model and it never imports private development records. Seed credentials are temporary and revoked by the existing seeder.
 
-For real agent work on the operator's own computer:
+For real agent work, sign in to the deployed website and open **Settings → Runtime → Connect Codex**. Copy its current versioned command; no source-code checkout is needed. The deployed 0.1.1 command for PowerShell is:
 
 ```powershell
-node byoa/connect.mjs --api https://app.YOUR_DOMAIN --watch
+npx.cmd --yes --package="https://grimoire-52-71-93-70.sslip.io/downloads/grimoire-connector.tgz?v=0.1.1" grimoire-connector --api "https://grimoire-52-71-93-70.sslip.io" --watch
 ```
 
-Approve the normal organization pairing in the app. Your computer and worker must stay online for real tasks. The public synthetic `/demo` remains inspectable without your computer. Existing Codex/model subscription or provider costs are separate from the AWS hosting estimate.
+Users without compatible Node.js can use **Download Connector for Windows** from the same setup page. Approve the organization pairing in the app. Grimoire login authorizes the workspace connection; Codex login remains local and supplies model access. Your computer and terminal must stay running for real tasks. The public synthetic `/demo` remains inspectable without your computer. Existing Codex/model subscription or provider costs are separate from the AWS hosting estimate.
 
 ## 4. Hosted verification and release checks
 
@@ -132,7 +136,7 @@ The following checks passed on the hosted release on 2026-10-02:
 
 - Fresh PostgreSQL 17 setup applied **32 migrations**; API startup attestation and private storage initialization passed. The three explicitly synthetic demo cases were seeded.
 - Actual Chrome at **1440 px desktop and 390 px mobile** loaded the supplied logo and all three cases through their real navigation links. Refresh passed, with no page errors or document overflow.
-- The installation owner signed in through the hosted UI. The session cookie was **Secure, HttpOnly and SameSite=Strict**; CSRF protection, logout and signed-out reload passed. Google sign-in is not configured; no Google flow was tested.
+- The installation owner signed in through the hosted UI. The session cookie was **Secure, HttpOnly and SameSite=Strict**; CSRF protection, logout and signed-out reload passed. Google sign-in was disabled during that initial verification; the later activation is recorded below.
 - Normal HTTPS signup and organization creation passed for independent accounts. The owning organization read a synthetic brief with **200**; another organization received **404**. A spoofed `X-Grimoire-Organization` header received the application's expected **409 `ACTIVE_ORGANIZATION_CHANGED`**. Four synthetic verification accounts were created across two runs, and all verification sessions were revoked afterward; no model tasks were run.
 - Public `/api/health` and `/api/setup/owner` returned **404**; anonymous `/api/me` returned **401**. Five private service ports were closed to external connections.
 - Nine invalid login attempts with varying client-supplied `X-Forwarded-For` values returned **six 401s followed by three 429s**. Those changing headers did not bypass the observed throttle.
@@ -141,6 +145,14 @@ The following checks passed on the hosted release on 2026-10-02:
 Previous local evidence also covers isolated proxy behavior, migration repeatability and tamper rejection. The hosted isolation check above covers brief reads and organization-header enforcement. Source/task/artifact revocation has **not been fully reverified on the hosted deployment beyond the public revoked demo case**; do not describe earlier local coverage as hosted tests. [The sanitized evidence record](../../docs/evidence/aws-judging-20261002.json) separates the completed hosted checks from these limits.
 
 For later releases, repeat HTTPS signup/sign-in, cookie/CSRF/logout, organization isolation, public route boundaries, demo refresh, desktop/mobile layout and capacity checks against the actual URL. Verify source/task/artifact revocation and withdrawn evidence in replies on the hosted app before relying on those paths. If judging includes live agent execution, enroll a real worker and complete one intended task, measuring memory pressure and response times during that run. Keep the worker's computer online. Network-failure behavior and any newly configured Google flow need their own hosted verification.
+
+### Google sign-in activation — 2 October 2026
+
+Google sign-in is enabled on the deployed site. The operator confirmed adding `https://grimoire-52-71-93-70.sslip.io` to the existing Google Web client's authorized JavaScript origins. The existing public client ID was added to the private deployment environment after a configuration backup and a check that no task was executing. Only the API container was recreated; its image and all other containers were unchanged. No migration or frontend build was needed.
+
+Hosted Chrome verified the official Google button and real Google account-entry popup without an origin/client rejection. Google displays `sslip.io` as the destination domain. Opening the popup did not create a Grimoire session, and `/demo` remained available without Google requests. The three Google frontend request tests passed. Full interactive Google sign-in, returning sign-in and real-account isolation still require operator verification; opening the provider page is not proof of a completed login. [Activation evidence](../../docs/evidence/aws-google-signin-20261002.json)
+
+Google accounts remain separate from password accounts: matching email addresses do not automatically link workspaces. See [Google sign-in setup](../../docs/google-sign-in.md).
 
 ## Backups and end of judging
 

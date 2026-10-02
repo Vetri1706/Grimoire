@@ -1,12 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { request, type Principal } from './api';
+import { ApiError, request, type Principal } from './api';
+import { connectorArtifactPath, connectorCommand, isConnectorOrigin, parseConnectorRelease, type ConnectorRelease } from './connector-release';
 import './worker-connections.css';
 
 type Connection = {
   connection_id: string; organization_id: string; device_name: string;
   adapter: string; policy_version: string; content_class: string;
   approved_at: string; revoked_at: string | null; last_seen: string | null;
-  status: 'connected' | 'disconnected' | 'revoked';
+  status: 'connected' | 'busy' | 'disconnected' | 'revoked';
 };
 type Pairing = {
   status: 'pending' | 'approved' | 'consumed' | 'expired';
@@ -15,7 +16,54 @@ type Pairing = {
   adapter: string; policy_version: string; content_class: string; consent_text: string;
 };
 const date = (value: string | null) => value ? new Date(value).toLocaleString() : 'No heartbeat received';
-const message = (error: unknown) => error instanceof Error ? error.message : 'Connection state is unavailable.';
+const message = (error: unknown) => {
+  if (error instanceof ApiError) {
+    if (error.status === 0) return 'Grimoire could not be reached. Check your internet connection, then retry. Previously displayed worker state is hidden until a fresh check succeeds.';
+    if (error.code === 'WORKER_CONNECTION_NOT_FOUND') return 'This pairing or connection is unavailable. Check the selected organization. If the pairing expired or was already used, restart the connector to get a new code.';
+    if (error.code === 'WORKER_CONNECTION_LIMIT') return 'This organization has reached its connection limit. Revoke an unused computer below, then run the connector again.';
+    if (error.code === 'WORKER_PAIRING_RATE_LIMIT') return 'Too many pairing attempts. Wait a moment, then retry the connector with a new code.';
+  }
+  return error instanceof Error ? error.message : 'Connection state is unavailable. Retry the authenticated check.';
+};
+
+function useConnectorRelease() {
+  const [release, setRelease] = useState<ConnectorRelease | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    const deadline = window.setTimeout(() => controller.abort(), 6000);
+    setLoading(true); setRelease(null);
+    async function load() {
+      try {
+        const options: RequestInit = { signal: controller.signal, credentials: 'omit', redirect: 'error', cache: 'no-store' };
+        const response = await fetch('/downloads/connector-release.json', options);
+        if (!response.ok) return;
+        const value = parseConnectorRelease(await response.json());
+        if (!value) return;
+        // SPA fallbacks can return a 200 HTML page for missing downloads. Check
+        // both artifacts before presenting a runnable command or download link.
+        const artifacts = await Promise.all((['package', 'windows'] as const).map(kind => fetch(connectorArtifactPath(value, kind), { ...options, method: 'HEAD' })));
+        if (artifacts.some(file => !file.ok || file.headers.get('content-type')?.includes('text/html') || file.headers.get('content-length') === '0')) return;
+        if (!controller.signal.aborted) setRelease(value);
+      } catch { /* An unavailable release must never produce a pretend command. */ }
+      finally { window.clearTimeout(deadline); if (active) setLoading(false); }
+    }
+    void load();
+    return () => { active = false; controller.abort(); window.clearTimeout(deadline); };
+  }, [revision]);
+  return { release, loading, retry: () => setRevision(value => value + 1) };
+}
+
+function ConnectorDownload({ release }: { release: ConnectorRelease }) {
+  return <div className="worker-download">
+    <a className="button secondary" href={connectorArtifactPath(release, 'windows')} download>Download Connector for Windows</a>
+    <p>Extract the ZIP, then open <strong>Connect Grimoire.cmd</strong>. When asked for the website address, paste:</p>
+    <Command value={window.location.origin} label="Copy Grimoire website address" />
+    <p>If a supported Node.js runtime is missing, the installer asks before downloading a verified private copy. It needs no administrator access and leaves your system Node.js unchanged.</p>
+  </div>;
+}
 
 function Command({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -41,7 +89,9 @@ function Command({ value, label }: { value: string; label: string }) {
 export function CodexConnectionSetup({ compact = false, disabled = false }: { compact?: boolean; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  const command = `node byoa/connect.mjs --api '${window.location.origin}' --watch`;
+  const distribution = useConnectorRelease();
+  const release = distribution.release;
+  const supportedOrigin = isConnectorOrigin(window.location.origin);
   return <div className={`worker-provider-card${compact ? ' worker-provider-compact' : ''}`}>
     <div className="worker-provider-heading">
       <span className="worker-provider-mark" aria-hidden="true">&gt;_</span>
@@ -50,22 +100,39 @@ export function CodexConnectionSetup({ compact = false, disabled = false }: { co
     </div>
     {open && <div className="worker-setup" id={panelId}>
       <h3>Connect this computer</h3>
-      <p>Your Codex login stays on this computer. Grimoire receives the proposal results.</p>
+      <p>Sign in to Grimoire to authorize a workspace. Your separate local Codex login supplies model access and stays on your computer.</p>
       <ol className="worker-setup-steps">
-        <li><span>1</span><div><strong>Run the connector</strong><p>From your Grimoire checkout, run this command in a terminal.</p><Command value={command} label="Copy connect command" /></div></li>
-        <li><span>2</span><div><strong>Authorize your workspace</strong><p>Open the link printed in your terminal. Match its code and approve the organization.</p></div></li>
-        <li><span>3</span><div><strong>Keep the worker running</strong><p>The same command starts the worker after approval. Keep the terminal open. It handles explicitly dispatched tasks, including ones already waiting; creating an agent does not dispatch a task.</p></div></li>
+        <li><span>1</span><div><strong>Start the connector on your computer</strong>
+          {!supportedOrigin ? <p role="alert">Open this Grimoire installation over HTTPS before connecting a computer. Local development also supports localhost.</p> : release ? <>
+            <p>Already have supported Node.js? Copy this command into a terminal. It downloads this installation's connector; no repository clone is needed.</p>
+            <Command value={connectorCommand(window.location.origin, release)} label="Copy connect command" />
+            <details className="worker-help"><summary>Windows without Node.js?</summary><ConnectorDownload release={release} /></details>
+            <details className="worker-help"><summary>Download details</summary><p>Connector {release.version}. This command uses the package hosted by this Grimoire installation. An npm registry package has not been published.</p><dl className="worker-download-checksums"><div><dt>Node package SHA-256</dt><dd><code>{release.package.sha256}</code></dd></div><div><dt>Windows ZIP SHA-256</dt><dd><code>{release.windows.sha256}</code></dd></div></dl></details>
+          </> : <div className="worker-release-unavailable" role="status"><p>{distribution.loading ? 'Checking connector downloads…' : 'Connector downloads are not available on this installation yet. Ask the workspace host to include the connector release, then check again.'}</p>{!distribution.loading && <button className="button secondary" type="button" onClick={distribution.retry}>Check downloads again</button>}</div>}
+        </div></li>
+        <li><span>2</span><div><strong>Authorize your workspace in the browser</strong><p>The connector opens a pairing page and prints the same link as a fallback. Sign in to Grimoire, match the terminal code, select your organization and review the requested access before authorizing.</p></div></li>
+        <li><span>3</span><div><strong>Wait for Connected, then dispatch tasks</strong><p>The worker sends real heartbeats after approval. Keep the terminal open while you dispatch tasks from Grimoire. It handles explicitly dispatched tasks, including ones already waiting; creating an agent does not dispatch a task.</p><p>Closing the connector stops local execution. <code>npx</code> does not install a background service.</p></div></li>
       </ol>
-      <details className="worker-help"><summary>Codex needs a login?</summary><p>Run <code>codex login</code> on this computer, finish signing in, then retry the connector. Check an existing login with <code>codex login status</code>.</p></details>
+      <details className="worker-help"><summary>Codex missing or not signed in?</summary><p>Node.js and Codex are separate installations. Follow the <a href="https://developers.openai.com/codex/cli" target="_blank" rel="noopener noreferrer">official Codex CLI setup</a>, then run <code>codex login</code> on this computer. Check an existing login with <code>codex login status</code> and retry the connector. Never paste Codex credentials into Grimoire.</p></details>
+      <details className="worker-help"><summary>The command does not start?</summary><p>If your terminal cannot find <code>npx</code>, use the Windows download or install a supported Node.js runtime. If PowerShell blocks <code>npx.ps1</code>, replace the command's first word with <code>npx.cmd</code>. A missing or incompatible Codex CLI is checked separately and reported in the terminal.</p></details>
     </div>}
   </div>;
 }
 
 function ConnectionStatus({ connection }: { connection: Connection }) {
-  const online = connection.status === 'connected';
+  const online = connection.status === 'connected' || connection.status === 'busy';
   const revoked = connection.status === 'revoked' || Boolean(connection.revoked_at);
-  const label = revoked ? 'Revoked' : online ? 'Worker online' : connection.last_seen ? 'Offline' : 'Authorized · worker not started';
+  const label = revoked ? 'Revoked' : connection.status === 'busy' ? 'Busy' : online ? 'Connected' : connection.last_seen ? 'Disconnected' : 'Authorized · worker not started';
   return <span className={`work-status ${revoked ? 'danger' : online ? 'good' : 'neutral'}`}><i />{label}</span>;
+}
+
+function ResumeConnector({ connection }: { connection: Connection }) {
+  const distribution = useConnectorRelease();
+  return <details className="worker-resume" open={!connection.last_seen}>
+    <summary>{connection.last_seen ? 'Resume connector' : 'Start connector'}</summary>
+    <p>On <strong>{connection.device_name}</strong>, rerun the original connect command or open <strong>Connect Grimoire.cmd</strong> and enter this website's address. The connector reuses the saved authorization. Keep its terminal open while it handles dispatched tasks.</p>
+    {distribution.release && isConnectorOrigin(window.location.origin) && <><p>With Node.js installed, this command selects this computer's saved connection directly:</p><Command value={connectorCommand(window.location.origin, distribution.release, connection.connection_id)} label={`Copy start command for ${connection.device_name}`} /></>}
+  </details>;
 }
 
 // This polling displays server-owned presence. It never creates a heartbeat or
@@ -141,11 +208,7 @@ export function WorkerConnections({ token, principal }: { token: string; princip
       <div className="worker-connection-list">{state.data?.connections.map(connection => <article key={connection.connection_id}>
         <div className="worker-connection-heading"><strong>{connection.device_name}</strong><ConnectionStatus connection={connection} /></div>
         <p className="worker-connection-meta">Codex CLI · {connection.last_seen ? `Last heartbeat ${date(connection.last_seen)}` : 'Waiting for its first heartbeat'}</p>
-        {!connection.revoked_at && connection.status !== 'revoked' && connection.status !== 'connected' && <details className="worker-resume" open={!connection.last_seen}>
-          <summary>{connection.last_seen ? 'Resume worker' : 'Start worker'}</summary>
-          <p>Run this on <strong>{connection.device_name}</strong> from the Grimoire checkout where you paired it. It handles explicitly dispatched tasks while the terminal stays open.</p>
-          <Command value={`node byoa/bridge.mjs --connection ${connection.connection_id} --watch`} label={`Copy start command for ${connection.device_name}`} />
-        </details>}
+        {!connection.revoked_at && connection.status !== 'revoked' && connection.status !== 'connected' && connection.status !== 'busy' && <ResumeConnector connection={connection} />}
         <details className="worker-details"><summary>Connection details</summary>
           <dl><div><dt>Access</dt><dd>Synthetic proposals · Human review required</dd></div><div><dt>Authorized</dt><dd>{date(connection.approved_at)}</dd></div><div><dt>Connection ID</dt><dd><code>{connection.connection_id}</code></dd></div><div><dt>Consent version</dt><dd><code>{connection.policy_version}</code></dd></div></dl>
           {connection.revoked_at ? <p>Revoked {date(connection.revoked_at)}</p> : <button className="button secondary" type="button" disabled={busy !== null} onClick={() => void revoke(connection)}>{busy === connection.connection_id ? 'Revoking…' : 'Revoke connection'}</button>}
@@ -187,7 +250,7 @@ export function WorkerPairing({ token, principal, code, onNavigate }: { token: s
     <p>Organization: <strong>{principal.organization_name}</strong>. Use the organization menu to choose a different workspace before approving.</p>
     <div className="worker-pairing-code"><span>Match this code with your terminal</span><strong>{code.toUpperCase()}</strong></div>
     {(!valid || state.error || error) && <p role="alert" className="error-message">{error || state.error || 'This pairing code is invalid.'}</p>}
-    {connected ? <div role="status"><h2>Return to your terminal</h2><p>The connector saves this organization’s worker access on your computer. With <code>--watch</code>, it starts the worker and handles explicitly dispatched tasks, including work already waiting. Keep the terminal open.</p><p>If you connected without <code>--watch</code>, use the start command printed there or open this connection below.</p><button type="button" className="button primary" onClick={() => onNavigate('/settings/runtime')}>View worker connection</button></div>
+    {connected ? <div role="status"><h2>Return to your terminal</h2><p>The connector saves this organization's worker access on your computer and starts handling explicitly dispatched tasks, including work already waiting. Keep its terminal open. Your Codex login stays in your local Codex account store.</p><p>Authorization is complete. Check the connection below for a real heartbeat before dispatching work.</p><button type="button" className="button primary" onClick={() => onNavigate('/settings/runtime')}>View worker connection</button></div>
       : review?.status === 'expired' ? <p role="alert">This code expired. Run the connect command again to get a new code.</p>
       : review && matches ? <>
         <dl className="settings-facts"><div><dt>Computer</dt><dd>{review.device_name}</dd></div><div><dt>Code expires</dt><dd>{date(review.expires_at)}</dd></div><div><dt>Access</dt><dd>Synthetic proposal preparation only</dd></div></dl>

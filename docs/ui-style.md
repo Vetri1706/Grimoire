@@ -143,7 +143,7 @@ narrow layout checks above were not repeated for the theme change.
   checks.
 
 External Chrome was not directly automated. Backend and database checks were not
-rerun for this theme change; their results are in `verification-2026-09-25.md`.
+rerun for this theme change. See [test commands](testing.md) for current checks.
 
 ## Source access and storage display
 
@@ -195,8 +195,7 @@ separate bounds. Hidden/offline clearing, suspended JavaScript timers,
 back-forward cache restoration, and in-flight races were reviewed in code but
 not separately simulated in this browser check. Mobile was not checked.
 
-Raw observations and timestamps are in
-[`evidence/layer-2b-browser.txt`](evidence/layer-2b-browser.txt).
+These observations describe that historical browser run, not a current test pass.
 
 ## Physical scope and local Codex CLI queue
 
@@ -230,8 +229,8 @@ shown as a connected Codex session; completion is labeled proposal preparation
 requiring human review. No Codex credential or object URL is sent to the browser.
 
 TypeScript and the Vite production build passed. These frontend checks do not
-establish that an adapter job or human confirmation ran; live results belong in
-the Layer 3 verification report. No mobile checks were added for this iteration.
+establish that an adapter job or human confirmation ran. No mobile checks were
+added for this iteration.
 
 ## Synthetic offers, comparison and task control
 
@@ -275,7 +274,7 @@ Paperclip connection is claimed.
 
 TypeScript and Vite production build checks passed for this slice. This frontend
 build does not establish live offer ingestion, comparison confirmation, dispatch
-or cancellation; those results belong in the Layer 4 integration evidence.
+or cancellation; those paths require separate integration checks.
 
 ## System appearance verification
 

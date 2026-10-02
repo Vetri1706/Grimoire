@@ -7,9 +7,8 @@ preparation and reviewable evidence comparisons. The implementation branch is
 PostgreSQL 17 database and private versioned MinIO storage. It does not merge the
 Paperclip application or depend on the unavailable Mac-local Paperclip instance.
 
-This document describes behavior and reproducible commands. Execution results,
-the resulting Windows commit and any failed or unexecuted checks belong in the
-separate verification report; a command listed here is not a reported pass.
+This document describes behavior and reproducible commands. See [test commands](testing.md)
+for the current verification entry point; a command listed here is not a reported pass.
 
 ## From free-text intake to an evidence draft
 

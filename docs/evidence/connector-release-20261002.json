@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-02",
+  "release": "0.1.0",
+  "status": "implemented_and_validated_locally",
+  "npm_published": false,
+  "deployed": false,
+  "model_invocations": 0,
+  "login_boundary": "Grimoire grants organization-scoped worker access. Codex account authentication remains in its existing local store.",
+  "artifacts": {
+    "package": {
+      "path": "web/public/downloads/grimoire-connector.tgz",
+      "bytes": 34208,
+      "sha256": "af645d7333aa96bba882a25d6e2bfd1a502fb783bd8feeb08155af5429b2568f"
+    },
+    "windows": {
+      "path": "web/public/downloads/grimoire-connector-windows.zip",
+      "bytes": 114569,
+      "sha256": "8ff5ba55fb851e9171292f6e4860572c0109a349fa11b537056ff1f779ae409d"
+    },
+    "generation": "web npm prebuild uses npm pack --ignore-scripts; archives contain 17 explicitly allowlisted package files and the Windows ZIP adds its launcher. Generated downloads are gitignored and rebuilt for each frontend build.",
+    "public_availability": "No production download URL or npm registry publication was created by this task. The local website checks actual same-origin downloads before showing a command."
+  },
+  "validation": {
+    "connector_node_lts_tests": { "passed": 56, "runtime": "24.21.0", "command": "node --test --test-isolation=none byoa/*.test.mjs", "note": "Final provider-run-ID compatibility adjustment additionally reran all three outbox tests successfully." },
+    "frontend_unit_tests": { "passed": 30, "command": "node --test --test-isolation=none src/*.test.ts" },
+    "rust_tests": { "passed": 50 },
+    "database_pairing_guard_groups": { "passed": 4, "script": "api/tests/worker_connection_guards.sql" },
+    "lifecycle": {
+      "passed": 11,
+      "script": "scripts/verify-worker-lifecycle.mjs",
+      "evidence": ".local/worker-lifecycle/1790921756942/results.json",
+      "stack": "Disposable Rust API 8082 and PostgreSQL database grimoire_codex_flow_test on 55434",
+      "coverage": ["pairing expiry and replay", "consent and cross-organization denial", "one concurrent claim winner", "fresh-heartbeat busy projection", "idempotent proposals and exact result receipts", "cancellation and late-output rejection", "heartbeat expiry and reconnect", "credential revocation", "lease expiry without redelivery", "lost successful response and private durable outbox", "fresh-process receipt recovery after expiry without duplicate effects"]
+    },
+    "browser": {
+      "passed": 13,
+      "script": "web/tests/codex-worker-pairing.mjs",
+      "evidence": ".local/codex-worker-pairing/1790921783955/results.json",
+      "coverage": ["packaged CLI pairing", "login route continuity", "organization selection and consent reset", "foreign account denial", "real idle-worker heartbeat", "Windows download and missing-release gating", "mobile and dark-mode setup", "stale-state hiding during outage", "restart existing enrollment", "revocation", "credential non-exposure"],
+      "provenance": "Browser evidence separately records executed package/module hashes and served download hashes. Subsequent result-error classification and provider-run-ID validation fixes were checked by focused tests and the final exact-artifact verifier; they did not change browser flow.",
+      "browser_errors": 0,
+      "tasks_dispatched": false
+    },
+    "final_package": {
+      "script": "scripts/verify-connector-package.mjs",
+      "passed": true,
+      "checks": ["exact file allowlist", "source byte equality", "release SHA-256 verification", "ZIP and tarball extracted outside repository", "help/version/local Codex checks using verified Node 24.21.0", "offline npm exec resolves bin from empty working directory"],
+      "registry_access": false
+    },
+    "windows_bootstrap": {
+      "script": "byoa/bootstrap/windows.test.ps1",
+      "passed": true,
+      "official_live_download_test": true,
+      "node": "24.21.0 LTS",
+      "checks": ["explicit installation consent", "private current-user ACL", "official pinned archive and executable SHA-256", "interrupted download retries", "corrupt archive rejection", "archive path traversal rejection", "runtime reuse", "actual verified x64 runtime execution"],
+      "arm64": "Official hashes pinned; execution not tested on this x64 computer."
+    },
+    "frontend_production_build": "passed",
+    "nginx_download_configuration": "syntax check passed in existing local image; no server or deployment started"
+  },
+  "recovery_boundary": "Interrupted generation or an ambiguous claim is never automatically re-executed. The server expires its lease; a Handler must explicitly request new work. Only exact saved result receipts are replayed across restart.",
+  "unchanged_authority": ["explicit dispatch only", "organization-scoped revocable credential", "same-origin requests without redirects", "lease, timeout, cancellation and revision checks", "proposal-only results", "separate research consent", "no server-supplied shell commands"],
+  "release_instructions": "byoa/README.md"
+}

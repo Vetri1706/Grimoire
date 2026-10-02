@@ -8,7 +8,7 @@
 
 Describe a product. Prepare a plan. Keep every proposal connected to its sources and revisions.
 
-[Get started](#get-started) · [How it works](#how-it-works) · [Architecture](#architecture) · [Documentation](#documentation)
+[Live app](https://grimoire-52-71-93-70.sslip.io) · [Try the demo](https://grimoire-52-71-93-70.sslip.io/demo) · [Get started](#get-started) · [Documentation](#documentation)
 
 </div>
 
@@ -16,9 +16,9 @@ Describe a product. Prepare a plan. Keep every proposal connected to its sources
 
 Grimoire brings product briefs, agent tasks, evidence, and review into one organization workspace. A **Scion** holds the product being investigated; agents prepare bounded proposals, and people review the resulting work.
 
-The current local implementation supports digital capability planning and synthetic physical-sourcing workflows. It uses a React interface, a Rust API, PostgreSQL 17, and private versioned object storage. Native agent profiles, skills, assignments, and task history belong to Grimoire. An optional local bridge runs preparation tasks through your existing Codex CLI login.
+Grimoire supports digital capability planning, focused public-web research and synthetic physical-sourcing workflows. It uses a React interface, a Rust API, PostgreSQL 17, and private versioned object storage. Native agent profiles, skills, assignments, and task history belong to Grimoire. A downloadable local connector runs explicitly dispatched tasks through your existing Codex CLI login.
 
-**Status:** active development. Local and synthetic workflows are documented; production readiness and real-world sourcing usefulness are not established. Agent completion never grants human approval.
+**Status:** active development, with an [AWS deployment](deploy/aws/README.md) and a public demo using saved synthetic examples. Real agent tasks require an authorized local connector. Agent completion never grants human approval; real-world sourcing usefulness remains unvalidated.
 
 ## Why Grimoire
 
@@ -37,7 +37,7 @@ Grimoire keeps that context attached to the work:
 
 1. **Create a Scion.** Describe the product and decision. Record known requirements; leave unknowns visible.
 2. **Prepare work.** Queue and dispatch a supported agent task. The result stays bound to its input revision.
-3. **Attach evidence.** Link permitted synthetic sources and record claims against exact source quotations.
+3. **Inspect evidence.** Review public-research source receipts, or link permitted synthetic sources and record claims against exact source quotations.
 4. **Review the result.** Inspect the proposal, its evidence, and unresolved questions together.
 5. **Track change.** Use revision history, task activity, and internal dependency views to understand what needs attention.
 
@@ -63,21 +63,24 @@ For example, a workshop website can produce capability hypotheses for hosting, c
 | Google sign-in | Optional; enabled with a configured Web application client ID. Tokens are verified server-side. |
 | Product intake | Incomplete drafts, immutable revisions, history, stale-edit rejection, and idempotent writes. |
 | Digital planning | Capability proposals and Handler-authored evidence comparison drafts. Digital vendor comparison is unavailable. |
-| Evidence | Synthetic text sources, explicit use permission, exact UTF-8 claim locators, and revocation. Automated extraction is unavailable. |
+| Evidence | Synthetic text sources with exact claim locators; public research with bounded page excerpts and retrieval receipts. Source withdrawal hides dependent content. |
+| Public research | Explicitly consented research tasks, observed search queries, public URLs and unverified reports. No authenticated scraping or supplier actions. |
 | Physical sourcing | Synthetic scope review, explicit supplier offers, and exact two-offer comparison. Missing terms remain missing. |
 | Agents | Native profiles, versioned instructions, skills, assignments, pause/resume, and Codex task history. |
 | Task conversations | Saved Handler notes, agent replies, and linked follow-up work; see the task-conversation contract. |
 | Data access | Organization-scoped intake and source connectors; a read-only local MCP stdio facade. |
-| Judge demo | A read-only `/demo` entry for separately published, persisted synthetic cases. Operator seeding is required. |
+| Public demo | A read-only `/demo` entry for separately published, persisted synthetic cases. Operator seeding is required. |
 | Commercial actions | Supplier selection, RFQ dispatch, purchases, and sourcing approval are not enabled by these workflows. |
 
 The documented MCP facade uses **stdio**. Do not treat it as a verified Streamable HTTP implementation.
 
-External research availability must be checked against the running connector registry and the applicable task contract. The supplied documentation describes public-research task routing but also marks external provider discovery as unavailable; it does not establish a complete provider-discovery workflow.
+Public research requires a connected research-capable worker and explicit consent for the public brief. Source retrieval establishes what was fetched, not the accuracy of a claim or a supplier's suitability. See the [research contract](docs/public-web-research.md) for limits.
 
 ## Get started
 
-The commands below follow the documented Windows/PowerShell setup. Run them from the repository root.
+To use the hosted app, sign in and open **Settings → Runtime → Connect Codex**. Copy its startup command, or download the Windows connector, then approve the organization in your browser. No source-code checkout is needed. Keep the connector terminal open for agent tasks; Codex authentication stays on your computer. See the [connector guide](byoa/README.md).
+
+For local development, the commands below follow the Windows/PowerShell setup. Run them from the repository root.
 
 ### Prerequisites
 
@@ -135,7 +138,7 @@ npm.cmd --prefix web ci
 npm.cmd --prefix web run dev -- --host 127.0.0.1 --port 5180
 ```
 
-Open **http://127.0.0.1:5180**, create a Handler account, and create your first Scion. Signup creates an isolated organization. Installation-owner setup is a separate action.
+Open **http://127.0.0.1:5180**, create a Handler account, then an organization and your first Scion. Installation-owner setup is a separate action.
 
 | Local service | Address |
 | --- | --- |
@@ -228,7 +231,7 @@ npm.cmd --prefix web run typecheck
 npm.cmd --prefix web run build
 ```
 
-Verification reports apply to their recorded commits, environments, and scenarios. A historical passing count is not a current CI result. See [native-agent verification](docs/verification-2026-09-27-native-agents.md) and [Windows adaptive verification](docs/windows-adaptive-verification.md).
+See [Testing](docs/testing.md) for connector packaging and browser/integration checks. Current deployment records remain in `docs/evidence/`; historical logs and screenshots are available in Git history.
 
 ## Documentation
 
@@ -240,16 +243,20 @@ Verification reports apply to their recorded commits, environments, and scenario
 | [Task conversations](docs/task-conversation.md) | Handler notes, replies, and follow-up tasks. |
 | [Adaptive Scions](docs/windows-adaptive-scion.md) | Digital planning, connector boundaries, MCP, and authority protections. |
 | [Local BYOA](docs/byoa-local.md) | Codex preparation and worker setup. |
+| [Downloadable connector](byoa/README.md) | One-command pairing, local credentials and package verification. |
+| [Public web research](docs/public-web-research.md) | Public briefs, source receipts, report review and withdrawal. |
 | [Object storage](docs/object-storage.md) | MinIO setup and exact-version source access. |
-| [Judge access](docs/judge-access.md) | Publishing and opening the persisted synthetic demo. |
+| [Public demo](docs/judge-access.md) | Seeding and opening the persisted synthetic examples. |
 | [Google sign-in](docs/google-sign-in.md) | Optional authentication configuration. |
 | [HTTP API](api/README.md) | Request/response contracts and limits. |
 | [Acceptance harness](harness/README.md) | Direct harness execution. |
+| [Testing](docs/testing.md) | Current verification commands and test boundaries. |
+| [AWS deployment](deploy/aws/README.md) | Hosted setup, updates and verification records. |
 | [Storage recovery backlog](docs/storage-recovery-backlog.md) | Unverified recovery and lifecycle behavior. |
 
 ## Current limitations
 
-The documented evidence workflows use synthetic records. Real supplier discovery, real supplier offers, automated extraction, digital vendor comparison, RFQs, and production sourcing qualification remain outside the established scope.
+The public demo and physical-sourcing workflows use synthetic records. Public research produces unverified reports and bounded excerpts; it does not qualify suppliers, create real offers, send RFQs, place orders or approve sourcing. Digital vendor comparison remains unavailable.
 
 Storage lifecycle work remains open for signed URLs, Object Lock, physical erasure, backup restoration, orphan cleanup, and recovery between object upload and database commit. Internal Watchtower behavior does not establish continuous external-provider monitoring.
 

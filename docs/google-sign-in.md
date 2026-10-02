@@ -16,6 +16,8 @@ Grimoire uses Google Identity Services directly. Rust verifies Google's ID token
    ```
 
    Add the exact HTTPS origin when deployed. Origins include scheme and port, but no `/api`, `/demo` or other path. `localhost` and `127.0.0.1` are distinct origins; registering both frontend addresses covers either local URL.
+
+   The current AWS deployment origin is `https://grimoire-52-71-93-70.sslip.io`. The operator confirmed registering it on 2 October 2026. Hosted provider-entry verification passed; see the [activation record](evidence/aws-google-signin-20261002.json) for its scope.
 5. Keep authentication limited to standard identity/profile information. No Drive, Gmail or other Google API access is requested. This JavaScript popup callback flow needs no authorized redirect URI.
 6. Copy the **client ID**, ending in `.apps.googleusercontent.com`. It is public. Do not share a client secret.
 
@@ -60,4 +62,4 @@ Open a fresh browser at the registered origin. Complete Google's account chooser
 
 Automated checks use ephemeral RSA test keys, synthetic SQL identities and explicitly mocked GIS browser callbacks. Production has no alternate key endpoint or token bypass. These checks do not establish a successful real Google login: that requires the user-owned client ID, registered origin and interactive Google account step.
 
-See the [2026-09-29 verification record](google-sign-in-verification-2026-09-29.md) for the completed automated checks and real Google provider-entry test.
+See [test commands](testing.md) for automated checks and the [hosted activation record](evidence/aws-google-signin-20261002.json) for the scope of the provider-entry check.

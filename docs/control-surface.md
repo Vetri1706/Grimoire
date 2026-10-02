@@ -88,8 +88,9 @@ Old local connector files are ignored and no longer read by Grimoire.
 
 ## Verification
 
-See [the executed OS verification report](verification-2026-09-26-control-surface.md)
-for browser observations, automated results and unverified deployment boundaries.
+See [test commands](testing.md) for the current verification entry point.
+Local checks do not establish hosted behavior; deployment checks must use the
+actual deployed instance.
 
 ```powershell
 pwsh -NoProfile -File scripts/dev.ps1 -Task Migrate

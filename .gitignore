@@ -1,6 +1,13 @@
 .env
+.env.*
+!.env.example
 .local/
 .tools/
+.aws/
+__pycache__/
+*.py[cod]
+*.pem
+*.key
 **/target/
 **/node_modules/
 **/dist/
@@ -9,3 +16,5 @@
 web/.vite/
 *.tsbuildinfo
 deploy/aws/backups/
+web/public/downloads/
+byoa/*.tgz
