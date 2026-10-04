@@ -40,20 +40,27 @@ pub fn capable(headers: &HeaderMap) -> bool {
     let mut values = headers.get_all("X-Grimoire-Public-Web").iter();
     values.next().and_then(|v| v.to_str().ok()) == Some("1") && values.next().is_none()
 }
+pub fn serpapi_capable(headers: &HeaderMap) -> bool {
+    let mut values = headers.get_all("X-Grimoire-SerpApi").iter();
+    capable(headers)
+        && values.next().and_then(|v| v.to_str().ok()) == Some("1")
+        && values.next().is_none()
+}
 pub fn validate_candidate(value: &Value) -> Result<(), ApiError> {
     let object = value
         .as_object()
         .ok_or_else(|| ApiError::invalid("A public research brief is required."))?;
-    if object.len() != 5
+    if !((object.len() == 5 && !object.contains_key("search_provider"))
+        || (object.len() == 6 && value["search_provider"] == "serpapi"))
         || value["synthetic"] != false
         || value["consent"] != true
         || value["policy_version"] != POLICY
         || !value["objective"]
             .as_str()
             .is_some_and(|s| bounded(s, 4000))
-        || !value["worker_connection_id"]
+        || value["worker_connection_id"]
             .as_str()
-            .is_some_and(|s| Uuid::parse_str(s).is_ok())
+            .is_none_or(|s| Uuid::parse_str(s).is_err())
     {
         return Err(ApiError(StatusCode::UNPROCESSABLE_ENTITY,"RESEARCH_CONSENT_REQUIRED","Choose a computer and explicitly consent to this public research brief using public-web-research-v1. No private source content is sent.".into()));
     }
@@ -82,6 +89,7 @@ async fn authorize_task(
     if !actor.is_agent || !capable(headers) {
         return Err(ApiError::forbidden());
     }
+    crate::agents::worker_seen(tx, headers).await?;
     let token = lease(headers)?;
     sqlx::query("SELECT app.intake_research_assert_task($1,$2)")
         .bind(task)
@@ -129,6 +137,28 @@ struct Source {
 struct Query {
     query: String,
     observed_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    engine: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    search_id: Option<String>,
+}
+impl Query {
+    fn provider_valid(&self) -> bool {
+        match (&self.provider, &self.engine, &self.search_id) {
+            (None, None, None) => true,
+            (Some(provider), Some(engine), Some(id)) => {
+                provider == "serpapi"
+                    && engine == "google"
+                    && (1..=128).contains(&id.len())
+                    && id
+                        .bytes()
+                        .all(|v| v.is_ascii_alphanumeric() || v == b'_' || v == b'-')
+            }
+            _ => false,
+        }
+    }
 }
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -143,6 +173,23 @@ struct ReportInput {
     capture_ids: Vec<Uuid>,
 }
 impl ReportInput {
+    fn validate_provider(&self, provider: Option<&str>) -> Result<(), ApiError> {
+        if self
+            .queries
+            .iter()
+            .any(|query| query.provider.as_deref() != provider)
+        {
+            return Err(ApiError::invalid(
+                "Search receipts must match the search provider explicitly selected for this task.",
+            ));
+        }
+        if provider == Some("serpapi") && (self.queries.len() > 3 || self.sources.is_empty()) {
+            return Err(ApiError::invalid(
+                "SerpApi research permits at most three queries and requires at least one successfully captured source.",
+            ));
+        }
+        Ok(())
+    }
     fn validate(&self) -> Result<(), ApiError> {
         let urls: HashSet<&str> = self.sources.iter().map(|v| v.url.as_str()).collect();
         let refs =
@@ -173,7 +220,8 @@ impl ReportInput {
                     || !refs(&v.source_urls)
             })
             || self.queries.iter().any(|v| {
-                !bounded(&v.query, 2000)
+                !v.provider_valid()
+                    || !bounded(&v.query, 2000)
                     || v.observed_at > Utc::now() + chrono::Duration::minutes(2)
             })
         {
@@ -560,12 +608,12 @@ async fn state(
     let connections: Vec<Value> = if actor.is_agent {
         vec![]
     } else {
-        sqlx::query_scalar("SELECT jsonb_build_object('connection_id',c.id,'device_name',c.device_name,'last_seen',p.last_seen,'status',CASE WHEN c.revoked_at IS NOT NULL THEN 'revoked' WHEN p.last_seen>clock_timestamp()-interval '15 seconds' THEN 'connected' ELSE 'disconnected' END,'research_capable',COALESCE(r.last_seen>clock_timestamp()-interval '15 seconds',false)) FROM grimoire.intake_worker_connections c LEFT JOIN grimoire.intake_worker_presence p ON (p.org_id,p.principal_id)=(c.org_id,c.principal_id) LEFT JOIN grimoire.intake_research_worker_presence r ON (r.org_id,r.principal_id)=(c.org_id,c.principal_id) ORDER BY c.created_at DESC,c.id LIMIT 100").fetch_all(&mut *tx).await?
+        sqlx::query_scalar("SELECT jsonb_build_object('connection_id',c.id,'device_name',c.device_name,'last_seen',p.last_seen,'status',CASE WHEN c.revoked_at IS NOT NULL THEN 'revoked' WHEN p.last_seen>clock_timestamp()-interval '15 seconds' THEN 'connected' ELSE 'disconnected' END,'research_capable',COALESCE(r.last_seen>clock_timestamp()-interval '15 seconds',false),'serpapi_capable',COALESCE(r.serpapi_capable AND r.last_seen>clock_timestamp()-interval '15 seconds',false)) FROM grimoire.intake_worker_connections c LEFT JOIN grimoire.intake_worker_presence p ON (p.org_id,p.principal_id)=(c.org_id,c.principal_id) LEFT JOIN grimoire.intake_research_worker_presence r ON (r.org_id,r.principal_id)=(c.org_id,c.principal_id) ORDER BY c.created_at DESC,c.id LIMIT 100").fetch_all(&mut *tx).await?
     };
     let briefs: Vec<Value> = if actor.is_agent {
         vec![]
     } else {
-        sqlx::query_scalar("SELECT jsonb_build_object('task_id',id,'objective',input->'candidate_proposal'->'objective','worker_connection_id',input->'candidate_proposal'->'worker_connection_id') FROM grimoire.intake_agent_tasks WHERE scion_id=$1 AND scion_revision=$2 AND task_kind='research_public_web' ORDER BY created_at DESC LIMIT 100").bind(id).bind(current).fetch_all(&mut *tx).await?
+        sqlx::query_scalar("SELECT jsonb_build_object('task_id',id,'objective',input->'candidate_proposal'->'objective','worker_connection_id',input->'candidate_proposal'->'worker_connection_id','search_provider',COALESCE(input->'candidate_proposal'->>'search_provider','codex')) FROM grimoire.intake_agent_tasks WHERE scion_id=$1 AND scion_revision=$2 AND task_kind='research_public_web' ORDER BY created_at DESC LIMIT 100").bind(id).bind(current).fetch_all(&mut *tx).await?
     };
     tx.commit().await?;
     Ok(Json(json!({"available":true,"policy_version":POLICY,"limits":{"max_sources":8,"max_queries":5,"max_steps":8,"max_candidates":8,"timeout_seconds":300},"worker_connections":connections,"reports":reports,"briefs":briefs})).into_response())
@@ -604,6 +652,13 @@ async fn submit(
     if revision != base {
         return Err(ApiError::stale());
     }
+    let search_provider: Option<String> = sqlx::query_scalar(
+        "SELECT input->'candidate_proposal'->>'search_provider' FROM grimoire.intake_agent_tasks WHERE id=$1",
+    )
+    .bind(task)
+    .fetch_one(&mut *tx)
+    .await?;
+    body.validate_provider(search_provider.as_deref())?;
     let value = serde_json::to_value(&body)?;
     let hash = format!("{:x}", Sha256::digest(serde_json::to_vec(&value)?));
     let old: Option<(Uuid, String)> = sqlx::query_as(
@@ -626,7 +681,10 @@ async fn submit(
     let receipts = captures(&mut tx, task).await?;
     for (source, capture_id) in body.sources.iter().zip(&body.capture_ids) {
         if !receipts.iter().any(|v| {
-            v["id"] == capture_id.to_string() && v["url"] == source.url && v["status"] != "revoked"
+            v["id"] == capture_id.to_string()
+                && v["url"] == source.url
+                && v["status"] != "revoked"
+                && (search_provider.as_deref() != Some("serpapi") || v["status"] == "captured")
         }) {
             return Err(ApiError::invalid(
                 "Each source must reference this task's exact URL capture receipt in the same order.",
@@ -795,5 +853,95 @@ mod tests {
         value["synthetic"] = json!(false);
         value["private_sources"] = json!(["private"]);
         assert!(validate_candidate(&value).is_err());
+    }
+    #[test]
+    fn serpapi_is_explicit_and_does_not_relax_consent() {
+        let candidate = json!({"synthetic":false,"objective":"Public procurement steps","consent":true,"policy_version":POLICY,"worker_connection_id":Uuid::new_v4(),"search_provider":"serpapi"});
+        assert!(validate_candidate(&candidate).is_ok());
+        for change in [
+            json!({"consent":false}),
+            json!({"search_provider":null}),
+            json!({"search_provider":"unknown"}),
+            json!({"private_sources":[]}),
+        ] {
+            let mut invalid = candidate.clone();
+            invalid
+                .as_object_mut()
+                .unwrap()
+                .extend(change.as_object().unwrap().clone());
+            assert!(validate_candidate(&invalid).is_err());
+        }
+    }
+    #[test]
+    fn search_provider_receipts_are_atomic_and_bounded() {
+        let legacy: Query =
+            serde_json::from_value(json!({"query":"public procurement","observed_at":Utc::now()}))
+                .unwrap();
+        assert!(legacy.provider_valid());
+        assert!(
+            serde_json::to_value(legacy)
+                .unwrap()
+                .get("provider")
+                .is_none()
+        );
+        let receipt = json!({"query":"public procurement","observed_at":Utc::now(),"provider":"serpapi","engine":"google","search_id":"search_ABC-123"});
+        assert!(
+            serde_json::from_value::<Query>(receipt.clone())
+                .unwrap()
+                .provider_valid()
+        );
+        for change in [
+            json!({"engine":null}),
+            json!({"provider":"codex"}),
+            json!({"search_id":"https://serpapi.com/?api_key=secret"}),
+            json!({"search_id":"a".repeat(129)}),
+        ] {
+            let mut invalid = receipt.clone();
+            invalid
+                .as_object_mut()
+                .unwrap()
+                .extend(change.as_object().unwrap().clone());
+            assert!(
+                !serde_json::from_value::<Query>(invalid)
+                    .unwrap()
+                    .provider_valid()
+            );
+        }
+    }
+    #[test]
+    fn serpapi_capability_requires_single_explicit_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Grimoire-SerpApi", "1".parse().unwrap());
+        assert!(!serpapi_capable(&headers));
+        headers.insert("X-Grimoire-Public-Web", "1".parse().unwrap());
+        assert!(serpapi_capable(&headers));
+        headers.append("X-Grimoire-SerpApi", "1".parse().unwrap());
+        assert!(!serpapi_capable(&headers));
+    }
+    #[test]
+    fn serpapi_report_limits_match_consent_without_changing_legacy_reports() {
+        let query = json!({"query":"public procurement","observed_at":Utc::now(),"provider":"serpapi","engine":"google","search_id":"search_ABC-123"});
+        let mut report: ReportInput = serde_json::from_value(json!({
+            "synthetic":false,"summary":"Public research","process_steps":[],"candidates":[],
+            "sources":[{"url":"https://www.gov.uk/contracts-finder","title":"Public source"}],
+            "capture_ids":[Uuid::new_v4()],"unresolved_gaps":[],"queries":[query.clone(),query.clone(),query.clone()]
+        })).unwrap();
+        assert!(report.validate().is_ok());
+        assert!(report.validate_provider(Some("serpapi")).is_ok());
+        assert!(report.validate_provider(None).is_err());
+        report.queries.push(serde_json::from_value(query).unwrap());
+        assert!(report.validate().is_ok());
+        assert!(report.validate_provider(Some("serpapi")).is_err());
+        report.queries.pop();
+        report.sources.clear();
+        report.capture_ids.clear();
+        assert!(report.validate().is_ok());
+        assert!(report.validate_provider(Some("serpapi")).is_err());
+        for query in &mut report.queries {
+            query.provider = None;
+            query.engine = None;
+            query.search_id = None;
+        }
+        assert!(report.validate_provider(None).is_ok());
     }
 }

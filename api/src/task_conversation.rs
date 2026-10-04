@@ -29,6 +29,8 @@ struct MessageInput {
     worker_connection_id: Option<Uuid>,
     #[serde(default)]
     public_web_consent: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    search_provider: Option<String>,
 }
 impl MessageInput {
     fn validate(&self) -> Result<(), ApiError> {
@@ -36,10 +38,15 @@ impl MessageInput {
             || self.body.chars().count() > 4000
             || self.body.contains('\0')
             || !matches!(self.intent.as_str(), "note" | "follow_up")
+            || self
+                .search_provider
+                .as_deref()
+                .is_some_and(|value| value != "serpapi")
             || (self.intent == "note"
                 && (self.agent_id.is_some()
                     || self.worker_connection_id.is_some()
-                    || self.public_web_consent))
+                    || self.public_web_consent
+                    || self.search_provider.is_some()))
         {
             return Err(ApiError::invalid(
                 "Use a task note or follow-up message of 1–4,000 characters. Notes cannot authorize agent work.",
@@ -47,6 +54,17 @@ impl MessageInput {
         }
         Ok(())
     }
+}
+fn followup_search_provider(
+    requested: Option<String>,
+    previous: Option<String>,
+) -> Result<Option<String>, ApiError> {
+    if previous.as_deref() == Some("serpapi") && requested.as_deref() != Some("serpapi") {
+        return Err(ApiError::invalid(
+            "Explicitly select SerpApi and consent to its search usage again for this follow-up.",
+        ));
+    }
+    Ok(requested)
 }
 fn conflict(code: &'static str, message: &str) -> ApiError {
     ApiError(StatusCode::CONFLICT, code, message.into())
@@ -203,10 +221,10 @@ async fn send(
             "This bounded thread has 200 messages. Start a new task to continue.",
         ));
     }
-    if input.intent == "follow_up" {
-        if let Some(reason) = availability(&mut tx, root, scion).await? {
-            return Err(conflict("TASK_FOLLOWUP_UNAVAILABLE", reason));
-        }
+    if input.intent == "follow_up"
+        && let Some(reason) = availability(&mut tx, root, scion).await?
+    {
+        return Err(conflict("TASK_FOLLOWUP_UNAVAILABLE", reason));
     }
     let message_id = Uuid::new_v4();
     sqlx::query("INSERT INTO grimoire.intake_task_messages(id,org_id,scion_id,scion_revision,thread_task_id,author_principal_id,author_name,body,intent,request_key,request_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)").bind(message_id).bind(actor.org_id).bind(scion).bind(base).bind(root).bind(actor.principal_id).bind(&actor.display_name).bind(&input.body).bind(&input.intent).bind(key).bind(hash).execute(&mut *tx).await?;
@@ -227,9 +245,20 @@ async fn send(
                     "Explicit public-brief consent and a selected research computer are required for every research follow-up.",
                 ));
             }
-            json!({"synthetic":false,"objective":input.body,"consent":true,"policy_version":crate::research::POLICY,"worker_connection_id":input.worker_connection_id})
+            let previous_provider: Option<String> = sqlx::query_scalar("SELECT input->'candidate_proposal'->>'search_provider' FROM grimoire.intake_agent_tasks WHERE id=$1")
+                .bind(parent).fetch_one(&mut *tx).await?;
+            let mut candidate = json!({"synthetic":false,"objective":input.body,"consent":true,"policy_version":crate::research::POLICY,"worker_connection_id":input.worker_connection_id});
+            if let Some(provider) =
+                followup_search_provider(input.search_provider, previous_provider)?
+            {
+                candidate["search_provider"] = json!(provider);
+            }
+            candidate
         } else {
-            if input.public_web_consent || input.worker_connection_id.is_some() {
+            if input.public_web_consent
+                || input.worker_connection_id.is_some()
+                || input.search_provider.is_some()
+            {
                 return Err(ApiError::invalid(
                     "Planning follow-ups do not authorize public web research.",
                 ));
@@ -311,6 +340,7 @@ mod tests {
             agent_id: None,
             worker_connection_id: None,
             public_web_consent: false,
+            search_provider: None,
         };
         assert!(input.validate().is_ok());
         input.public_web_consent = true;
@@ -331,5 +361,18 @@ mod tests {
         assert!(capable(&h));
         h.append("X-Grimoire-Task-Messages", HeaderValue::from_static("1"));
         assert!(!capable(&h));
+    }
+    #[test]
+    fn serpapi_followups_require_fresh_explicit_provider_selection() {
+        assert!(followup_search_provider(None, Some("serpapi".into())).is_err());
+        assert!(
+            followup_search_provider(Some("serpapi".into()), Some("serpapi".into()))
+                .is_ok_and(|provider| provider.as_deref() == Some("serpapi"))
+        );
+        assert!(matches!(followup_search_provider(None, None), Ok(None)));
+        assert!(
+            followup_search_provider(Some("serpapi".into()), None)
+                .is_ok_and(|provider| provider.as_deref() == Some("serpapi"))
+        );
     }
 }

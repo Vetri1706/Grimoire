@@ -9,6 +9,7 @@ __pycache__/
 *.pem
 *.key
 **/target/
+api/target-*/
 **/node_modules/
 **/dist/
 *.log

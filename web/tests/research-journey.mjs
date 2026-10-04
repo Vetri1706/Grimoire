@@ -11,15 +11,18 @@ import { childEnvironment } from '../../byoa/bridge.mjs';
 // Explicit opt-in: one real provider task using only an invented public brief.
 // No model/provider output, source bytes, token or worker credential is printed.
 assert.equal(process.env.GRIMOIRE_TEST_DISPOSABLE, '1');
-assert.equal(process.env.GRIMOIRE_TEST_LIVE_CODEX, '1', 'This journey invokes the installed authenticated Codex CLI once.');
+assert.equal(process.env.GRIMOIRE_TEST_LIVE_CODEX, '1', 'This journey invokes the installed authenticated Codex CLI.');
+const serpapi = process.env.GRIMOIRE_TEST_SEARCH_PROVIDER === 'serpapi';
+if (serpapi) assert.ok(process.env.SERPAPI_API_KEY, 'SerpApi live verification requires a locally configured key.');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const base = process.env.GRIMOIRE_WEB_URL ?? 'http://127.0.0.1:5182';
 const database = process.env.GRIMOIRE_TEST_DATABASE ?? 'grimoire_codex_flow_test';
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname));
 assert.ok(database.endsWith('_test'));
 assert.equal((await (await fetch(`${base}/api/health`)).json()).database.name, database);
-const evidence = path.join(root, '.local', 'research-journey', String(Date.now()));
+const evidence = path.join(root, '.local', serpapi ? 'serpapi-live-journey' : 'research-journey', String(Date.now()));
 await mkdir(evidence, { recursive: true });
+if (serpapi) process.env.GRIMOIRE_CONNECTOR_HOME = path.join(evidence, 'connector-state');
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage(); page.setDefaultTimeout(25000);
@@ -40,11 +43,16 @@ async function until(check, message, timeout = 30000) {
   throw new Error(`Timed out: ${message}`);
 }
 async function screenshot(name) { await page.screenshot({ path: path.join(evidence, `${name}.png`), fullPage: true, animations: 'disabled' }); }
+async function openReport() {
+  const report = page.locator('.research-deliverable');
+  await report.waitFor();
+  if (await report.getAttribute('open') === null) await report.locator(':scope > summary').click();
+}
 const checked = message => { checks.push(message); console.log(message); };
 const researchState = () => api(`/scions/${scion.id}/research`);
 function startWorker() {
   workerExited = false;
-  bridge = spawn(process.execPath, [path.join(root, 'byoa/bridge.mjs'), '--connection', record.connection_id, '--watch'], { cwd: root, env: childEnvironment(process.env), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  bridge = spawn(process.execPath, [path.join(root, 'byoa/bridge.mjs'), '--connection', record.connection_id, '--watch'], { cwd: root, env: { ...childEnvironment(process.env), ...(serpapi ? { SERPAPI_API_KEY: process.env.SERPAPI_API_KEY, GRIMOIRE_CONNECTOR_HOME: process.env.GRIMOIRE_CONNECTOR_HOME } : {}) }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   bridge.on('close', () => { workerExited = true; }); bridge.stdout.on('data', () => {});
   bridge.stderr.on('data', bytes => { workerError = (workerError + bytes.toString()).slice(-4000); });
 }
@@ -58,9 +66,9 @@ try {
   await api(`/worker-connections/pairings/${pairing.user_code}/approve`, { method: 'POST', data: { organization_id: org, consent: true, policy_version: 'codex-synthetic-v1' } });
   const enrolled = await api('/worker-connections/pairings/poll', { method: 'POST', data: { device_secret: pairing.device_secret } });
   record = { version: 1, api_origin: base, connection_id: enrolled.connection_id, organization_id: enrolled.organization_id, organization_name: enrolled.organization_name, credential: enrolled.credential, adapter: enrolled.adapter, policy_version: enrolled.policy_version, content_class: enrolled.content_class, enrolled_at: new Date().toISOString() };
-  savedPath = await saveConnection(record); startWorker();
-  await until(async () => (await researchState()).worker_connections.some(item => item.connection_id === record.connection_id && item.research_capable && item.status === 'connected'), 'research-capable worker heartbeat');
-  const candidate = { synthetic: false, objective: 'Public test brief: understand GOV.UK Contracts Finder. No real supplier selection or purchase is authorized.', consent: true, policy_version: 'public-web-research-v1', worker_connection_id: record.connection_id };
+  savedPath = await saveConnection(record, serpapi ? path.join(process.env.GRIMOIRE_CONNECTOR_HOME, 'connections') : undefined); startWorker();
+  await until(async () => (await researchState()).worker_connections.some(item => item.connection_id === record.connection_id && item.research_capable && (!serpapi || item.serpapi_capable) && item.status === 'connected'), 'research-capable worker heartbeat');
+  const candidate = { synthetic: false, objective: 'Public test brief: understand GOV.UK Contracts Finder. No real supplier selection or purchase is authorized.', consent: true, policy_version: 'public-web-research-v1', worker_connection_id: record.connection_id, ...(serpapi ? { search_provider: 'serpapi' } : {}) };
   const queuedBody = { task_kind: 'research_public_web', candidate_proposal: candidate, agent_id: agent.id, timeout_seconds: 300 };
   const idempotency = randomUUID();
   const cancelled = await api(`/scions/${scion.id}/agent-tasks`, { method: 'POST', expected: 201, extra: { 'Idempotency-Key': idempotency, 'If-Match': '"1"' }, data: queuedBody });
@@ -71,7 +79,8 @@ try {
   checked('A retried task request reuses one native task; cancelling queued research starts no provider work.');
   await page.goto(`${base}/#/scions/${scion.id}/research/new`);
   await page.getByRole('form', { name: 'Public web research' }).waitFor();
-  await page.getByLabel('Public research brief', { exact: true }).fill('For an invented UK supplier considering public-sector contracts, research the official GOV.UK Contracts Finder workflow: finding suitable opportunities, where notices are published, and what a supplier should verify before responding. Use only official gov.uk public guidance, at most 2 search queries and 2 source pages. Return 3 concise supported process steps, no supplier or product candidates, and explicit unresolved gaps. Do not submit a bid, create an account, contact anyone, or make a purchase.');
+  if (serpapi) await page.getByLabel('Search provider', { exact: true }).selectOption('serpapi');
+  await page.getByLabel('Public research brief', { exact: true }).fill('For an invented UK supplier considering public-sector contracts, research the official GOV.UK Contracts Finder workflow: finding suitable opportunities, where notices are published, and what a supplier should verify before responding. Use one search query: Contracts Finder GOV.UK. Plan a maximum budget of 8 source-page capture attempts. Base the report only on official gov.uk public guidance. Return 3 concise supported process steps, no supplier or product candidates, and explicit unresolved gaps. Do not submit a bid, create an account, contact anyone, or make a purchase.');
   await page.getByLabel(/^Assigned agent/).selectOption(agent.id);
   await page.getByLabel(/^Research computer/).selectOption(record.connection_id);
   assert.equal(await page.getByRole('button', { name: 'Start research', exact: true }).isEnabled(), false);
@@ -80,7 +89,7 @@ try {
   await page.getByRole('button', { name: 'Start research', exact: true }).click();
   activeTask = await until(async () => (await api(`/scions/${scion.id}/agent-tasks`)).tasks.find(task => task.id !== cancelled.id), 'saved browser research task');
   checked('Browser collects explicit public-brief, agent and computer consent and dispatches the saved native task.');
-  console.log('Waiting for one actual Codex public research task and server captures.');
+  console.log(`Waiting for ${serpapi ? 'Codex planning, live SerpApi search and Codex synthesis' : 'one actual Codex public research run'} and server captures.`);
   activeTask = await until(async () => {
     const task = (await api(`/scions/${scion.id}/agent-tasks`)).tasks.find(item => item.id === activeTask.id);
     if (['failed', 'cancelled'].includes(task?.status)) throw new Error(`Actual research task ${task.status}: ${task.failure_code}`);
@@ -91,14 +100,25 @@ try {
   report = (await researchState()).reports.find(item => item.id === activeTask.proposal_id);
   assert.ok(report?.input); assert.equal(report.agent_task_id, activeTask.id); assert.equal(report.status, 'current'); assert.equal(report.reviews.length, 0);
   assert.ok(report.input.queries.length >= 1 && report.input.queries.length <= 5);
+  if (serpapi) {
+    assert.ok(report.input.queries.length <= 3);
+    for (const query of report.input.queries) { assert.equal(query.provider, 'serpapi'); assert.equal(query.engine, 'google'); assert.match(query.search_id, /^[A-Za-z0-9_-]{1,128}$/); }
+  }
   assert.ok(report.input.sources.length >= 1 && report.input.sources.length <= 8);
-  const captured = report.captures.filter(item => item.status === 'captured');
+  const captured = report.captures.filter(item => report.input.capture_ids.includes(item.id) && item.status === 'captured');
   assert.ok(captured.length >= 1, 'At least one real public source must be fetched successfully.');
+  if (serpapi) {
+    assert.equal(captured.length, report.input.sources.length, 'Every SerpApi report source must have a captured receipt.');
+    assert.equal(report.input.queries.length, 1, 'The search plan must honor the brief\'s one-query limit.');
+    assert.ok(report.captures.length <= 8, 'The search plan stays within the eight-page limit.');
+  }
   for (const capture of captured) { assert.match(capture.content_sha256, /^[a-f0-9]{64}$/); assert.ok(capture.excerpt?.length); assert.ok(capture.byte_length > 0); assert.ok(new URL(capture.final_url).hostname.endsWith('gov.uk')); }
   assert.equal((await api(`/scions/${scion.id}/control-surface`)).approval_available, false);
+  await openReport();
   await page.getByRole('heading', { name: 'Research report', exact: true }).waitFor();
+  await page.locator('.research-provenance > summary').click();
   await screenshot('02-real-research-report');
-  checked('One actual Codex run produced a native completed task, observed query provenance and real server-captured public source hashes; no review or approval was created.');
+  checked(`${serpapi ? 'Two actual Codex runs with live SerpApi search' : 'One actual Codex run'} produced a native completed task, observed query provenance and real server-captured public source hashes; no review or approval was created.`);
   await page.getByLabel('Review note', { exact: true }).fill('Reviewed the public guidance and recorded capture receipts. Supplier suitability, current opportunity terms and procurement approval require separate human decisions.');
   // The server commits a real review, but its response is deliberately lost.
   // Retrying must recover the same receipt without a second review or approval.
@@ -113,7 +133,7 @@ try {
   await until(async () => (await researchState()).reports.find(item => item.id === report.id)?.reviews.length === 1, 'persisted Handler review');
   assert.equal((await api(`/scions/${scion.id}/control-surface`)).approval_available, false);
   await screenshot('03-human-review');
-  await page.reload(); await page.getByRole('heading', { name: 'Research report', exact: true }).waitFor();
+  await page.reload(); await openReport(); await page.getByRole('heading', { name: 'Research report', exact: true }).waitFor();
   assert.equal(await page.locator('.research-review-receipt').count(), 1);
   checked('A lost review response retries to one persisted receipt; Handler review survives reload and remains separate from procurement approval.');
   const foreign = await browser.newContext();
@@ -139,14 +159,14 @@ try {
   await until(() => page.locator('.research-result').count().then(count => count === 0), 'open view hides dependent report content');
   assert.equal(await page.getByRole('button', { name: 'Record review', exact: true }).count(), 0);
   await screenshot('05-source-withdrawal-blocks');
-  await page.reload(); await page.getByText('Source access has changed. This report is hidden until replacement research is available.', { exact: true }).waitFor();
+  await page.reload(); await openReport(); await page.getByText('Source access has changed. This report is hidden until replacement research is available.', { exact: true }).waitFor();
   checked('Source withdrawal hides captured bytes and dependent report in the already-open browser, blocks new review, and survives reload.');
   assert.equal(errors.length, 0);
-  await writeFile(path.join(evidence, 'results.json'), JSON.stringify({ status: 'PASS', database, checks, scion_id: scion.id, task_id: activeTask.id, provider_run_id: activeTask.provider_run_id, report_id: report.id, captured_sources: captured.map(item => ({ id: item.id, url: item.final_url, content_sha256: item.content_sha256, byte_length: item.byte_length })), actual_codex_runs: 1, approval_granted: false, browser_errors: errors }, null, 2));
-  console.log(JSON.stringify({ status: 'PASS', evidence, checks: checks.length, actual_codex_runs: 1 }));
+  await writeFile(path.join(evidence, 'results.json'), JSON.stringify({ status: 'PASS', database, checks, scion_id: scion.id, task_id: activeTask.id, provider_run_id: activeTask.provider_run_id, report_id: report.id, captured_sources: captured.map(item => ({ id: item.id, url: item.final_url, content_sha256: item.content_sha256, byte_length: item.byte_length })), search_provider: serpapi ? 'serpapi' : 'codex_web', queries: report.input.queries, actual_codex_runs: serpapi ? 2 : 1, approval_granted: false, browser_errors: errors }, null, 2));
+  console.log(JSON.stringify({ status: 'PASS', evidence, checks: checks.length, actual_codex_runs: serpapi ? 2 : 1 }));
 } catch (error) {
   await screenshot('failure').catch(() => {});
-  await writeFile(path.join(evidence, 'failure.json'), JSON.stringify({ message: error.message, checks, browser_errors: errors, scion_id: scion?.id, task_id: activeTask?.id, worker_diagnostic: workerError.replaceAll(record?.credential ?? '___never___', '[redacted]') }, null, 2));
+  await writeFile(path.join(evidence, 'failure.json'), JSON.stringify({ message: error.message, checks, browser_errors: errors, scion_id: scion?.id, task_id: activeTask?.id, worker_diagnostic: workerError.replaceAll(record?.credential ?? '___never___', '[redacted]').replaceAll(process.env.SERPAPI_API_KEY ?? '___never___', '[redacted]') }, null, 2));
   throw error;
 } finally {
   if (scion) for (const task of (await api(`/scions/${scion.id}/agent-tasks`).catch(() => ({ tasks: [] }))).tasks) if (['queued', 'dispatched', 'running'].includes(task.status)) await api(`/scions/${scion.id}/agent-tasks/${task.id}/cancel`, { method: 'POST', data: {} }).catch(() => {});

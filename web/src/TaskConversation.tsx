@@ -5,7 +5,8 @@ import type { Scion } from './api';
 import type { AgentTask } from './scope-api';
 import type { NativeAgent } from './agents-api';
 import AgentAvatar from './AgentAvatar';
-import { useResearch } from './research-api';
+import { researchProviderLabel, useResearch } from './research-api';
+import type { ResearchSearchProvider } from './research-api';
 import { useTaskConversation } from './task-conversation-api';
 import type { MessageReceipt, TaskResponse } from './task-conversation-api';
 import WorkStateGlyph from './WorkStateGlyph';
@@ -14,7 +15,7 @@ import { useLayoutPreferences } from './LayoutPreferences';
 import './task-conversation.css';
 
 type Retry = { body: string; key: string; revision: number; intent: 'note' | 'follow_up'; unknown: boolean };
-type Draft = { body: string; intent: 'note' | 'follow_up'; agentId: string; connectionId: string; consent: boolean; retry: Retry | null };
+type Draft = { body: string; intent: 'note' | 'follow_up'; agentId: string; connectionId: string; searchProvider: ResearchSearchProvider | null; consent: boolean; retry: Retry | null };
 // Drafts are user input, kept only in this tab's memory. A new authentication
 // context clears the previous account's drafts; no source/result cache is kept.
 let draftScope = '';
@@ -59,7 +60,7 @@ function ConversationBody({ token, scion, task, nativeAgents, canPrepare, onNavi
   scopeDrafts(authScope);
   const draftKey = `${scion.id}:${task.id}`;
   const allowsAgent = ['prepare_capability_plan', 'research_public_web'].includes(task.task_kind);
-  const [draft, setDraft] = useState<Draft>(() => drafts.get(draftKey) ?? { body: '', intent: allowsAgent ? 'follow_up' : 'note', agentId: task.agent_id ?? '', connectionId: '', consent: false, retry: null });
+  const [draft, setDraft] = useState<Draft>(() => drafts.get(draftKey) ?? { body: '', intent: allowsAgent ? 'follow_up' : 'note', agentId: task.agent_id ?? '', connectionId: '', searchProvider: null, consent: false, retry: null });
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [authEnded, setAuthEnded] = useState(false); const sessionActive = useRef(true);
   const [connectionReady, setConnectionReady] = useState(false);
@@ -103,8 +104,9 @@ function ConversationBody({ token, scion, task, nativeAgents, canPrepare, onNavi
   const update = (patch: Partial<Draft>) => setDraft(old => ({ ...old, ...patch }));
   const research = task.task_kind === 'research_public_web' && draft.intent === 'follow_up';
   const readyChanged = useCallback((ready: boolean) => setConnectionReady(ready), []);
+  const providerChanged = useCallback((provider: ResearchSearchProvider) => setDraft(old => old.searchProvider === provider ? old : { ...old, searchProvider: provider, connectionId: '', consent: false }), []);
   const locked = busy || Boolean(draft.retry) || authEnded;
-  const permitted = Boolean(data && canPrepare && (draft.intent === 'note' || data.follow_up_available && (!research || draft.consent && connectionReady)));
+  const permitted = Boolean(data && canPrepare && (draft.intent === 'note' || data.follow_up_available && (!research || draft.consent && connectionReady && draft.searchProvider)));
   const composerAgent = nativeAgents.find(agent => agent.id === (draft.agentId || task.agent_id));
   const composerAgentName = composerAgent?.config.name || 'your agent';
   const sendLabel = busy ? 'Sending…' : draft.retry ? 'Retry message' : draft.intent === 'note' ? 'Add note' : 'Send message';
@@ -153,7 +155,7 @@ function ConversationBody({ token, scion, task, nativeAgents, canPrepare, onNavi
 
   async function send(event: FormEvent) {
     event.preventDefault(); if (busy || !sessionActive.current || !data || !canPrepare || !draft.body.trim() || !draft.retry && !permitted) return;
-    const retry = draft.retry ?? { body: JSON.stringify({ body: draft.body.trim(), intent: draft.intent, ...(draft.intent === 'follow_up' ? { ...(draft.agentId ? { agent_id: draft.agentId } : {}), ...(research ? { worker_connection_id: draft.connectionId, public_web_consent: true } : {}) } : {}) }), key: crypto.randomUUID(), revision: data.current_revision, intent: draft.intent, unknown: false };
+    const retry = draft.retry ?? { body: JSON.stringify({ body: draft.body.trim(), intent: draft.intent, ...(draft.intent === 'follow_up' ? { ...(draft.agentId ? { agent_id: draft.agentId } : {}), ...(research ? { worker_connection_id: draft.connectionId, public_web_consent: true, ...(draft.searchProvider === 'serpapi' ? { search_provider: 'serpapi' } : {}) } : {}) } : {}) }), key: crypto.randomUUID(), revision: data.current_revision, intent: draft.intent, unknown: false };
     drafts.set(draftKey, { ...draft, retry });
     update({ retry }); setBusy(true); setError(''); setNotice('');
     const controller = new AbortController(); pending.current = controller; const deadline = window.setTimeout(() => controller.abort(), 12000);
@@ -195,7 +197,7 @@ function ConversationBody({ token, scion, task, nativeAgents, canPrepare, onNavi
       <form ref={form} className="task-chat-composer" aria-label="Message task" onSubmit={send}>
         <label className="task-chat-sr-only" htmlFor={`task-message-${task.id}`}>{research ? 'Public follow-up brief' : 'Message'}</label>
         <textarea ref={editor} id={`task-message-${task.id}`} aria-describedby={`task-message-help-${task.id}`} value={draft.body} maxLength={4000} rows={2} disabled={locked || !canPrepare} onChange={event => update({ body: event.target.value })} placeholder={draft.intent === 'note' ? 'Add a note to this task…' : research ? `Message ${composerAgentName} — what should we research next? Public information only…` : `Message ${composerAgentName} — describe what you want done…`} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); form.current?.requestSubmit(); } }} />
-        {research && <ResearchConsent token={token} scion={scion} connectionId={draft.connectionId} consent={draft.consent} disabled={locked} onConnection={value => update({ connectionId: value, consent: false })} onConsent={value => update({ consent: value })} onReady={readyChanged} />}
+        {research && <ResearchConsent token={token} scion={scion} taskId={task.id} connectionId={draft.connectionId} consent={draft.consent} disabled={locked} onConnection={value => update({ connectionId: value, consent: false })} onConsent={value => update({ consent: value })} onReady={readyChanged} onProvider={providerChanged} />}
         <div className="task-chat-composer-actions">
           <div className="task-chat-options">
             <button type="button" className="task-chat-add" aria-label="Manage task evidence" title="Add or manage Scion evidence" disabled={busy || authEnded || !canPrepare} onClick={() => onNavigate(`/scions/${scion.id}/sources`)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
@@ -222,10 +224,13 @@ function ResponseEntry({ response, nativeAgents, onOpen, children }: { response:
   </TaskConversationEntry>;
 }
 
-function ResearchConsent({ token, scion, connectionId, consent, disabled, onConnection, onConsent, onReady }: { token: string; scion: Scion; connectionId: string; consent: boolean; disabled: boolean; onConnection: (id: string) => void; onConsent: (checked: boolean) => void; onReady: (ready: boolean) => void }) {
+function ResearchConsent({ token, scion, taskId, connectionId, consent, disabled, onConnection, onConsent, onReady, onProvider }: { token: string; scion: Scion; taskId: string; connectionId: string; consent: boolean; disabled: boolean; onConnection: (id: string) => void; onConsent: (checked: boolean) => void; onReady: (ready: boolean) => void; onProvider: (provider: ResearchSearchProvider) => void }) {
   const { data } = useResearch(token, scion.id, scion.current_revision);
-  const connections = data?.worker_connections.filter(connection => connection.status === 'connected' && connection.research_capable) ?? [];
-  const ready = connections.some(connection => connection.connection_id === connectionId);
+  const brief = data?.briefs.find(item => item.task_id === taskId);
+  const provider = brief ? brief.search_provider ?? 'codex' : null;
+  const connections = data?.worker_connections.filter(connection => connection.status === 'connected' && connection.research_capable && (provider !== 'serpapi' || connection.serpapi_capable === true)) ?? [];
+  const ready = provider !== null && connections.some(connection => connection.connection_id === connectionId);
+  useEffect(() => { if (provider) onProvider(provider); }, [provider, onProvider]);
   useEffect(() => { onReady(ready); return () => onReady(false); }, [ready, onReady]);
-  return <div className="task-chat-research"><label>Research computer<select aria-label="Research computer" value={connectionId} disabled={disabled} onChange={event => onConnection(event.target.value)}><option value="">Choose a connected computer</option>{connections.map(connection => <option key={connection.connection_id} value={connection.connection_id}>{connection.device_name}</option>)}</select></label><label className="task-chat-consent"><input type="checkbox" checked={consent} disabled={disabled} onChange={event => onConsent(event.target.checked)} /><span>Send this public brief to my Codex account and retrieve public pages. My private Scion brief and uploaded sources are not included.</span></label>{data && !connections.length && <p>No authorized research computer is currently connected.</p>}</div>;
+  return <div className="task-chat-research"><label>Research computer<select aria-label="Research computer" value={connectionId} disabled={disabled || !provider} onChange={event => onConnection(event.target.value)}><option value="">Choose a connected computer</option>{connections.map(connection => <option key={connection.connection_id} value={connection.connection_id}>{connection.device_name}</option>)}</select></label>{provider && <small>Search provider: {researchProviderLabel(provider)}</small>}<label className="task-chat-consent"><input type="checkbox" checked={consent} disabled={disabled || !provider} onChange={event => onConsent(event.target.checked)} /><span>Send this public brief to {provider === 'serpapi' ? 'SerpApi Google Search and my Codex account' : 'my Codex account for web search'} and retrieve public pages. {provider === 'serpapi' && 'Up to 3 searches may consume SerpApi search credits. '}My private Scion brief and uploaded sources are not included.</span></label>{!provider && <p>The original research provider is unavailable. Recheck the task before starting follow-up research.</p>}{data && provider && !connections.length && <p>{provider === 'serpapi' ? <>No SerpApi research computer is ready. Configure <code>SERPAPI_API_KEY</code> on an authorized computer and restart its updated worker.</> : 'No authorized research computer is currently connected.'}</p>}</div>;
 }

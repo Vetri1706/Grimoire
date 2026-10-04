@@ -6,7 +6,7 @@ This package is **not published to npm**. The website distributes its own npm ta
 
 ## Users with Node
 
-Supported runtimes: Node.js 22.16 or later within 22.x, Node.js 24.x, or Node.js 26.3 or later within 26.x. The Windows installer still offers Node.js 24 LTS when a compatible runtime is missing. Copy the website's versioned `npx --package="https://YOUR-SITE/downloads/grimoire-connector.tgz?v=0.1.1" grimoire-connector --api "https://YOUR-SITE" --watch` command. The actual website fills in its own address and release version after checking that its download is available. The version query avoids reusing a cached older connector after an update.
+Supported runtimes: Node.js 22.16 or later within 22.x, Node.js 24.x, or Node.js 26.3 or later within 26.x. The Windows installer still offers Node.js 24 LTS when a compatible runtime is missing. Copy the website's versioned `npx --package="https://YOUR-SITE/downloads/grimoire-connector.tgz?v=0.1.2" grimoire-connector --api "https://YOUR-SITE" --watch` command. The actual website fills in its own address and release version after checking that its download is available. The version query avoids reusing a cached older connector after an update.
 
 The connector checks the installed native Codex CLI and local login, opens a pairing page, and waits for an authenticated Grimoire Handler to choose the organization and approve the displayed permissions. Compare the code and device before approving. Only the human pairing code is in the browser link; the possession secret remains in memory. A heartbeat, not the approval response, makes the website show Connected.
 
@@ -17,6 +17,20 @@ Keep the terminal open. This is not a background service. Ctrl+C stops the manag
 Download and extract the whole Windows ZIP. Open **Connect Grimoire.cmd**, then paste the website origin shown in Connect Codex. The launcher finds a compatible system Node or offers a pinned official Node.js LTS download. Type `INSTALL` to consent. It verifies the archive and executable hashes and installs privately under `%LOCALAPPDATA%\Grimoire\Connector\runtime`; it never changes global PATH or the system Node version. The PowerShell execution-policy override applies only to that launcher process. An organization's device policy may prohibit scripts; no machine policy is changed to bypass it.
 
 Node installation does **not** install or authenticate Codex. Follow [OpenAI's Codex CLI setup](https://developers.openai.com/codex/cli/), run `codex login` on your computer, and rerun the launcher. The bridge checks isolated-exec flags available in Codex CLI 0.157.1, including `--ignore-user-config` and `--ignore-rules`; incompatible versions fail before pairing or task claiming. A nonstandard installation can set `GRIMOIRE_CODEX_BIN` to an absolute native `codex.exe`/`codex` path. Never set it to a script received from a task.
+
+## Optional SerpApi research
+
+Connector 0.1.2 supports **SerpApi (Google search)** as an explicit public-research provider. Keep `SERPAPI_API_KEY` in a private local environment file, never in `VITE_*`, a browser, a prompt, source control or a task brief. It is needed only by the local connector, not the API server. From a checkout, start with:
+
+```powershell
+node --env-file=.local/serpapi.env byoa/cli.mjs --api http://127.0.0.1:5187 --watch
+```
+
+Replace the example origin with your Grimoire site. For the packaged connector, supply the same environment variable to its launcher. A connected worker advertises SerpApi capability only while its key is configured. This indicates configuration, not a verified balance or valid key.
+
+Choose SerpApi in public research, select that computer and approve the provider-specific consent. Codex plans at most three queries and a one-to-eight-page retrieval budget from the public brief; the connector calls SerpApi directly, the API captures public source pages within that budget, and a second tool-free Codex pass synthesizes the captured excerpts. The planner is instructed to honor a lower page limit in the brief. Each query retains its SerpApi search ID and timestamp. There is no silent fallback to Codex web search, and provider failures do not produce a successful report. Searches use `no_cache=true`, consume SerpApi credits, and are not automatically retried. Codex usage is separate. Python and an MCP server are not required for this native Node integration.
+
+The key is excluded from Codex's child-process environment. Public-search receipts still come from the trusted enrolled worker; they are not independent provider attestations. Reports remain unverified and require separate human review.
 
 ## State and authority
 

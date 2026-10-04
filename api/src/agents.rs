@@ -89,7 +89,8 @@ pub(super) async fn worker_seen(tx: &mut Tx, headers: &HeaderMap) -> Result<(), 
             .execute(&mut **tx)
             .await?;
         if crate::research::capable(headers) {
-            sqlx::query("SELECT app.intake_research_worker_seen()")
+            sqlx::query("SELECT app.intake_research_worker_seen($1)")
+                .bind(crate::research::serpapi_capable(headers))
                 .execute(&mut **tx)
                 .await?;
         }

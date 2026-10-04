@@ -24,7 +24,8 @@ export function publicResearchUrl(value) {
 }
 
 export function validateResearchCandidate(value) {
-  if (!exact(value, fields) || value.synthetic !== false || value.consent !== true ||
+  const keys = value?.search_provider === 'serpapi' ? [...fields, 'search_provider'] : fields
+  if (!exact(value, keys) || value.synthetic !== false || value.consent !== true ||
       value.policy_version !== 'public-web-research-v1' || !uuid.test(value.worker_connection_id) || !text(value.objective, 4000)) throw new Error('INVALID_RESEARCH_CONSENT')
   return value
 }

@@ -482,7 +482,7 @@ pub(super) async fn enqueue(
         "SELECT {COLUMNS} FROM grimoire.intake_agent_tasks WHERE created_by=$1 AND request_key=$2"
     ))
     .bind(actor.principal_id)
-    .bind(&key)
+    .bind(key)
     .fetch_optional(&mut **tx)
     .await?
     {
@@ -554,7 +554,11 @@ async fn claim(
             .bind(sqlx::types::Json(&task.input.0["candidate_proposal"]))
             .fetch_one(&mut *tx)
             .await?;
-        if !crate::research::capable(&headers) || !permitted {
+        if !crate::research::capable(&headers)
+            || !permitted
+            || (task.input.0["candidate_proposal"]["search_provider"] == "serpapi"
+                && !crate::research::serpapi_capable(&headers))
+        {
             return Err(ApiError(StatusCode::FORBIDDEN,"RESEARCH_WORKER_REQUIRED","This task requires the explicitly selected computer running the updated public research worker.".into()));
         }
     }

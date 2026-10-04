@@ -154,6 +154,50 @@ BEGIN
  PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
  denied:=false;BEGIN PERFORM app.intake_research_assert_task(cancel_task,lease);EXCEPTION WHEN SQLSTATE 'G2901' THEN denied:=true;END;
  IF NOT denied THEN RAISE EXCEPTION 'Cancelled research lease still permits capture/submission'; END IF;
+ UPDATE grimoire.intake_agent_tasks SET status='cancelled',cancelled_at=clock_timestamp(),completed_at=clock_timestamp() WHERE id=cancel_task;
  RAISE NOTICE 'PASS exact captures, no approval promotion, signed lease, separate review, idempotent withdrawal, cancellation, prior-result withdrawal propagation and artifact-insert rejection';
+END $$;
+-- Provider protocol fixture only: no search service, model or website is called.
+DO $$
+DECLARE candidate jsonb;body jsonb;scion uuid:=gen_random_uuid();task uuid:=gen_random_uuid();lease uuid:=gen_random_uuid();capture uuid:=gen_random_uuid();failed_capture uuid:=gen_random_uuid();
+BEGIN
+ candidate:=jsonb_build_object('synthetic',false,'objective','Public SerpApi protocol fixture','consent',true,'policy_version','public-web-research-v1','worker_connection_id','d3520000-0000-4000-8000-000000000031','search_provider','serpapi');
+ IF NOT app.intake_research_candidate_valid(candidate) OR app.intake_research_candidate_valid(candidate||'{"search_provider":"unknown"}') OR app.intake_research_candidate_valid(candidate||'{"search_provider":null}') OR app.intake_research_candidate_valid(candidate||'{"consent":false}') THEN RAISE EXCEPTION 'Explicit provider consent shape not enforced'; END IF;
+ PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
+ PERFORM app.intake_research_worker_seen();
+ IF app.intake_research_connection(candidate,true) THEN RAISE EXCEPTION 'Legacy worker advertised SerpApi'; END IF;
+ PERFORM app.intake_research_worker_seen(true);
+ IF NOT app.intake_research_connection(candidate,true) THEN RAISE EXCEPTION 'Configured worker not eligible'; END IF;
+ PERFORM app.intake_research_worker_seen(false);
+ IF app.intake_research_connection(candidate,true) THEN RAISE EXCEPTION 'Lost SerpApi capability retained'; END IF;
+ PERFORM app.intake_research_worker_seen(true);
+ PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000011',true);
+ INSERT INTO grimoire.intake_scions(id,org_id,created_by) VALUES(scion,app.current_org_id(),app.current_principal_id());
+ INSERT INTO grimoire.intake_revisions(org_id,scion_id,number,name,product_description,product_category,change_summary,created_by)
+ VALUES(app.current_org_id(),scion,1,'SerpApi protocol fixture','No provider call; rollback-only validation.','digital','Guard fixture',app.current_principal_id());
+ INSERT INTO grimoire.intake_agent_tasks(id,org_id,scion_id,scion_revision,task_kind,input,created_by,request_key,request_sha256,timeout_seconds)
+ VALUES(task,app.current_org_id(),scion,1,'research_public_web',jsonb_build_object('candidate_proposal',candidate),app.current_principal_id(),task::text,repeat('a',64),240);
+ UPDATE grimoire.intake_agent_tasks SET status='dispatched',dispatched_at=clock_timestamp() WHERE id=task;
+ PERFORM set_config('app.current_principal_id','d3520000-0000-4000-8000-000000000012',true);
+ UPDATE grimoire.intake_agent_tasks SET status='running',attempt=1,claimed_by=app.current_principal_id(),claimed_at=clock_timestamp(),lease_token=lease,lease_until=clock_timestamp()+interval '270 seconds' WHERE id=task;
+ PERFORM app.intake_research_assert_task(task,lease);
+ PERFORM set_config('app.agent_task_id',task::text,true);PERFORM set_config('app.agent_task_lease',lease::text,true);
+ INSERT INTO grimoire.intake_research_captures(id,org_id,scion_id,scion_revision,agent_task_id,requested_url,status,fetched_at,content_sha256,byte_length,excerpt,created_by)
+ VALUES(capture,app.current_org_id(),scion,1,task,'https://www.gov.uk/contracts-finder','captured',clock_timestamp(),repeat('a',64),41,'Protocol fixture only; no website fetched.',app.current_principal_id());
+ INSERT INTO grimoire.intake_research_captures(id,org_id,scion_id,scion_revision,agent_task_id,requested_url,status,fetched_at,failure_code,created_by)
+ VALUES(failed_capture,app.current_org_id(),scion,1,task,'https://www.gov.uk/not-fetched-protocol-fixture','failed',clock_timestamp(),'PROTOCOL_FIXTURE_NO_FETCH',app.current_principal_id());
+ body:=jsonb_build_object('synthetic',false,'summary','Protocol fixture only, no actual search.','process_steps','[]'::jsonb,'candidates','[]'::jsonb,'sources','[]'::jsonb,'capture_ids','[]'::jsonb,'unresolved_gaps','[]'::jsonb,'queries',jsonb_build_array(jsonb_build_object('query','Protocol fixture, not executed','observed_at',clock_timestamp(),'provider','serpapi','engine','google','search_id','protocol_123')));
+ IF app.intake_research_report_valid(task,body) THEN RAISE EXCEPTION 'SerpApi report with no source accepted'; END IF;
+ body:=body||jsonb_build_object('sources',jsonb_build_array(jsonb_build_object('url','https://www.gov.uk/contracts-finder','title','Protocol-only receipt')),'capture_ids',jsonb_build_array(capture));
+ IF NOT app.intake_research_report_valid(task,body) THEN RAISE EXCEPTION 'Bounded SerpApi metadata rejected'; END IF;
+ IF app.intake_research_report_valid(task,body||jsonb_build_object('sources',jsonb_build_array(jsonb_build_object('url','https://www.gov.uk/not-fetched-protocol-fixture','title','Failed protocol receipt')),'capture_ids',jsonb_build_array(failed_capture))) THEN RAISE EXCEPTION 'Failed SerpApi source capture accepted'; END IF;
+ IF NOT app.intake_research_report_valid(task,jsonb_set(body,'{queries}',(body->'queries')||(body->'queries')||(body->'queries'))) THEN RAISE EXCEPTION 'Three consented SerpApi queries rejected'; END IF;
+ IF app.intake_research_report_valid(task,jsonb_set(body,'{queries}',(body->'queries')||(body->'queries')||(body->'queries')||(body->'queries'))) THEN RAISE EXCEPTION 'SerpApi three-query consent exceeded'; END IF;
+ IF app.intake_research_report_valid(task,body#-'{queries,0,provider}') OR app.intake_research_report_valid(task,body#-'{queries,0,engine}') OR app.intake_research_report_valid(task,body#-'{queries,0,search_id}') THEN RAISE EXCEPTION 'Incomplete provider metadata accepted'; END IF;
+ IF app.intake_research_report_valid(task,jsonb_set(body,'{queries,0,provider}','"codex"')) OR app.intake_research_report_valid(task,jsonb_set(body,'{queries,0,search_id}','"https://serpapi.com/?api_key=secret"')) THEN RAISE EXCEPTION 'Mismatched or unsafe provider metadata accepted'; END IF;
+ IF app.intake_research_report_valid(task,jsonb_set(body,'{queries,0,search_id}','123')) THEN RAISE EXCEPTION 'Non-string SerpApi search ID accepted'; END IF;
+ PERFORM app.intake_research_worker_seen();
+ IF app.intake_research_connection(candidate,true) THEN RAISE EXCEPTION 'Legacy heartbeat failed to clear SerpApi'; END IF;
+ RAISE NOTICE 'PASS explicit SerpApi selection, configured worker presence, lost capability and atomic provider receipts';
 END $$;
 ROLLBACK;

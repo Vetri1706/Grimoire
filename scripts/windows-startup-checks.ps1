@@ -116,6 +116,7 @@ $migrationFiles = @(
     'db/intake/0054_research_receipt_locks.sql',
     'db/intake/0055_task_conversations.sql'
     'db/intake/0056_task_conversation_dependencies.sql'
+    'db/intake/0057_serpapi_research.sql'
 )
 $attestationSource = Get-Content -LiteralPath (Join-Path $projectRoot 'api/src/attestation.rs') -Raw
 $compiledFiles = @([regex]::Matches($attestationSource, 'migration!\("([^"]+)",\s*"([^"]+)"\)') | ForEach-Object { "db/$($_.Groups[1].Value)/$($_.Groups[2].Value)" })

@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, request } from './api';
 import type { AgentTask, AgentTaskList } from './scope-api';
 
+export type ResearchSearchProvider = 'codex' | 'serpapi';
+export const researchProviderLabel = (provider: ResearchSearchProvider) => provider === 'serpapi' ? 'SerpApi Google Search' : 'Codex web search';
+
 export type ResearchInput = {
   synthetic: false; summary: string;
   process_steps: { title: string; detail: string; source_urls: string[] }[];
   candidates: { name: string; url: string; rationale: string; source_urls: string[] }[];
   sources: { url: string; title: string }[]; unresolved_gaps: string[];
-  queries: { query: string; observed_at: string }[]; capture_ids: string[];
+  queries: { query: string; observed_at: string; provider?: 'serpapi'; engine?: 'google'; search_id?: string }[]; capture_ids: string[];
 };
 export type ResearchCapture = { id: string; url: string | null; final_url: string | null; status: 'captured' | 'failed' | 'revoked'; excerpt: string | null; content_sha256: string | null; fetched_at: string; failure_code: string | null; http_status: number | null; byte_length: number | null };
 export type ResearchReport = {
@@ -17,8 +20,8 @@ export type ResearchReport = {
 };
 export type ResearchState = {
   available: true; policy_version: string; limits: Record<string, number>;
-  worker_connections: { connection_id: string; device_name: string; status: string; last_seen: string | null; research_capable: boolean }[];
-  reports: ResearchReport[]; briefs: { task_id: string; objective: string; worker_connection_id?: string }[];
+  worker_connections: { connection_id: string; device_name: string; status: string; last_seen: string | null; research_capable: boolean; serpapi_capable?: boolean }[];
+  reports: ResearchReport[]; briefs: { task_id: string; objective: string; worker_connection_id?: string; search_provider?: ResearchSearchProvider }[];
 };
 
 /** Live authorization lease; derived website content is never persisted in browser storage. */

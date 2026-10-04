@@ -64,7 +64,7 @@ For example, a workshop website can produce capability hypotheses for hosting, c
 | Product intake | Incomplete drafts, immutable revisions, history, stale-edit rejection, and idempotent writes. |
 | Digital planning | Capability proposals and Handler-authored evidence comparison drafts. Digital vendor comparison is unavailable. |
 | Evidence | Synthetic text sources with exact claim locators; public research with bounded page excerpts and retrieval receipts. Source withdrawal hides dependent content. |
-| Public research | Explicitly consented research tasks, observed search queries, public URLs and unverified reports. No authenticated scraping or supplier actions. |
+| Public research | Explicitly consented Codex web or SerpApi Google research, observed search queries, public URLs and unverified reports. No authenticated scraping or supplier actions. |
 | Physical sourcing | Synthetic scope review, explicit supplier offers, and exact two-offer comparison. Missing terms remain missing. |
 | Agents | Native profiles, versioned instructions, skills, assignments, pause/resume, and Codex task history. |
 | Task conversations | Saved Handler notes, agent replies, and linked follow-up work; see the task-conversation contract. |
@@ -74,7 +74,7 @@ For example, a workshop website can produce capability hypotheses for hosting, c
 
 The documented MCP facade uses **stdio**. Do not treat it as a verified Streamable HTTP implementation.
 
-Public research requires a connected research-capable worker and explicit consent for the public brief. Source retrieval establishes what was fetched, not the accuracy of a claim or a supplier's suitability. See the [research contract](docs/public-web-research.md) for limits.
+Public research requires a connected research-capable worker and explicit consent for the public brief. The optional SerpApi flow uses Codex to plan bounded queries, SerpApi to discover current public results, server-side page captures, and Codex to synthesize captured evidence with search receipts. Configure `SERPAPI_API_KEY` only on the selected local connector; see [connector setup](byoa/README.md#optional-serpapi-research). Source retrieval establishes what was fetched, not the accuracy of a claim or a supplier's suitability. See the [research contract](docs/public-web-research.md) for limits.
 
 ## Get started
 

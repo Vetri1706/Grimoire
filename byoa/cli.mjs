@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline/promises'
 import { hostname } from 'node:os'
 import { requireSupportedNode } from './state.mjs'
 
-export const version = '0.1.1'
+export const version = '0.1.2'
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 export function parseCliArguments(args) {
   const result = { watch: true, browser: true }

@@ -1,11 +1,11 @@
 {
   "name": "grimoire-local-connector",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local Codex connector for an explicitly authorized Grimoire organization",
   "type": "module",
   "license": "MIT",
   "bin": { "grimoire-connector": "cli.mjs" },
   "engines": { "node": ">=22.16.0 <23 || >=24.0.0 <25 || >=26.3.0 <27" },
-  "files": ["cli.mjs", "state.mjs", "browser.mjs", "outbox.mjs", "connect.mjs", "bridge.mjs", "connection.mjs", "research.mjs", "agent-events.mjs", "conversation.mjs", "bootstrap/windows.ps1", "bootstrap/launch.cmd", "bootstrap/node-runtime.json", "bootstrap/README.md", "README.md", "LICENSE"],
+  "files": ["cli.mjs", "state.mjs", "browser.mjs", "outbox.mjs", "connect.mjs", "bridge.mjs", "connection.mjs", "research.mjs", "serpapi.mjs", "serpapi-research.mjs", "agent-events.mjs", "conversation.mjs", "bootstrap/windows.ps1", "bootstrap/launch.cmd", "bootstrap/node-runtime.json", "bootstrap/README.md", "README.md", "LICENSE"],
   "scripts": { "test": "node --test *.test.mjs" }
 }

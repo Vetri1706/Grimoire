@@ -60,7 +60,12 @@
 .task-chat-consent { display: flex; align-items: flex-start; gap: 10px; font-size: var(--text-small); line-height: 1.6; }
 .task-chat-consent input { flex: none; margin-top: 4px; }
 /* The main scrollport already ends above the mobile navigation. */
-@media(max-width:850px) { .task-conversation { min-height: 440px; } }
+@media(max-width:850px) {
+  .task-conversation { min-height: 440px; }
+  .task-chat-dock:has(.task-chat-research) { position: relative; }
+  .company-main>#main-content:has(.task-chat-research) { scroll-padding-bottom: 24px; }
+  .task-conversation:has(.task-chat-research) :is(input, textarea, select, button, summary) { scroll-margin-block: 24px; }
+}
 @media(max-height:600px) { .task-chat-dock { position: static; }.company-main>#main-content:has(.task-conversation) { scroll-padding-bottom: 24px; } }
 @media(max-width:600px) {
   .task-thread-entry-human { max-width: 94%; }

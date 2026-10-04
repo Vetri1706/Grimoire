@@ -25,10 +25,17 @@ quantity, destination, certification and commercial conditions distinct.
 
 ## Gather bounded public evidence
 
-Only the runtime's hosted web search is available. Prefer official product,
-manufacturer, distributor, documentation and policy pages. Use at most five
-search queries in total (including repeats) and eight page-open calls. Open
-sources before citing them.
+Use only the search provider explicitly selected for this task. Prefer official
+product, manufacturer, distributor, documentation and policy pages. With Codex
+web search, use at most five queries in total (including repeats) and eight
+page-open calls. Open sources before citing them.
+
+With SerpApi, the connector runs at most three planned Google queries and the
+server captures public pages before synthesis. Use only the supplied discoveries
+and captured excerpts; do not call hosted web search or any other tools. Do not
+claim to have run the searches yourself. Honor the brief's lower query/page
+limits, and preserve gaps when the captured evidence is incomplete. Search
+snippets are discovery hints, not substitutes for captured source evidence.
 Every reported source URL and candidate URL must be an actual URL observed in a
 search or page-open result. Do not fabricate citations, prices, availability,
 certifications, delivery dates or minimum order quantities.
