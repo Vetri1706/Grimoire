@@ -1,0 +1,112 @@
+{
+  "status": "deployed_and_hosted_protocol_checks_passed",
+  "deployed_at": "2026-10-04T13:51:23Z",
+  "host": "https://grimoire-52-71-93-70.sslip.io",
+  "release": "0.1.2",
+  "source_commit": "51d5142cd9992ed3c3f70f6a337024ac21d7c25c",
+  "source_file_count": 328,
+  "source_archive_sha256": "cb51d7708db173059eb484d4bc578d3c9f9690a2c4a15c80bdbcffc576e14963",
+  "image_archive_sha256": "c167aa66bd4dae7617d090b258b9eef477e6be61236727c1ff78eae60892522c",
+  "images": {
+    "platform": "linux/amd64",
+    "built_on_production_host": false,
+    "api": {
+      "id": "sha256:8f78d2389b470206b043985b473bd21b0dc4c364e5da21522af3aa962b9a3285",
+      "config_id": "sha256:21749cdda282f6ffd4d45c22f59cdd1314519de14507e2458ac2d70720e4860d",
+      "previous_id": "sha256:db6da234d2876890413b4178c09aad40d670e50d624b821938b4155a0cc20d19"
+    },
+    "web": {
+      "id": "sha256:65b3a3eb0a13968d795fb2c053f614a197771ec5087cbe8eaf7406437cee576a",
+      "config_id": "sha256:09793d4d5844ff00bf07ea325c7da13ba0b0eea47f3ba4cac1529a46bdc11001",
+      "previous_id": "sha256:948280e152494bd419c2111daed40cb5603062ae2af368191bc9695d2b89351c"
+    }
+  },
+  "migration": {
+    "applied": ["0057_serpapi_research.sql"],
+    "exact_historical_receipts_preserved": true,
+    "catalog_verified": true,
+    "api_startup_attested": true,
+    "existing_tables_fingerprinted": 114,
+    "existing_rows_preserved": true,
+    "fingerprint_exclusion": "Only the newly added serpapi_capable column; every existing value defaulted to false.",
+    "active_tasks_before_maintenance": 0,
+    "public_web_stopped_during_migration": true,
+    "automatic_database_restore": false
+  },
+  "backup": {
+    "quiesced": true,
+    "private_logical_dump_bytes": 1120638,
+    "sha256": "89c5aceb834e8335adafac7c296a6e12d33c00ac8b17c1b97e8668d89bd3f85a",
+    "archive_catalog_verified": true,
+    "downloaded_privately_with_matching_hash": true,
+    "configuration_and_catalog_backed_up": true,
+    "restore_tested": false,
+    "includes_object_storage": false
+  },
+  "preserved": {
+    "database_storage_https_containers": true,
+    "host_nginx_configuration": true,
+    "google_and_other_private_configuration": true,
+    "instance_size_and_memory_limits": true,
+    "original_ssh_firewall_restored": true,
+    "public_ports": [80, 443],
+    "ssh_access": "Original operator IPv4 /32 only; temporary deployment address removed."
+  },
+  "connector": {
+    "version": "0.1.2",
+    "package_sha256": "1603e0cefdc65436d27bdcffd9701911f4333da4526ffeb9c32a4ca47396ef27",
+    "windows_zip_sha256": "201bd8761a5e75f2ee6a2da13ac481ed5c27ec73083b7cd7ae73c99c12682745",
+    "verified_tls_downloads": true,
+    "no_store_and_nosniff": true,
+    "downloaded_package_check_passed": true,
+    "npm_registry_published": false,
+    "serpapi_key_location": "Private environment of the operator's local connector only; not deployed or bundled."
+  },
+  "hosted_verification": {
+    "status": "PASS",
+    "browser": "Chrome",
+    "desktop_viewport": [1440, 1000],
+    "mobile_viewport": [390, 844],
+    "browser_errors": [],
+    "checks": [
+      "Both downloads and release manifest verified against local SHA-256 values over verified TLS.",
+      "Public health, owner setup and private files return 404; anonymous identity returns 401.",
+      "All three synthetic demo cases render read-only without document overflow or session cookies.",
+      "Owner password sign-in and logout retain Secure, HttpOnly, SameSite=Strict session protection.",
+      "Changing provider clears consent; an incapable worker is unavailable and rejected by the API.",
+      "Explicit SerpApi consent persists through native task dispatch, then cancellation before worker claim.",
+      "Missing explicit provider on follow-up returns 422; consented follow-up retains SerpApi and is cancelled before execution.",
+      "Research consent and follow-up forms fit desktop/mobile; mobile composer remains in normal flow."
+    ],
+    "created_isolated_test_records": {
+      "handlers": 1,
+      "organizations": 1,
+      "scions": 1,
+      "agents": 1,
+      "protocol_worker_connections": 1,
+      "tasks": 2
+    },
+    "test_tasks_cancelled_unclaimed": 2,
+    "test_worker_revoked": true,
+    "owner_and_test_sessions_logged_out": true,
+    "existing_workspace_content_modified": false,
+    "model_runs": 0,
+    "serpapi_calls": 0,
+    "public_source_fetches": 0,
+    "local_results": ".local/aws-production/serpapi-0.1.2-20261004/1791121899152/results.json"
+  },
+  "local_validation": {
+    "connector_tests": 80,
+    "rust_tests": 55,
+    "frontend_tests": 31,
+    "sql_guards_clippy_and_build": "passed",
+    "live_provider_scope": "Successful persisted local SerpApi reports exist, but later attempts failed on unavailable captures or validation. The full paid browser journey was not recorded as passing. See docs/public-web-research.md."
+  },
+  "limits": [
+    "Hosted protocol checks are not proof of live hosted SerpApi research completion.",
+    "Real research requires the operator's current local connector, Codex access, private SerpApi key, explicit consent and provider credits.",
+    "No completed backup restore, renewed live-workload capacity test, full Google OAuth sign-in, or full hosted evidence-withdrawal test was performed in this release.",
+    "The prior API image cannot attest the migrated database; an image-only rollback is not valid.",
+    "The existing single-host Lightsail deployment remains a judging deployment, not a high-availability service."
+  ]
+}

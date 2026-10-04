@@ -2,7 +2,7 @@
 
 The judging deployment is live at **[Grimoire](https://grimoire-52-71-93-70.sslip.io)**, with a public **[synthetic judge demo](https://grimoire-52-71-93-70.sslip.io/demo)**. It uses an explicitly approved **Lightsail Linux IPv4 1 GB / 2 vCPU / 40 GB instance: USD 7/month**, with the `small` memory profile and a **2 GiB swap file on its included disk**. React's compiled files, Rust API, PostgreSQL 17 and private versioned object storage run on that host. A real Codex worker must run on the operator's computer and connect over HTTPS; no real worker or model task was run during deployment verification.
 
-HTTPS, password sign-in, the three public demo cases and a bounded host-local capacity check passed on 2026-10-02. The instance runs in `us-east-1`. Its initial five application images came from **`899a9fbcc8ca753f07349940a0f70f14788da607`**; the API and web were subsequently replaced by the **connector 0.1.1 release** described below. See [initial deployment evidence](../../docs/evidence/aws-judging-20261002.json), [connector release evidence](../../docs/evidence/aws-connector-20261002.json), and the verification scope below. This is a single-host judging deployment, not a high-availability service. The original 2 GB / 60 GB / USD 12 profile remains the scripts' default, but the account blocked that instance size during provisioning. Selecting `small` is explicit; the scripts do not silently downgrade a host.
+HTTPS, password sign-in, the three public demo cases and a bounded host-local capacity check passed on 2026-10-02. The instance runs in `us-east-1`. Its initial five application images came from **`899a9fbcc8ca753f07349940a0f70f14788da607`**; the API and web now run the **SerpApi / connector 0.1.2 release**, deployed on 2026-10-04. See [initial deployment evidence](../../docs/evidence/aws-judging-20261002.json), [connector 0.1.1 evidence](../../docs/evidence/aws-connector-20261002.json), [SerpApi release evidence](../../docs/evidence/aws-serpapi-20261004.json), and the verification scope below. This is a single-host judging deployment, not a high-availability service. The original 2 GB / 60 GB / USD 12 profile remains the scripts' default, but the account blocked that instance size during provisioning. Selecting `small` is explicit; the scripts do not silently downgrade a host.
 
 ## Cost and limits
 
@@ -67,9 +67,11 @@ aws budgets create-budget --profile default --region us-east-1 --account-id YOUR
 
 ## 2. Build outside the small AWS instance
 
-Current API/web release: **connector 0.1.1**, deployed 2026-10-02 at 06:42 UTC. Both Linux amd64 images were built off-host from the checkout based on `e7d63a81162f78736d9dbc904984b745a5475adb` plus the locally validated connector changes. A 194-file source SHA-256 manifest records those uncommitted source bytes. The API adds live busy-state projection and exact receipt recovery; the website serves the npm-pack tarball and Windows ZIP with versioned URLs, including Node 26.3 compatibility. The host's bind-mounted nginx configuration was updated with strict download handling. No npm registry package was published.
+Current API/web release: **SerpApi / connector 0.1.2**, deployed 2026-10-04 at 13:51 UTC from committed source **`51d5142cd9992ed3c3f70f6a337024ac21d7c25c`**. Both Linux amd64 images were built off-host, labeled with that revision, and transferred in a SHA-256-verified archive alongside an exact Git source archive with 328 file hashes. The live `API_IMAGE` is pinned to `sha256:8f78d2389b470206b043985b473bd21b0dc4c364e5da21522af3aa962b9a3285` and `WEB_IMAGE` to `sha256:65b3a3eb0a13968d795fb2c053f614a197771ec5087cbe8eaf7406437cee576a`. The host's existing checkout was retained; only the new migration, compiled catalog, and attestation source were copied into its migration inputs. API and web execution uses the new immutable images, not that checkout's historical HEAD.
 
-The live `API_IMAGE` is pinned to `sha256:db6da234d2876890413b4178c09aad40d670e50d624b821938b4155a0cc20d19`, and `WEB_IMAGE` to `sha256:948280e152494bd419c2111daed40cb5603062ae2af368191bc9695d2b89351c`. Database, object storage, HTTPS containers and the small-host memory configuration were retained. No migration ran. The previous image references, nginx configuration and a fresh private logical database backup are retained for rollback. Full deployment and verification scope is in the connector evidence record linked above.
+With no active tasks, public web and API were stopped for a private database/configuration backup. Only `0057_serpapi_research.sql` was applied. Historical migration receipts and all 114 existing table fingerprints remained unchanged, excluding the new `serpapi_capable` column, whose existing rows defaulted to false. The new API passed full startup attestation before public web restarted. Database, storage and HTTPS container identities, nginx configuration, Google configuration, secrets and small-host resource limits were preserved. After this migration, an old API image alone is not a valid rollback: any database restore needs a separately reviewed recovery plan. The backup archive was verified and copied privately off-host; no restore was performed.
+
+Previous release: **connector 0.1.1**, deployed 2026-10-02 at 06:42 UTC. Both Linux amd64 images were built off-host from the checkout based on `e7d63a81162f78736d9dbc904984b745a5475adb` plus the locally validated connector changes. A 194-file source SHA-256 manifest records those uncommitted source bytes. Its API image was `sha256:db6da234d2876890413b4178c09aad40d670e50d624b821938b4155a0cc20d19`, and web image was `sha256:948280e152494bd419c2111daed40cb5603062ae2af368191bc9695d2b89351c`. That release added live busy-state projection and exact receipt recovery, updated the bind-mounted nginx download rules, and applied no migration. Both connector releases serve a versioned npm-pack tarball and Windows ZIP; neither was published to the npm registry.
 
 Earlier favicon update on 2026-10-02: the web container used `grimoire-web:sha-9124c628ed334abd6751e1cd5ff9b70c1ca04a76`, built off-host and transferred as a checksum-verified image archive. Only `web/index.html` changed in that release; at that point the other four application images retained their original digest pins. [Favicon release evidence](../../docs/evidence/aws-favicon-20261002.json) records its image identity and hosted Chrome checks. That image remains available for rollback; the connector release preserves the supplied favicon.
 
@@ -122,15 +124,25 @@ sudo docker compose --env-file deploy/aws/.env -f deploy/aws/compose.yaml run --
 
 The owner script prompts privately for a new passphrase and does not print session cookies. Use normal HTTPS sign-in afterward. The `/demo` seed creates only explicit synthetic judging cases. It does not execute a model and it never imports private development records. Seed credentials are temporary and revoked by the existing seeder.
 
-For real agent work, sign in to the deployed website and open **Settings → Runtime → Connect Codex**. Copy its current versioned command; no source-code checkout is needed. The deployed 0.1.1 command for PowerShell is:
+For real agent work, sign in to the deployed website and open **Settings → Runtime → Connect Codex**. Copy its current versioned command; no source-code checkout is needed. The deployed 0.1.2 command for PowerShell is:
 
 ```powershell
-npx.cmd --yes --package="https://grimoire-52-71-93-70.sslip.io/downloads/grimoire-connector.tgz?v=0.1.1" grimoire-connector --api "https://grimoire-52-71-93-70.sslip.io" --watch
+npx.cmd --yes --package="https://grimoire-52-71-93-70.sslip.io/downloads/grimoire-connector.tgz?v=0.1.2" grimoire-connector --api "https://grimoire-52-71-93-70.sslip.io" --watch
 ```
 
 Users without compatible Node.js can use **Download Connector for Windows** from the same setup page. Approve the organization pairing in the app. Grimoire login authorizes the workspace connection; Codex login remains local and supplies model access. Your computer and terminal must stay running for real tasks. The public synthetic `/demo` remains inspectable without your computer. Existing Codex/model subscription or provider costs are separate from the AWS hosting estimate.
 
+For SerpApi research, configure `SERPAPI_API_KEY` privately in that local connector's environment, restart it using 0.1.2, then choose **SerpApi Google Search** and consent to the public brief. An ordinary connected worker without the key is not SerpApi-capable. The key is not deployed to AWS or embedded in browser assets/downloads. See [local connector setup](../../byoa/README.md#optional-serpapi-research).
+
 ## 4. Hosted verification and release checks
+
+### SerpApi release, 4 October 2026
+
+The 0.1.2 hosted checks passed over verified TLS: both connector downloads matched the local release SHA-256 values and retained `no-store`/`nosniff`; public diagnostic/private-file boundaries remained closed; owner password sign-in and logout retained the Secure, HttpOnly, Strict cookie. All three read-only synthetic demo cases and the SerpApi forms were checked in Chrome at 1440 px desktop and 390 px mobile, without document overflow or page errors. The downloaded package also passed `grimoire-connector --check` without pairing or executing a model.
+
+An isolated protocol-only test verified provider changes clear consent, an incapable worker is rejected, explicit SerpApi selection persists through task creation and follow-up, and a follow-up without explicit provider consent returns 422. It created one test Handler, organization, Scion, agent and protocol worker, plus two tasks cancelled before claim. The worker was revoked and both test/owner sessions logged out. The isolated test records remain; existing workspace content was not changed. No real worker, model, SerpApi request, or source capture ran in this hosted check. Earlier successful local provider runs do not establish hosted end-to-end research success. Google OAuth completion, capacity under live model work and full hosted evidence withdrawal were not reverified. [Release evidence](../../docs/evidence/aws-serpapi-20261004.json)
+
+### Initial deployment, 2 October 2026
 
 The following checks passed on the hosted release on 2026-10-02:
 
@@ -155,6 +167,8 @@ Hosted Chrome verified the official Google button and real Google account-entry 
 Google accounts remain separate from password accounts: matching email addresses do not automatically link workspaces. See [Google sign-in setup](../../docs/google-sign-in.md).
 
 ## Backups and end of judging
+
+Before the 0.1.2 migration on 2026-10-04, a quiesced **1,120,638-byte** private PostgreSQL dump and copies of the prior configuration/catalog were retained on the host. `pg_restore --list` passed, and the dump was downloaded into the operator-only local release directory with matching SHA-256. Its recorded hash is in the SerpApi release evidence. This verifies archive readability and transfer integrity, not a completed restore; object storage was retained in place and is not contained in the SQL dump.
 
 A private PostgreSQL logical backup of approximately **1.1 MB** was created and downloaded on 2026-10-02. Its archive catalog parsed successfully with `pg_restore --list`, and the remote/local SHA-256 hashes matched. These checks verify archive readability and transfer integrity, not a completed restore. The single Lightsail snapshot **`grimoire-demo-backup-20261002`** was **in progress at this verification point**; snapshot completion and restoration have not yet been verified. The logical dump alone does not contain pinned object versions.
 
